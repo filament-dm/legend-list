@@ -50,6 +50,7 @@ export function updateItemPositions(
     const preferCachedSize =
         !doMVCP ||
         dataChanged ||
+        state.hasInvalidationChanges ||
         state.scrollAdjustHandler.getAdjust() !== 0 ||
         (peek$(ctx, "scrollAdjustPending") ?? 0) !== 0;
 

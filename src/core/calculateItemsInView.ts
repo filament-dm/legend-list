@@ -130,6 +130,10 @@ export function calculateItemsInView(
     params: { doMVCP?: boolean; dataChanged?: boolean; forceFullItemPositions?: boolean } = {},
 ) {
     const state = ctx.state;
+
+    // Reset invalidation flag at the start of each calculation cycle
+    state.hasInvalidationChanges = false;
+
     batchedUpdates(() => {
         const {
             columns,

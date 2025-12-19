@@ -37,42 +37,27 @@ export function getItemSize(
                 sizesKnown.delete(key);
                 sizes.delete(key);
                 sizeInvalidationKeys.set(key, currentInvalidationKey);
+                // Set flag to indicate that invalidation changes occurred this cycle
+                state.hasInvalidationChanges = true;
             }
         }
     }
 
     const sizeKnown = sizesKnown.get(key)!;
     if (sizeKnown !== undefined) {
+        console.log(`[getItemSize] Using sizesKnown cache for ${key}: ${sizeKnown}px`);
         return sizeKnown;
     }
 
     let size: number | undefined;
 
+    // preferCachedSize allows using the sizes cache (estimated/calculated sizes)
+    // Note: Invalidation check already ran above, so cache is fresh if it exists
     if (preferCachedSize) {
         const cachedSize = sizes.get(key);
         if (cachedSize !== undefined) {
-            // Check if invalidation key has changed
-            if (getItemSizeInvalidationKey) {
-                const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
-                if (currentInvalidationKey !== undefined) {
-                    const cachedInvalidationKey = sizeInvalidationKeys.get(key);
-                    if (cachedInvalidationKey !== currentInvalidationKey) {
-                        // Invalidation key changed - clear cache and update key
-                        sizes.delete(key);
-                        sizeInvalidationKeys.set(key, currentInvalidationKey);
-                        // Fall through to recalculate size
-                    } else {
-                        // Key unchanged - use cached size
-                        return cachedSize;
-                    }
-                } else {
-                    // No invalidation key provided - use cached size
-                    return cachedSize;
-                }
-            } else {
-                // No invalidation function - use cached size
-                return cachedSize;
-            }
+            console.log(`[getItemSize] Using sizes cache for ${key}: ${cachedSize}px (preferCachedSize=true)`);
+            return cachedSize;
         }
     }
 
@@ -103,6 +88,7 @@ export function getItemSize(
     if (size === undefined) {
         // Get estimated size if we don't have an average or already cached size
         size = getEstimatedItemSize ? getEstimatedItemSize(index, data, itemType) : estimatedItemSize!;
+        console.log(`[getItemSize] Calculated new size for ${key}: ${size}px (via ${getEstimatedItemSize ? 'getEstimatedItemSize' : 'estimatedItemSize'})`);
     }
 
     setSize(ctx, key, size);

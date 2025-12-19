@@ -485,6 +485,7 @@ interface InternalState {
     startReachedSnapshot: ThresholdSnapshot | undefined;
     stickyContainerPool: Set<number>;
     stickyContainers: Map<number, number>;
+    hasInvalidationChanges: boolean;
     timeouts: Set<number>;
     timeoutSetPaddingTop?: any;
     timeoutSizeMessage: any;

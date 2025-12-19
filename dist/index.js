@@ -1397,33 +1397,21 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
         sizesKnown.delete(key);
         sizes.delete(key);
         sizeInvalidationKeys.set(key, currentInvalidationKey);
+        state.hasInvalidationChanges = true;
       }
     }
   }
   const sizeKnown = sizesKnown.get(key);
   if (sizeKnown !== void 0) {
+    console.log(`[getItemSize] Using sizesKnown cache for ${key}: ${sizeKnown}px`);
     return sizeKnown;
   }
   let size;
   if (preferCachedSize) {
     const cachedSize = sizes.get(key);
     if (cachedSize !== void 0) {
-      if (getItemSizeInvalidationKey) {
-        const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
-        if (currentInvalidationKey !== void 0) {
-          const cachedInvalidationKey = sizeInvalidationKeys.get(key);
-          if (cachedInvalidationKey !== currentInvalidationKey) {
-            sizes.delete(key);
-            sizeInvalidationKeys.set(key, currentInvalidationKey);
-          } else {
-            return cachedSize;
-          }
-        } else {
-          return cachedSize;
-        }
-      } else {
-        return cachedSize;
-      }
+      console.log(`[getItemSize] Using sizes cache for ${key}: ${cachedSize}px (preferCachedSize=true)`);
+      return cachedSize;
     }
   }
   if (getFixedItemSize) {
@@ -1446,6 +1434,7 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
   }
   if (size === void 0) {
     size = getEstimatedItemSize ? getEstimatedItemSize(index, data, itemType) : estimatedItemSize;
+    console.log(`[getItemSize] Calculated new size for ${key}: ${size}px (via ${getEstimatedItemSize ? "getEstimatedItemSize" : "estimatedItemSize"})`);
   }
   setSize(ctx, key, size);
   if (getItemSizeInvalidationKey) {
@@ -2057,7 +2046,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   const shouldOptimize = !forceFullUpdate && !dataChanged && Math.abs(getScrollVelocity(state)) > 0;
   const maxVisibleArea = scrollBottomBuffered + 1e3;
   const useAverageSize = !getEstimatedItemSize;
-  const preferCachedSize = !doMVCP || dataChanged || state.scrollAdjustHandler.getAdjust() !== 0 || ((_a3 = peek$(ctx, "scrollAdjustPending")) != null ? _a3 : 0) !== 0;
+  const preferCachedSize = !doMVCP || dataChanged || state.hasInvalidationChanges || state.scrollAdjustHandler.getAdjust() !== 0 || ((_a3 = peek$(ctx, "scrollAdjustPending")) != null ? _a3 : 0) !== 0;
   let currentRowTop = 0;
   let column = 1;
   let maxSizeInRow = 0;
@@ -2582,6 +2571,7 @@ function handleStickyRecycling(ctx, stickyArray, scroll, scrollBuffer, currentSt
 }
 function calculateItemsInView(ctx, params = {}) {
   const state = ctx.state;
+  state.hasInvalidationChanges = false;
   reactDom.unstable_batchedUpdates(() => {
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const {
@@ -3794,6 +3784,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         startReachedSnapshot: void 0,
         stickyContainerPool: /* @__PURE__ */ new Set(),
         stickyContainers: /* @__PURE__ */ new Map(),
+        hasInvalidationChanges: false,
         timeoutSizeMessage: 0,
         timeouts: /* @__PURE__ */ new Set(),
         totalSize: 0,

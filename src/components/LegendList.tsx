@@ -273,6 +273,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 startReachedSnapshot: undefined,
                 stickyContainerPool: new Set(),
                 stickyContainers: new Map(),
+                hasInvalidationChanges: false,
                 timeoutSizeMessage: 0,
                 timeouts: new Set(),
                 totalSize: 0,

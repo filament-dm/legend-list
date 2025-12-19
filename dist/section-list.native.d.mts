@@ -1,7 +1,7 @@
 import * as react_native from 'react-native';
 import { SectionListData, SectionBase, SectionListRenderItemInfo, SectionListScrollParams } from 'react-native';
 import * as React from 'react';
-import { a as LegendListRef, L as LegendListProps } from './types-BlvUxaRT.mjs';
+import { a as LegendListRef, L as LegendListProps } from './types-CsVJSaBy.mjs';
 import 'react-native-reanimated';
 
 type SectionListSeparatorProps<ItemT, SectionT> = {
