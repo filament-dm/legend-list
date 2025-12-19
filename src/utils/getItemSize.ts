@@ -10,7 +10,6 @@ export function getItemSize(
     useAverageSize?: boolean,
     preferCachedSize?: boolean,
 ) {
-    console.log(`[getItemSize] key=${key}, preferCachedSize=${preferCachedSize}`);
     const state = ctx.state;
     const {
         sizesKnown,
@@ -64,10 +63,8 @@ export function getItemSize(
     // }
 
     if (size === undefined) {
-        console.log(`[getItemSize] ${key}: GETTING ESTIMATED SIZE!!!!`);
         // Get estimated size if we don't have an average or already cached size
         size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize!;
-        console.log(`[getItemSize] ${key}: called getEstimatedItemSize, got size=${size}`);
     }
 
     setSize(ctx, key, size);

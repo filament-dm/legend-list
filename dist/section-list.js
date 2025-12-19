@@ -1243,7 +1243,6 @@ function setSize(ctx, itemKey, size) {
 // src/utils/getItemSize.ts
 function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
   var _a3;
-  console.log(`[getItemSize] key=${key}, preferCachedSize=${preferCachedSize}`);
   const state = ctx.state;
   const {
     sizesKnown,
@@ -1255,9 +1254,7 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
   let size;
   const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
   if (size === void 0) {
-    console.log(`[getItemSize] ${key}: GETTING ESTIMATED SIZE!!!!`);
     size = getEstimatedItemSize ? getEstimatedItemSize(index, data, itemType) : estimatedItemSize;
-    console.log(`[getItemSize] ${key}: called getEstimatedItemSize, got size=${size}`);
   }
   setSize(ctx, key, size);
   return size;
@@ -1858,8 +1855,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   const indexByKeyForChecking = IS_DEV ? /* @__PURE__ */ new Map() : void 0;
   const shouldOptimize = !forceFullUpdate && !dataChanged && Math.abs(getScrollVelocity(state)) > 0;
   const maxVisibleArea = scrollBottomBuffered + 1e3;
-  const useAverageSize = !getEstimatedItemSize;
-  const preferCachedSize = !doMVCP || dataChanged || state.scrollAdjustHandler.getAdjust() !== 0 || ((_a3 = peek$(ctx, "scrollAdjustPending")) != null ? _a3 : 0) !== 0;
+  !doMVCP || dataChanged || state.scrollAdjustHandler.getAdjust() !== 0 || ((_a3 = peek$(ctx, "scrollAdjustPending")) != null ? _a3 : 0) !== 0;
   let currentRowTop = 0;
   let column = 1;
   let maxSizeInRow = 0;
@@ -1874,7 +1870,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
       const prevIndex = startIndex - 1;
       const prevId = getId(state, prevIndex);
       const prevPosition = (_b = positions.get(prevId)) != null ? _b : 0;
-      const prevSize = (_c = sizesKnown.get(prevId)) != null ? _c : getItemSize(ctx, prevId, prevIndex, data[prevIndex], useAverageSize, preferCachedSize);
+      const prevSize = (_c = sizesKnown.get(prevId)) != null ? _c : getItemSize(ctx, prevId, prevIndex, data[prevIndex]);
       currentRowTop = prevPosition + prevSize;
     }
   }
@@ -1891,7 +1887,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
       breakAt = i + itemsPerRow + 10;
     }
     const id = (_d = idCache[i]) != null ? _d : getId(state, i);
-    const size = (_e = sizesKnown.get(id)) != null ? _e : getItemSize(ctx, id, i, data[i], useAverageSize, preferCachedSize);
+    const size = (_e = sizesKnown.get(id)) != null ? _e : getItemSize(ctx, id, i, data[i]);
     if (IS_DEV && needsIndexByKey) {
       if (indexByKeyForChecking.has(id)) {
         console.error(
