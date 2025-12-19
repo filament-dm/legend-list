@@ -117,6 +117,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         estimatedListSize,
         extraData,
         getEstimatedItemSize,
+        getItemSizeInvalidationKey,
         getFixedItemSize,
         getItemType,
         horizontal,
@@ -266,6 +267,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 scrollTime: 0,
                 sizes: new Map(),
                 sizesKnown: new Map(),
+                sizeInvalidationKeys: new Map(),
                 startBuffered: -1,
                 startNoBuffer: -1,
                 startReachedSnapshot: undefined,
@@ -310,6 +312,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         dataVersion,
         estimatedItemSize,
         getEstimatedItemSize,
+        getItemSizeInvalidationKey,
         getFixedItemSize,
         getItemType,
         horizontal: !!horizontal,
@@ -435,6 +438,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 );
             // If we have no keyExtractor then we have no guarantees about previous item sizes so we have to reset
             refState.current.sizes.clear();
+            refState.current.sizeInvalidationKeys.clear();
             refState.current.positions.clear();
             refState.current.totalSize = 0;
             set$(ctx, "totalSize", 0);

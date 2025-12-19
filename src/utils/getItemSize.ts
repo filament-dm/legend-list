@@ -14,8 +14,9 @@ export function getItemSize(
     const {
         sizesKnown,
         sizes,
+        sizeInvalidationKeys,
         averageSizes,
-        props: { estimatedItemSize, getEstimatedItemSize, getFixedItemSize, getItemType },
+        props: { estimatedItemSize, getEstimatedItemSize, getItemSizeInvalidationKey, getFixedItemSize, getItemType },
         scrollingTo,
     } = state;
     const sizeKnown = sizesKnown.get(key)!;
@@ -30,7 +31,28 @@ export function getItemSize(
     if (preferCachedSize) {
         const cachedSize = sizes.get(key);
         if (cachedSize !== undefined) {
-            return cachedSize;
+            // Check if invalidation key has changed
+            if (getItemSizeInvalidationKey) {
+                const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
+                if (currentInvalidationKey !== undefined) {
+                    const cachedInvalidationKey = sizeInvalidationKeys.get(key);
+                    if (cachedInvalidationKey !== currentInvalidationKey) {
+                        // Invalidation key changed - clear cache and update key
+                        sizes.delete(key);
+                        sizeInvalidationKeys.set(key, currentInvalidationKey);
+                        // Fall through to recalculate size
+                    } else {
+                        // Key unchanged - use cached size
+                        return cachedSize;
+                    }
+                } else {
+                    // No invalidation key provided - use cached size
+                    return cachedSize;
+                }
+            } else {
+                // No invalidation function - use cached size
+                return cachedSize;
+            }
         }
     }
 
@@ -64,6 +86,14 @@ export function getItemSize(
     }
 
     setSize(ctx, key, size);
+
+    // Update invalidation key if function is provided and we're using cached sizes
+    if (preferCachedSize && getItemSizeInvalidationKey) {
+        const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
+        if (currentInvalidationKey !== undefined) {
+            sizeInvalidationKeys.set(key, currentInvalidationKey);
+        }
+    }
 
     return size;
 }

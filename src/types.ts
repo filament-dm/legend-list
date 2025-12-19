@@ -115,6 +115,32 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     getEstimatedItemSize?: (index: number, item: ItemT, type: TItemType) => number;
 
     /**
+     * Function to generate a cache invalidation key for item sizes.
+     * When the key changes for an item, its cached size is invalidated and
+     * getEstimatedItemSize will be called with the new item data.
+     * This is useful when item content changes affect size (e.g., images loading, content expanding).
+     *
+     * @param index - The index of the item in the data array
+     * @param item - The item data
+     * @param type - The item type (if getItemType is provided)
+     * @returns A key representing the item's current size state, or undefined to use cache normally
+     *
+     * @example
+     * ```tsx
+     * <LegendList
+     *   data={messages}
+     *   getItemSizeInvalidationKey={(index, item) =>
+     *     item.imageLoaded ? 'loaded' : 'pending'
+     *   }
+     *   getEstimatedItemSize={(index, item) =>
+     *     item.imageLoaded ? 200 : 100
+     *   }
+     * />
+     * ```
+     */
+    getItemSizeInvalidationKey?: (index: number, item: ItemT, type: TItemType) => string | number | undefined;
+
+    /**
      * Ratio of initial container pool size to data length (e.g., 0.5 for half).
      * @default 2
      */
@@ -448,6 +474,7 @@ export interface InternalState {
     scrollTime: number;
     sizes: Map<string, number>;
     sizesKnown: Map<string, number>;
+    sizeInvalidationKeys: Map<string, string | number>;
     startBuffered: number;
     startBufferedId?: string;
     startNoBuffer: number;
@@ -473,6 +500,7 @@ export interface InternalState {
         dataVersion: Key | undefined;
         estimatedItemSize: number | undefined;
         getEstimatedItemSize: LegendListProps["getEstimatedItemSize"];
+        getItemSizeInvalidationKey: LegendListProps["getItemSizeInvalidationKey"];
         getFixedItemSize: LegendListProps["getFixedItemSize"];
         getItemType: LegendListProps["getItemType"];
         horizontal: boolean;

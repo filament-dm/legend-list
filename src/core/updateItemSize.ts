@@ -136,8 +136,9 @@ export function updateOneItemSize(ctx: StateContext, itemKey: string, sizeObj: {
     const {
         indexByKey,
         sizesKnown,
+        sizeInvalidationKeys,
         averageSizes,
-        props: { data, horizontal, getEstimatedItemSize, getItemType, getFixedItemSize },
+        props: { data, horizontal, getEstimatedItemSize, getItemSizeInvalidationKey, getItemType, getFixedItemSize },
     } = state;
     if (!data) return 0;
 
@@ -149,6 +150,15 @@ export function updateOneItemSize(ctx: StateContext, itemKey: string, sizeObj: {
     const size = Platform.OS === "web" ? Math.round(rawSize) : roundSize(rawSize);
     const prevSizeKnown = sizesKnown.get(itemKey);
     sizesKnown.set(itemKey, size);
+
+    // Store invalidation key when size is measured
+    if (getItemSizeInvalidationKey) {
+        const itemType = getItemType ? (getItemType(data[index], index) ?? "") : "";
+        const invalidationKey = getItemSizeInvalidationKey(index, data[index], itemType);
+        if (invalidationKey !== undefined) {
+            sizeInvalidationKeys.set(itemKey, invalidationKey);
+        }
+    }
 
     // Update averages per item type
     // If user has provided getEstimatedItemSize that has precedence over averages
