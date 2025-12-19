@@ -116,9 +116,17 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
             // Invalidate the size caches for specified indices
             invalidateSizes(ctx, options.indices);
 
+            // Clear the precomputed scroll range to force recalculation
+            // This ensures the calculation doesn't get skipped due to scroll range optimization
+            state.scrollForNextCalculateItemsInView = undefined;
+
             // Trigger position recalculation with MVCP
-            console.log("[legend-list] invalidateItemSizes: triggering calculateItemsInView with MVCP");
-            calculateItemsInView(ctx, { doMVCP: true });
+            // Use forceFullItemPositions to bypass the skip optimization in calculateItemsInView
+            console.log("[legend-list] invalidateItemSizes: forcing full recalculation (forceFullItemPositions=true)");
+            calculateItemsInView(ctx, {
+                doMVCP: true,
+                forceFullItemPositions: true  // Force calculation even if scroll is in "safe" range
+            });
 
             // Clear the explicit anchor after a microtask to allow MVCP to use it
             if (options.anchor) {

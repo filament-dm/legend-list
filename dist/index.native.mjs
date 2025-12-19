@@ -3431,8 +3431,13 @@ function createImperativeHandle(ctx) {
         setExplicitAnchor(ctx, options.anchor.index, viewPosition);
       }
       invalidateItemSizes(ctx, options.indices);
-      console.log("[legend-list] invalidateItemSizes: triggering calculateItemsInView with MVCP");
-      calculateItemsInView(ctx, { doMVCP: true });
+      state.scrollForNextCalculateItemsInView = void 0;
+      console.log("[legend-list] invalidateItemSizes: forcing full recalculation (forceFullItemPositions=true)");
+      calculateItemsInView(ctx, {
+        doMVCP: true,
+        forceFullItemPositions: true
+        // Force calculation even if scroll is in "safe" range
+      });
       if (options.anchor) {
         if (typeof queueMicrotask !== "undefined") {
           queueMicrotask(() => {
