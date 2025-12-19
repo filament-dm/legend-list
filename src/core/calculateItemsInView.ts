@@ -131,11 +131,10 @@ export function calculateItemsInView(
 ) {
     const state = ctx.state;
 
-    // Reset invalidation flag at the start of each calculation cycle
+    // Capture invalidation flag for this cycle (will reset after MVCP)
     const hadInvalidationChanges = state.hasInvalidationChanges;
-    state.hasInvalidationChanges = false;
     if (hadInvalidationChanges) {
-        console.log('[calculateItemsInView] Reset hasInvalidationChanges from true to false (new cycle starting)');
+        console.log('[calculateItemsInView] Detected hasInvalidationChanges=true, will reset after MVCP');
     }
 
     batchedUpdates(() => {
@@ -271,6 +270,12 @@ export function calculateItemsInView(
         }
 
         checkMVCP?.();
+
+        // Reset invalidation flag after MVCP completes
+        if (hadInvalidationChanges) {
+            state.hasInvalidationChanges = false;
+            console.log('[calculateItemsInView] Reset hasInvalidationChanges to false (after MVCP completed)');
+        }
 
         ////// Prepare for loop
         let startNoBuffer: number | null = null;

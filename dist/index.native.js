@@ -2410,9 +2410,8 @@ function handleStickyRecycling(ctx, stickyArray, scroll, scrollBuffer, currentSt
 function calculateItemsInView(ctx, params = {}) {
   const state = ctx.state;
   const hadInvalidationChanges = state.hasInvalidationChanges;
-  state.hasInvalidationChanges = false;
   if (hadInvalidationChanges) {
-    console.log("[calculateItemsInView] Reset hasInvalidationChanges from true to false (new cycle starting)");
+    console.log("[calculateItemsInView] Detected hasInvalidationChanges=true, will reset after MVCP");
   }
   reactNative.unstable_batchedUpdates(() => {
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j;
@@ -2512,6 +2511,10 @@ function calculateItemsInView(ctx, params = {}) {
       state.minIndexSizeChanged = void 0;
     }
     checkMVCP == null ? void 0 : checkMVCP();
+    if (hadInvalidationChanges) {
+      state.hasInvalidationChanges = false;
+      console.log("[calculateItemsInView] Reset hasInvalidationChanges to false (after MVCP completed)");
+    }
     let startNoBuffer = null;
     let startBuffered = null;
     let startBufferedId = null;
