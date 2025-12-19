@@ -19,14 +19,34 @@ export function getItemSize(
         props: { estimatedItemSize, getEstimatedItemSize, getItemSizeInvalidationKey, getFixedItemSize, getItemType },
         scrollingTo,
     } = state;
+
+    const itemType = getItemType ? (getItemType(data, index) ?? "") : "";
+
+    // Check invalidation key FIRST before returning cached sizesKnown
+    // If the key has changed, force remeasurement
+    if (getItemSizeInvalidationKey) {
+        const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
+        if (currentInvalidationKey !== undefined) {
+            const cachedInvalidationKey = sizeInvalidationKeys.get(key);
+            if (cachedInvalidationKey !== undefined && cachedInvalidationKey !== currentInvalidationKey) {
+                // Invalidation key changed - clear all caches to force remeasurement
+                console.log(
+                    `[getItemSize] Invalidation key changed for ${key}: ` +
+                    `${cachedInvalidationKey} → ${currentInvalidationKey}, forcing remeasurement`
+                );
+                sizesKnown.delete(key);
+                sizes.delete(key);
+                sizeInvalidationKeys.set(key, currentInvalidationKey);
+            }
+        }
+    }
+
     const sizeKnown = sizesKnown.get(key)!;
     if (sizeKnown !== undefined) {
         return sizeKnown;
     }
 
     let size: number | undefined;
-
-    const itemType = getItemType ? (getItemType(data, index) ?? "") : "";
 
     if (preferCachedSize) {
         const cachedSize = sizes.get(key);
@@ -87,10 +107,16 @@ export function getItemSize(
 
     setSize(ctx, key, size);
 
-    // Update invalidation key if function is provided and we're using cached sizes
-    if (preferCachedSize && getItemSizeInvalidationKey) {
+    // Store invalidation key if function is provided (always, not just when preferCachedSize)
+    // We need this for future comparisons to detect when it changes
+    if (getItemSizeInvalidationKey) {
         const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
         if (currentInvalidationKey !== undefined) {
+            const existingKey = sizeInvalidationKeys.get(key);
+            // Only log if we're actually setting it for the first time or it's changing
+            if (existingKey === undefined) {
+                console.log(`[getItemSize] Storing initial invalidation key for ${key}: ${currentInvalidationKey}`);
+            }
             sizeInvalidationKeys.set(key, currentInvalidationKey);
         }
     }

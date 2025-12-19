@@ -1231,12 +1231,26 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
     props: { estimatedItemSize, getEstimatedItemSize, getItemSizeInvalidationKey, getFixedItemSize, getItemType },
     scrollingTo
   } = state;
+  const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
+  if (getItemSizeInvalidationKey) {
+    const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
+    if (currentInvalidationKey !== void 0) {
+      const cachedInvalidationKey = sizeInvalidationKeys.get(key);
+      if (cachedInvalidationKey !== void 0 && cachedInvalidationKey !== currentInvalidationKey) {
+        console.log(
+          `[getItemSize] Invalidation key changed for ${key}: ${cachedInvalidationKey} \u2192 ${currentInvalidationKey}, forcing remeasurement`
+        );
+        sizesKnown.delete(key);
+        sizes.delete(key);
+        sizeInvalidationKeys.set(key, currentInvalidationKey);
+      }
+    }
+  }
   const sizeKnown = sizesKnown.get(key);
   if (sizeKnown !== void 0) {
     return sizeKnown;
   }
   let size;
-  const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
   if (preferCachedSize) {
     const cachedSize = sizes.get(key);
     if (cachedSize !== void 0) {
@@ -1280,9 +1294,13 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
     size = getEstimatedItemSize ? getEstimatedItemSize(index, data, itemType) : estimatedItemSize;
   }
   setSize(ctx, key, size);
-  if (preferCachedSize && getItemSizeInvalidationKey) {
+  if (getItemSizeInvalidationKey) {
     const currentInvalidationKey = getItemSizeInvalidationKey(index, data, itemType);
     if (currentInvalidationKey !== void 0) {
+      const existingKey = sizeInvalidationKeys.get(key);
+      if (existingKey === void 0) {
+        console.log(`[getItemSize] Storing initial invalidation key for ${key}: ${currentInvalidationKey}`);
+      }
       sizeInvalidationKeys.set(key, currentInvalidationKey);
     }
   }
@@ -3207,7 +3225,11 @@ function updateOneItemSize(ctx, itemKey, sizeObj) {
     const itemType = getItemType ? (_a3 = getItemType(data[index], index)) != null ? _a3 : "" : "";
     const invalidationKey = getItemSizeInvalidationKey(index, data[index], itemType);
     if (invalidationKey !== void 0) {
+      const prevKey = sizeInvalidationKeys.get(itemKey);
       sizeInvalidationKeys.set(itemKey, invalidationKey);
+      console.log(
+        `[updateOneItemSize] ${itemKey} measured at ${size}px, invalidationKey: ${prevKey != null ? prevKey : "none"} \u2192 ${invalidationKey}`
+      );
     }
   }
   if (!getEstimatedItemSize && !getFixedItemSize && size > 0) {

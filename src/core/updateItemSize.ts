@@ -156,7 +156,12 @@ export function updateOneItemSize(ctx: StateContext, itemKey: string, sizeObj: {
         const itemType = getItemType ? (getItemType(data[index], index) ?? "") : "";
         const invalidationKey = getItemSizeInvalidationKey(index, data[index], itemType);
         if (invalidationKey !== undefined) {
+            const prevKey = sizeInvalidationKeys.get(itemKey);
             sizeInvalidationKeys.set(itemKey, invalidationKey);
+            console.log(
+                `[updateOneItemSize] ${itemKey} measured at ${size}px, ` +
+                `invalidationKey: ${prevKey ?? 'none'} → ${invalidationKey}`
+            );
         }
     }
 
