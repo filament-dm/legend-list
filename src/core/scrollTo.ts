@@ -30,6 +30,14 @@ export function scrollTo(ctx: StateContext, params: ScrollTarget & { noScrolling
     // Disable scroll adjust while scrolling so that it doesn't do extra work affecting the target offset
     state.scrollHistory.length = 0;
 
+    // Clear explicit anchor if one is set, as a real scroll operation is starting
+    if (state.scrollingTo && (state.scrollingTo as any).isExplicitAnchor) {
+        console.log(
+            `[legend-list] scrollTo: clearing explicit anchor (was at index ${state.scrollingTo.index}) due to new scroll operation`,
+        );
+        state.scrollingTo = undefined;
+    }
+
     // noScrollingTo is used for the workaround in mvcp to fake it with scroll
     if (!noScrollingTo) {
         state.scrollingTo = scrollTarget;

@@ -55,6 +55,9 @@ export function updateItemSize(ctx: StateContext, itemKey: string, sizeObj: { wi
     const size = roundSize(horizontal ? sizeObj.width : sizeObj.height);
 
     if (diff !== 0) {
+        console.log(
+            `[legend-list] updateItemSize: index ${index} (key: ${itemKey}) changed from ${size - diff}px to ${size}px (diff: ${diff}px)`,
+        );
         minIndexSizeChanged = minIndexSizeChanged !== undefined ? Math.min(minIndexSizeChanged, index) : index;
 
         // Check if item is in view
@@ -119,6 +122,9 @@ export function updateItemSize(ctx: StateContext, itemKey: string, sizeObj: { wi
 
     if (didContainersLayout || checkAllSizesKnown(state)) {
         if (needsRecalculate) {
+            console.log(
+                `[legend-list] updateItemSize: triggering MVCP for index ${index} (item is in buffered view range)`,
+            );
             state.scrollForNextCalculateItemsInView = undefined;
 
             calculateItemsInView(ctx, { doMVCP: true });

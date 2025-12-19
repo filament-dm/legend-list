@@ -61,6 +61,9 @@ export function getItemSize(
     if (size === undefined) {
         // Get estimated size if we don't have an average or already cached size
         size = getEstimatedItemSize ? getEstimatedItemSize(index, data, itemType) : estimatedItemSize!;
+        console.log(
+            `[legend-list] getItemSize: using estimate for index ${index}, type "${itemType}", size ${size}px (from ${getEstimatedItemSize ? "getEstimatedItemSize" : "estimatedItemSize prop"})`,
+        );
     }
 
     setSize(ctx, key, size);

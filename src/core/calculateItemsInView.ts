@@ -228,6 +228,9 @@ export function calculateItemsInView(
         if (!dataChanged && !forceFullItemPositions && scrollForNextCalculateItemsInView) {
             const { top, bottom } = scrollForNextCalculateItemsInView;
             if ((top === null || scrollTopBuffered > top) && (bottom === null || scrollBottomBuffered < bottom)) {
+                console.log(
+                    `[legend-list] calculateItemsInView: skipping (scroll within precomputed range, top: ${top}, bottom: ${bottom}, scrollTopBuffered: ${scrollTopBuffered}, scrollBottomBuffered: ${scrollBottomBuffered})`,
+                );
                 if (!IsNewArchitecture && state.initialAnchor) {
                     ensureInitialAnchor(ctx);
                 }
@@ -237,9 +240,13 @@ export function calculateItemsInView(
 
         ////// Update item positions and do MVCP
         // Handle maintainVisibleContentPosition adjustment early
+        console.log(
+            `[legend-list] calculateItemsInView: preparing MVCP (doMVCP: ${doMVCP}, dataChanged: ${dataChanged}, forceFullItemPositions: ${forceFullItemPositions})`,
+        );
         const checkMVCP = doMVCP ? prepareMVCP(ctx, dataChanged) : undefined;
 
         if (dataChanged) {
+            console.log("[legend-list] calculateItemsInView: clearing index/position maps for data change");
             indexByKey.clear();
             idCache.length = 0;
             positions.clear();
@@ -250,6 +257,9 @@ export function calculateItemsInView(
         const startIndex =
             forceFullItemPositions || dataChanged ? 0 : (minIndexSizeChanged ?? state.startBuffered ?? 0);
 
+        console.log(
+            `[legend-list] calculateItemsInView: updating positions (startIndex: ${startIndex}, minIndexSizeChanged: ${minIndexSizeChanged})`,
+        );
         updateItemPositions(ctx, dataChanged, {
             doMVCP,
             forceFullUpdate: !!forceFullItemPositions,
@@ -259,10 +269,18 @@ export function calculateItemsInView(
 
         if (minIndexSizeChanged !== undefined) {
             // Clear minIndexSizeChanged after using it for position updates
+            console.log(
+                `[legend-list] calculateItemsInView: clearing minIndexSizeChanged (was: ${minIndexSizeChanged})`,
+            );
             state.minIndexSizeChanged = undefined;
         }
 
-        checkMVCP?.();
+        if (checkMVCP) {
+            console.log("[legend-list] calculateItemsInView: executing MVCP callback");
+            checkMVCP();
+        } else {
+            console.log("[legend-list] calculateItemsInView: no MVCP callback to execute");
+        }
 
         ////// Prepare for loop
         let startNoBuffer: number | null = null;

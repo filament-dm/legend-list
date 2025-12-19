@@ -1,5 +1,9 @@
+import { calculateItemsInView } from "@/core/calculateItemsInView";
+import { clearExplicitAnchor } from "@/core/clearExplicitAnchor";
+import { invalidateItemSizes as invalidateSizes } from "@/core/invalidateItemSizes";
 import { scrollTo } from "@/core/scrollTo";
 import { scrollToIndex } from "@/core/scrollToIndex";
+import { setExplicitAnchor } from "@/core/setExplicitAnchor";
 import {
     type LegendListListenerType,
     type ListenerType,
@@ -97,6 +101,42 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
         setVisibleContentAnchorOffset: (value: number | ((val: number) => number)) => {
             const val = isFunction(value) ? value(peek$(ctx, "scrollAdjustUserOffset") || 0) : value;
             set$(ctx, "scrollAdjustUserOffset", val);
+        },
+        invalidateItemSizes: (options) => {
+            console.log(
+                `[legend-list] invalidateItemSizes called: indices=[${options.indices.join(", ")}], anchor=${options.anchor ? `index ${options.anchor.index}, viewPosition ${options.anchor.viewPosition ?? 1}` : "none"}`,
+            );
+
+            // Set explicit anchor if provided
+            if (options.anchor) {
+                const viewPosition = options.anchor.viewPosition ?? 1;
+                setExplicitAnchor(ctx, options.anchor.index, viewPosition);
+            }
+
+            // Invalidate the size caches for specified indices
+            invalidateSizes(ctx, options.indices);
+
+            // Trigger position recalculation with MVCP
+            console.log("[legend-list] invalidateItemSizes: triggering calculateItemsInView with MVCP");
+            calculateItemsInView(ctx, { doMVCP: true });
+
+            // Clear the explicit anchor after a microtask to allow MVCP to use it
+            if (options.anchor) {
+                // Use queueMicrotask if available (modern browsers/Node), otherwise setTimeout
+                if (typeof queueMicrotask !== "undefined") {
+                    queueMicrotask(() => {
+                        clearExplicitAnchor(ctx);
+                        console.log("[legend-list] invalidateItemSizes: complete");
+                    });
+                } else {
+                    setTimeout(() => {
+                        clearExplicitAnchor(ctx);
+                        console.log("[legend-list] invalidateItemSizes: complete");
+                    }, 0);
+                }
+            } else {
+                console.log("[legend-list] invalidateItemSizes: complete (no anchor)");
+            }
         },
     };
 }

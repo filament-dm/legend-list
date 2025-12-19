@@ -646,6 +646,23 @@ export type LegendListRef = {
      * @param enabled - If true, scroll processing is enabled.
      */
     setScrollProcessingEnabled(enabled: boolean): void;
+
+    /**
+     * Invalidates cached sizes for specified items and optionally maintains scroll position
+     * relative to an anchor item. Useful when items will change size due to data updates.
+     * @param options - Configuration for size invalidation.
+     * @param options.indices - Array of item indices whose sizes should be invalidated.
+     * @param options.anchor - Optional anchor configuration to maintain scroll position.
+     * @param options.anchor.index - Index of the item to use as anchor.
+     * @param options.anchor.viewPosition - Position in viewport (0 = top, 0.5 = middle, 1 = bottom). Default: 1.
+     */
+    invalidateItemSizes(options: {
+        indices: number[];
+        anchor?: {
+            index: number;
+            viewPosition?: number;
+        };
+    }): void;
 };
 
 export interface ViewToken<ItemT = any> {
