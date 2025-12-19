@@ -29,6 +29,14 @@ export function requestAdjust(ctx: StateContext, positionDiff: number, dataChang
 
         const readyToRender = peek$(ctx, "readyToRender");
 
+        console.log(
+            `[MVCP] Applying scroll adjustment | ` +
+            `adjustment=${positionDiff.toFixed(1)}px ` +
+            `newScroll=${state.scroll.toFixed(1)}px | ` +
+            `needsWorkaround=${needsScrollWorkaround} ` +
+            `readyToRender=${readyToRender}`
+        );
+
         if (readyToRender) {
             doit();
 

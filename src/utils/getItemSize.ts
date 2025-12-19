@@ -39,6 +39,7 @@ export function getItemSize(
                 sizeInvalidationKeys.set(key, currentInvalidationKey);
                 // Set flag to indicate that invalidation changes occurred this cycle
                 state.hasInvalidationChanges = true;
+                console.log(`[getItemSize] hasInvalidationChanges set to TRUE for key: ${key}`);
             }
         }
     }

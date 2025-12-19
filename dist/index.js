@@ -1398,6 +1398,7 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
         sizes.delete(key);
         sizeInvalidationKeys.set(key, currentInvalidationKey);
         state.hasInvalidationChanges = true;
+        console.log(`[getItemSize] hasInvalidationChanges set to TRUE for key: ${key}`);
       }
     }
   }
@@ -1779,6 +1780,7 @@ function updateScroll(ctx, newScroll, forceUpdate) {
 function requestAdjust(ctx, positionDiff, dataChanged) {
   const state = ctx.state;
   if (Math.abs(positionDiff) > 0.1) {
+    const needsScrollWorkaround = Platform.OS === "android";
     const doit = () => {
       {
         state.scrollAdjustHandler.requestAdjust(positionDiff);
@@ -1790,6 +1792,9 @@ function requestAdjust(ctx, positionDiff, dataChanged) {
     state.scroll += positionDiff;
     state.scrollForNextCalculateItemsInView = void 0;
     const readyToRender = peek$(ctx, "readyToRender");
+    console.log(
+      `[MVCP] Applying scroll adjustment | adjustment=${positionDiff.toFixed(1)}px newScroll=${state.scroll.toFixed(1)}px | needsWorkaround=${needsScrollWorkaround} readyToRender=${readyToRender}`
+    );
     if (readyToRender) {
       doit();
     } else {
@@ -1814,6 +1819,9 @@ function prepareMVCP(ctx, dataChanged) {
   const scrollingToViewPosition = scrollingTo == null ? void 0 : scrollingTo.viewPosition;
   const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
   const indexByKey = state.indexByKey;
+  console.log(
+    `[MVCP] prepareMVCP called | dataChanged=${dataChanged} shouldMVCP=${shouldMVCP} (mvcpData=${mvcpData}, mvcpScroll=${mvcpScroll}) | hasInvalidationChanges=${state.hasInvalidationChanges} | scrollingTo=${scrollTarget !== void 0 ? `index ${scrollTarget}` : "none"} | idsInView=${idsInView.length} items`
+  );
   if (shouldMVCP) {
     if (scrollTarget !== void 0) {
       targetId = getId(state, scrollTarget);
@@ -1832,6 +1840,13 @@ function prepareMVCP(ctx, dataChanged) {
     }
     if (targetId !== void 0) {
       prevPosition = positions.get(targetId);
+      console.log(
+        `[MVCP] Target selected | id=${targetId} index=${indexByKey.get(targetId)} prevPosition=${prevPosition}px | mode=${dataChanged ? "data-change" : "size-change"}`
+      );
+    } else if (dataChanged && idsInViewWithPositions.length > 0) {
+      console.log(
+        `[MVCP] No single target, collected ${idsInViewWithPositions.length} items for data-change mode`
+      );
     }
     return () => {
       let positionDiff = 0;
@@ -1841,6 +1856,9 @@ function prepareMVCP(ctx, dataChanged) {
           const newPosition = positions.get(id);
           if (newPosition !== void 0) {
             positionDiff = newPosition - position;
+            console.log(
+              `[MVCP] Data-change mode found item | id=${id} index=${indexByKey.get(id)} prevPos=${position.toFixed(1)}px newPos=${newPosition.toFixed(1)}px diff=${positionDiff.toFixed(1)}px | hasInvalidationChanges=${state.hasInvalidationChanges}`
+            );
             break;
           }
         }
@@ -1850,14 +1868,21 @@ function prepareMVCP(ctx, dataChanged) {
         if (newPosition !== void 0) {
           const totalSize = getContentSize(ctx);
           let diff = newPosition - prevPosition;
+          const originalDiff = diff;
           if (diff !== 0 && state.scroll + state.scrollLength > totalSize) {
             if (diff > 0) {
               diff = Math.max(0, totalSize - state.scroll - state.scrollLength);
             } else {
               diff = 0;
             }
+            console.log(
+              `[MVCP] Near end-of-list adjustment | originalDiff=${originalDiff.toFixed(1)}px adjustedDiff=${diff.toFixed(1)}px | scroll=${state.scroll.toFixed(1)} scrollLength=${state.scrollLength.toFixed(1)} totalSize=${totalSize.toFixed(1)}`
+            );
           }
           positionDiff = diff;
+          console.log(
+            `[MVCP] Position calculation | targetId=${targetId} prevPos=${prevPosition.toFixed(1)}px newPos=${newPosition.toFixed(1)}px diff=${diff.toFixed(1)}px | hasInvalidationChanges=${state.hasInvalidationChanges}`
+          );
         }
       }
       if (scrollingToViewPosition && scrollingToViewPosition > 0) {
@@ -1872,7 +1897,14 @@ function prepareMVCP(ctx, dataChanged) {
         }
       }
       if (Math.abs(positionDiff) > 0.1) {
+        console.log(
+          `[MVCP] Requesting scroll adjustment | adjustment=${positionDiff.toFixed(1)}px fromScroll=${state.scroll.toFixed(1)}px toScroll=${(state.scroll + positionDiff).toFixed(1)}px | dataChanged=${dataChanged} hasInvalidationChanges=${state.hasInvalidationChanges}`
+        );
         requestAdjust(ctx, positionDiff);
+      } else {
+        console.log(
+          `[MVCP] Adjustment too small (${positionDiff.toFixed(3)}px), skipping`
+        );
       }
     };
   }
@@ -2028,7 +2060,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   scrollBottomBuffered: -1,
   startIndex: 0
 }) {
-  var _a3, _b, _c, _d, _e;
+  var _a3, _b, _c, _d, _e, _f;
   const state = ctx.state;
   const {
     columns,
@@ -2047,6 +2079,9 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   const maxVisibleArea = scrollBottomBuffered + 1e3;
   const useAverageSize = !getEstimatedItemSize;
   const preferCachedSize = !doMVCP || dataChanged || state.hasInvalidationChanges || state.scrollAdjustHandler.getAdjust() !== 0 || ((_a3 = peek$(ctx, "scrollAdjustPending")) != null ? _a3 : 0) !== 0;
+  console.log(
+    `[updateItemPositions] Size preference | preferCachedSize=${preferCachedSize} | doMVCP=${doMVCP} dataChanged=${dataChanged} hasInvalidationChanges=${state.hasInvalidationChanges} currentAdjust=${state.scrollAdjustHandler.getAdjust().toFixed(1)}px pendingAdjust=${((_b = peek$(ctx, "scrollAdjustPending")) != null ? _b : 0).toFixed(1)}px`
+  );
   let currentRowTop = 0;
   let column = 1;
   let maxSizeInRow = 0;
@@ -2062,8 +2097,8 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
     } else if (startIndex < dataLength) {
       const prevIndex = startIndex - 1;
       const prevId = getId(state, prevIndex);
-      const prevPosition = (_b = positions.get(prevId)) != null ? _b : 0;
-      const prevSize = (_c = sizesKnown.get(prevId)) != null ? _c : getItemSize(ctx, prevId, prevIndex, data[prevIndex], useAverageSize, preferCachedSize);
+      const prevPosition = (_c = positions.get(prevId)) != null ? _c : 0;
+      const prevSize = (_d = sizesKnown.get(prevId)) != null ? _d : getItemSize(ctx, prevId, prevIndex, data[prevIndex], useAverageSize, preferCachedSize);
       currentRowTop = prevPosition + prevSize;
     }
   }
@@ -2079,8 +2114,8 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
       const itemsPerRow = hasColumns ? numColumns : 1;
       breakAt = i + itemsPerRow + 10;
     }
-    const id = (_d = idCache[i]) != null ? _d : getId(state, i);
-    const size = (_e = sizesKnown.get(id)) != null ? _e : getItemSize(ctx, id, i, data[i], useAverageSize, preferCachedSize);
+    const id = (_e = idCache[i]) != null ? _e : getId(state, i);
+    const size = (_f = sizesKnown.get(id)) != null ? _f : getItemSize(ctx, id, i, data[i], useAverageSize, preferCachedSize);
     if (IS_DEV && needsIndexByKey) {
       if (indexByKeyForChecking.has(id)) {
         console.error(
@@ -2571,7 +2606,11 @@ function handleStickyRecycling(ctx, stickyArray, scroll, scrollBuffer, currentSt
 }
 function calculateItemsInView(ctx, params = {}) {
   const state = ctx.state;
+  const hadInvalidationChanges = state.hasInvalidationChanges;
   state.hasInvalidationChanges = false;
+  if (hadInvalidationChanges) {
+    console.log("[calculateItemsInView] Reset hasInvalidationChanges from true to false (new cycle starting)");
+  }
   reactDom.unstable_batchedUpdates(() => {
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const {
@@ -3221,9 +3260,15 @@ var ScrollAdjustHandler = class {
     if ((scrollingTo == null ? void 0 : scrollingTo.animated) && !scrollingTo.isInitialScroll) {
       this.pendingAdjust += add;
       set$(this.ctx, "scrollAdjustPending", this.pendingAdjust);
+      console.log(
+        `[ScrollAdjustHandler] Queued pending adjustment | add=${add.toFixed(1)}px totalPending=${this.pendingAdjust.toFixed(1)}px (waiting for animated scroll to finish)`
+      );
     } else {
       this.appliedAdjust += add;
       set$(this.ctx, "scrollAdjust", this.appliedAdjust);
+      console.log(
+        `[ScrollAdjustHandler] Applied adjustment | add=${add.toFixed(1)}px totalApplied=${this.appliedAdjust.toFixed(1)}px`
+      );
     }
     if (this.ctx.state.scrollingTo) {
       checkFinishedScroll(this.ctx);

@@ -17,9 +17,20 @@ export class ScrollAdjustHandler {
         if (Platform.OS === "web" && scrollingTo?.animated && !scrollingTo.isInitialScroll) {
             this.pendingAdjust += add;
             set$(this.ctx, "scrollAdjustPending", this.pendingAdjust);
+            console.log(
+                `[ScrollAdjustHandler] Queued pending adjustment | ` +
+                `add=${add.toFixed(1)}px ` +
+                `totalPending=${this.pendingAdjust.toFixed(1)}px ` +
+                `(waiting for animated scroll to finish)`
+            );
         } else {
             this.appliedAdjust += add;
             set$(this.ctx, "scrollAdjust", this.appliedAdjust);
+            console.log(
+                `[ScrollAdjustHandler] Applied adjustment | ` +
+                `add=${add.toFixed(1)}px ` +
+                `totalApplied=${this.appliedAdjust.toFixed(1)}px`
+            );
         }
 
         if (this.ctx.state.scrollingTo) {

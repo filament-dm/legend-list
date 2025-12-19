@@ -132,7 +132,11 @@ export function calculateItemsInView(
     const state = ctx.state;
 
     // Reset invalidation flag at the start of each calculation cycle
+    const hadInvalidationChanges = state.hasInvalidationChanges;
     state.hasInvalidationChanges = false;
+    if (hadInvalidationChanges) {
+        console.log('[calculateItemsInView] Reset hasInvalidationChanges from true to false (new cycle starting)');
+    }
 
     batchedUpdates(() => {
         const {

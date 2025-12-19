@@ -54,6 +54,16 @@ export function updateItemPositions(
         state.scrollAdjustHandler.getAdjust() !== 0 ||
         (peek$(ctx, "scrollAdjustPending") ?? 0) !== 0;
 
+    console.log(
+        `[updateItemPositions] Size preference | ` +
+        `preferCachedSize=${preferCachedSize} | ` +
+        `doMVCP=${doMVCP} ` +
+        `dataChanged=${dataChanged} ` +
+        `hasInvalidationChanges=${state.hasInvalidationChanges} ` +
+        `currentAdjust=${state.scrollAdjustHandler.getAdjust().toFixed(1)}px ` +
+        `pendingAdjust=${(peek$(ctx, "scrollAdjustPending") ?? 0).toFixed(1)}px`
+    );
+
     let currentRowTop = 0;
     let column = 1;
     let maxSizeInRow = 0;

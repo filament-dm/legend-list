@@ -22,7 +22,15 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
     const indexByKey = state.indexByKey;
 
-    // console.log("prepareMVCP", ctx.contextNum, shouldMVCP, dataChanged, mvcpdataChanged, mvcpScroll);
+    console.log(
+        `[MVCP] prepareMVCP called | ` +
+        `dataChanged=${dataChanged} ` +
+        `shouldMVCP=${shouldMVCP} ` +
+        `(mvcpData=${mvcpData}, mvcpScroll=${mvcpScroll}) | ` +
+        `hasInvalidationChanges=${state.hasInvalidationChanges} | ` +
+        `scrollingTo=${scrollTarget !== undefined ? `index ${scrollTarget}` : 'none'} | ` +
+        `idsInView=${idsInView.length} items`
+    );
 
     if (shouldMVCP) {
         if (scrollTarget !== undefined) {
@@ -51,6 +59,17 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
 
         if (targetId !== undefined) {
             prevPosition = positions.get(targetId)!;
+            console.log(
+                `[MVCP] Target selected | ` +
+                `id=${targetId} ` +
+                `index=${indexByKey.get(targetId)} ` +
+                `prevPosition=${prevPosition}px | ` +
+                `mode=${dataChanged ? 'data-change' : 'size-change'}`
+            );
+        } else if (dataChanged && idsInViewWithPositions.length > 0) {
+            console.log(
+                `[MVCP] No single target, collected ${idsInViewWithPositions.length} items for data-change mode`
+            );
         }
 
         // Return a function to do MVCP based on the prepared values
@@ -65,6 +84,15 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                     const newPosition = positions.get(id);
                     if (newPosition !== undefined) {
                         positionDiff = newPosition - position;
+                        console.log(
+                            `[MVCP] Data-change mode found item | ` +
+                            `id=${id} ` +
+                            `index=${indexByKey.get(id)} ` +
+                            `prevPos=${position.toFixed(1)}px ` +
+                            `newPos=${newPosition.toFixed(1)}px ` +
+                            `diff=${positionDiff.toFixed(1)}px | ` +
+                            `hasInvalidationChanges=${state.hasInvalidationChanges}`
+                        );
                         break;
                     }
                 }
@@ -77,6 +105,8 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                 if (newPosition !== undefined) {
                     const totalSize = getContentSize(ctx);
                     let diff = newPosition - prevPosition;
+                    const originalDiff = diff;
+
                     if (diff !== 0 && state.scroll + state.scrollLength > totalSize) {
                         // If we're scrolling to the end of the list, then there's two potential issues we workaround:
                         // 1. List items above the scroll target may be in view so we don't want to take too much adjusting
@@ -86,9 +116,26 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                         } else {
                             diff = 0;
                         }
+                        console.log(
+                            `[MVCP] Near end-of-list adjustment | ` +
+                            `originalDiff=${originalDiff.toFixed(1)}px ` +
+                            `adjustedDiff=${diff.toFixed(1)}px | ` +
+                            `scroll=${state.scroll.toFixed(1)} ` +
+                            `scrollLength=${state.scrollLength.toFixed(1)} ` +
+                            `totalSize=${totalSize.toFixed(1)}`
+                        );
                     }
 
                     positionDiff = diff;
+
+                    console.log(
+                        `[MVCP] Position calculation | ` +
+                        `targetId=${targetId} ` +
+                        `prevPos=${prevPosition.toFixed(1)}px ` +
+                        `newPos=${newPosition.toFixed(1)}px ` +
+                        `diff=${diff.toFixed(1)}px | ` +
+                        `hasInvalidationChanges=${state.hasInvalidationChanges}`
+                    );
                 }
             }
 
@@ -105,7 +152,19 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             }
 
             if (Math.abs(positionDiff) > 0.1) {
+                console.log(
+                    `[MVCP] Requesting scroll adjustment | ` +
+                    `adjustment=${positionDiff.toFixed(1)}px ` +
+                    `fromScroll=${state.scroll.toFixed(1)}px ` +
+                    `toScroll=${(state.scroll + positionDiff).toFixed(1)}px | ` +
+                    `dataChanged=${dataChanged} ` +
+                    `hasInvalidationChanges=${state.hasInvalidationChanges}`
+                );
                 requestAdjust(ctx, positionDiff, dataChanged && mvcpData);
+            } else {
+                console.log(
+                    `[MVCP] Adjustment too small (${positionDiff.toFixed(3)}px), skipping`
+                );
             }
         };
     }
