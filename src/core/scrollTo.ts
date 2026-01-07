@@ -1,6 +1,7 @@
 import { calculateOffsetWithOffsetPosition } from "@/core/calculateOffsetWithOffsetPosition";
 import { clampScrollOffset } from "@/core/clampScrollOffset";
 import { doScrollTo } from "@/core/doScrollTo";
+import { finishScrollTo } from "@/core/finishScrollTo";
 import { Platform } from "@/platform/Platform";
 import type { StateContext } from "@/state/state";
 import type { ScrollTarget } from "@/types";
@@ -35,6 +36,13 @@ export function scrollTo(ctx: StateContext, params: ScrollTarget & { noScrolling
         state.scrollingTo = scrollTarget;
     }
     state.scrollPending = offset;
+
+    // Check if already at target position (within 1px tolerance)
+    if (!forceScroll && Math.abs(offset - state.scroll) < 1) {
+        // Already at target - callback is already wrapped in double RAF, so just call finishScrollTo directly
+        finishScrollTo(ctx);
+        return;
+    }
 
     if (forceScroll || !isInitialScroll || Platform.OS === "android") {
         doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });

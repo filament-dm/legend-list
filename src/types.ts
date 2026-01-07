@@ -431,7 +431,11 @@ export interface ScrollTarget {
     isInitialScroll?: boolean;
     itemSize?: number;
     offset: number;
-    onComplete?: () => void;
+    /**
+     * Optional callback invoked when the scroll operation completes.
+     * This fires after scroll animations complete, or after layout settles (via double RAF) when no scroll is needed.
+     */
+    onSettled?: () => void;
     precomputedWithViewOffset?: boolean;
     viewOffset?: number;
     viewPosition?: number;
@@ -634,34 +638,30 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.index - The index to scroll to.
-     * @param params.onComplete - Optional callback invoked when scroll animation completes.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollIndexIntoView(params: {
-        animated?: boolean | undefined;
-        index: number;
-        onComplete?: () => void;
-    }): void;
+    scrollIndexIntoView(params: { animated?: boolean | undefined; index: number; onSettled?: () => void }): void;
 
     /**
-     * Scrolls a specific index into view.
+     * Scrolls a specific item into view.
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.item - The item to scroll to.
-     * @param params.onComplete - Optional callback invoked when scroll animation completes.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollItemIntoView(params: { animated?: boolean | undefined; item: any; onComplete?: () => void }): void;
+    scrollItemIntoView(params: { animated?: boolean | undefined; item: any; onSettled?: () => void }): void;
 
     /**
      * Scrolls to the end of the list.
      * @param options - Options for scrolling.
      * @param options.animated - If true, animates the scroll. Default: true.
      * @param options.viewOffset - Offset from the target position.
-     * @param options.onComplete - Optional callback invoked when scroll animation completes.
+     * @param options.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
     scrollToEnd(options?: {
         animated?: boolean | undefined;
         viewOffset?: number | undefined;
-        onComplete?: () => void;
+        onSettled?: () => void;
     }): void;
 
     /**
@@ -671,14 +671,14 @@ export type LegendListRef = {
      * @param params.index - The index to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
-     * @param params.onComplete - Optional callback invoked when scroll animation completes.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
     scrollToIndex(params: {
         animated?: boolean | undefined;
         index: number;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
-        onComplete?: () => void;
+        onSettled?: () => void;
     }): void;
 
     /**
@@ -688,14 +688,14 @@ export type LegendListRef = {
      * @param params.item - The item to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
-     * @param params.onComplete - Optional callback invoked when scroll animation completes.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
     scrollToItem(params: {
         animated?: boolean | undefined;
         item: any;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
-        onComplete?: () => void;
+        onSettled?: () => void;
     }): void;
 
     /**
@@ -703,9 +703,9 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.offset - The pixel offset to scroll to.
      * @param params.animated - If true, animates the scroll. Default: true.
-     * @param params.onComplete - Optional callback invoked when scroll animation completes.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollToOffset(params: { offset: number; animated?: boolean | undefined; onComplete?: () => void }): void;
+    scrollToOffset(params: { offset: number; animated?: boolean | undefined; onSettled?: () => void }): void;
 
     /**
      * Sets or adds to the offset of the visible content anchor.

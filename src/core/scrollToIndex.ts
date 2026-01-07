@@ -9,7 +9,7 @@ export type ScrollToIndexParams = Parameters<LegendListRef["scrollToIndex"]>[0];
 
 export function scrollToIndex(
     ctx: StateContext,
-    { index, viewOffset = 0, animated = true, viewPosition, onComplete }: ScrollToIndexParams,
+    { index, viewOffset = 0, animated = true, viewPosition, onSettled }: ScrollToIndexParams,
 ) {
     const state = ctx.state;
     const { data } = state.props;
@@ -31,12 +31,23 @@ export function scrollToIndex(
     const targetId = getId(state, index);
     const itemSize = getItemSize(ctx, targetId, index, state.props.data[index!]);
 
+    // Wrap onSettled in double RAF to ensure layout has settled before callback fires
+    const wrappedOnSettled = onSettled
+        ? () => {
+              requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                      onSettled();
+                  });
+              });
+          }
+        : undefined;
+
     scrollTo(ctx, {
         animated,
         index,
         itemSize,
         offset: firstIndexOffset,
-        onComplete,
+        onSettled: wrappedOnSettled,
         viewOffset,
         viewPosition: viewPosition ?? 0,
     });

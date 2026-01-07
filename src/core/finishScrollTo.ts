@@ -8,7 +8,7 @@ export function finishScrollTo(ctx: StateContext) {
     if (state?.scrollingTo) {
         // Save scrollingTo before clearing it so we can pass it to commitPendingAdjust
         const scrollingTo = state.scrollingTo;
-        const callback = scrollingTo.onComplete;
+        const callback = scrollingTo.onSettled;
 
         state.scrollHistory.length = 0;
         state.initialScroll = undefined;

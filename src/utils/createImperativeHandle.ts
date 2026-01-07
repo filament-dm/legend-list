@@ -21,19 +21,24 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
     const state = ctx.state;
     const scrollIndexIntoView = (options: Parameters<LegendListRef["scrollIndexIntoView"]>[0]) => {
         if (state) {
-            const { index, onComplete, ...rest } = options;
+            const { index, onSettled, ...rest } = options;
             const { startNoBuffer, endNoBuffer } = state;
             if (index < startNoBuffer || index > endNoBuffer) {
+                // Item is not in view - scroll to it
                 const viewPosition = index < startNoBuffer ? 0 : 1;
                 scrollToIndex(ctx, {
                     ...rest,
                     index,
-                    onComplete,
+                    onSettled,
                     viewPosition,
                 });
-            } else if (onComplete) {
-                // Item is already in view, invoke callback immediately
-                onComplete();
+            } else if (onSettled) {
+                // Item is already in view - wrap callback in double RAF and fire directly
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        onSettled();
+                    });
+                });
             }
         }
     };
@@ -103,7 +108,22 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
                 scrollToIndex(ctx, { index, ...props });
             }
         },
-        scrollToOffset: (params) => scrollTo(ctx, params),
+        scrollToOffset: (params) => {
+            // Wrap onSettled in double RAF to ensure layout has settled before callback fires
+            const wrappedParams = params.onSettled
+                ? {
+                      ...params,
+                      onSettled: () => {
+                          requestAnimationFrame(() => {
+                              requestAnimationFrame(() => {
+                                  params.onSettled!();
+                              });
+                          });
+                      },
+                  }
+                : params;
+            scrollTo(ctx, wrappedParams);
+        },
         setScrollProcessingEnabled: (enabled: boolean) => {
             state.scrollProcessingEnabled = enabled;
         },
