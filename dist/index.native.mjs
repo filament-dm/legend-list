@@ -1163,7 +1163,7 @@ function finishScrollTo(ctx) {
   const state = ctx.state;
   if (state == null ? void 0 : state.scrollingTo) {
     const scrollingTo = state.scrollingTo;
-    const callback = scrollingTo.onComplete;
+    const callback = scrollingTo.onSettled;
     state.scrollHistory.length = 0;
     state.initialScroll = void 0;
     state.initialAnchor = void 0;
@@ -1268,6 +1268,10 @@ function scrollTo(ctx, params) {
     state.scrollingTo = scrollTarget;
   }
   state.scrollPending = offset;
+  if (!forceScroll && Math.abs(offset - state.scroll) < 1) {
+    finishScrollTo(ctx);
+    return;
+  }
   if (forceScroll || !isInitialScroll || Platform2.OS === "android") {
     doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
   } else {
@@ -2208,7 +2212,7 @@ function comparatorByDistance(a, b) {
 }
 
 // src/core/scrollToIndex.ts
-function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition, onComplete }) {
+function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition, onSettled }) {
   const state = ctx.state;
   const { data } = state.props;
   if (index >= data.length) {
@@ -2224,12 +2228,19 @@ function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPositi
   state.scrollForNextCalculateItemsInView = void 0;
   const targetId = getId(state, index);
   const itemSize = getItemSize(ctx, targetId, index, state.props.data[index]);
+  const wrappedOnSettled = onSettled ? () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        onSettled();
+      });
+    });
+  } : void 0;
   scrollTo(ctx, {
     animated,
     index,
     itemSize,
     offset: firstIndexOffset,
-    onComplete,
+    onSettled: wrappedOnSettled,
     viewOffset,
     viewPosition: viewPosition != null ? viewPosition : 0
   });
@@ -3191,18 +3202,22 @@ function createImperativeHandle(ctx) {
   const state = ctx.state;
   const scrollIndexIntoView = (options) => {
     if (state) {
-      const { index, onComplete, ...rest } = options;
+      const { index, onSettled, ...rest } = options;
       const { startNoBuffer, endNoBuffer } = state;
       if (index < startNoBuffer || index > endNoBuffer) {
         const viewPosition = index < startNoBuffer ? 0 : 1;
         scrollToIndex(ctx, {
           ...rest,
           index,
-          onComplete,
+          onSettled,
           viewPosition
         });
-      } else if (onComplete) {
-        onComplete();
+      } else if (onSettled) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            onSettled();
+          });
+        });
       }
     }
   };
@@ -3266,7 +3281,19 @@ function createImperativeHandle(ctx) {
         scrollToIndex(ctx, { index, ...props });
       }
     },
-    scrollToOffset: (params) => scrollTo(ctx, params),
+    scrollToOffset: (params) => {
+      const wrappedParams = params.onSettled ? {
+        ...params,
+        onSettled: () => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              params.onSettled();
+            });
+          });
+        }
+      } : params;
+      scrollTo(ctx, wrappedParams);
+    },
     setScrollProcessingEnabled: (enabled) => {
       state.scrollProcessingEnabled = enabled;
     },
