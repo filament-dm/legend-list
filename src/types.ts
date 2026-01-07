@@ -431,6 +431,7 @@ export interface ScrollTarget {
     isInitialScroll?: boolean;
     itemSize?: number;
     offset: number;
+    onComplete?: () => void;
     precomputedWithViewOffset?: boolean;
     viewOffset?: number;
     viewPosition?: number;
@@ -633,24 +634,35 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.index - The index to scroll to.
+     * @param params.onComplete - Optional callback invoked when scroll animation completes.
      */
-    scrollIndexIntoView(params: { animated?: boolean | undefined; index: number }): void;
+    scrollIndexIntoView(params: {
+        animated?: boolean | undefined;
+        index: number;
+        onComplete?: () => void;
+    }): void;
 
     /**
      * Scrolls a specific index into view.
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.item - The item to scroll to.
+     * @param params.onComplete - Optional callback invoked when scroll animation completes.
      */
-    scrollItemIntoView(params: { animated?: boolean | undefined; item: any }): void;
+    scrollItemIntoView(params: { animated?: boolean | undefined; item: any; onComplete?: () => void }): void;
 
     /**
      * Scrolls to the end of the list.
      * @param options - Options for scrolling.
      * @param options.animated - If true, animates the scroll. Default: true.
      * @param options.viewOffset - Offset from the target position.
+     * @param options.onComplete - Optional callback invoked when scroll animation completes.
      */
-    scrollToEnd(options?: { animated?: boolean | undefined; viewOffset?: number | undefined }): void;
+    scrollToEnd(options?: {
+        animated?: boolean | undefined;
+        viewOffset?: number | undefined;
+        onComplete?: () => void;
+    }): void;
 
     /**
      * Scrolls to a specific index in the list.
@@ -659,12 +671,14 @@ export type LegendListRef = {
      * @param params.index - The index to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
+     * @param params.onComplete - Optional callback invoked when scroll animation completes.
      */
     scrollToIndex(params: {
         animated?: boolean | undefined;
         index: number;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
+        onComplete?: () => void;
     }): void;
 
     /**
@@ -674,12 +688,14 @@ export type LegendListRef = {
      * @param params.item - The item to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
+     * @param params.onComplete - Optional callback invoked when scroll animation completes.
      */
     scrollToItem(params: {
         animated?: boolean | undefined;
         item: any;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
+        onComplete?: () => void;
     }): void;
 
     /**
@@ -687,8 +703,9 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.offset - The pixel offset to scroll to.
      * @param params.animated - If true, animates the scroll. Default: true.
+     * @param params.onComplete - Optional callback invoked when scroll animation completes.
      */
-    scrollToOffset(params: { offset: number; animated?: boolean | undefined }): void;
+    scrollToOffset(params: { offset: number; animated?: boolean | undefined; onComplete?: () => void }): void;
 
     /**
      * Sets or adds to the offset of the visible content anchor.

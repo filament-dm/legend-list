@@ -9,7 +9,7 @@ export type ScrollToIndexParams = Parameters<LegendListRef["scrollToIndex"]>[0];
 
 export function scrollToIndex(
     ctx: StateContext,
-    { index, viewOffset = 0, animated = true, viewPosition }: ScrollToIndexParams,
+    { index, viewOffset = 0, animated = true, viewPosition, onComplete }: ScrollToIndexParams,
 ) {
     const state = ctx.state;
     const { data } = state.props;
@@ -36,6 +36,7 @@ export function scrollToIndex(
         index,
         itemSize,
         offset: firstIndexOffset,
+        onComplete,
         viewOffset,
         viewPosition: viewPosition ?? 0,
     });

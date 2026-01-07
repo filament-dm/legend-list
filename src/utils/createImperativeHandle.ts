@@ -21,15 +21,19 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
     const state = ctx.state;
     const scrollIndexIntoView = (options: Parameters<LegendListRef["scrollIndexIntoView"]>[0]) => {
         if (state) {
-            const { index, ...rest } = options;
+            const { index, onComplete, ...rest } = options;
             const { startNoBuffer, endNoBuffer } = state;
             if (index < startNoBuffer || index > endNoBuffer) {
                 const viewPosition = index < startNoBuffer ? 0 : 1;
                 scrollToIndex(ctx, {
                     ...rest,
                     index,
+                    onComplete,
                     viewPosition,
                 });
+            } else if (onComplete) {
+                // Item is already in view, invoke callback immediately
+                onComplete();
             }
         }
     };
