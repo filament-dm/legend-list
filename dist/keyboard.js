@@ -51,12 +51,16 @@ var useCombinedRef = (...refs) => {
 };
 
 // src/integrations/keyboard.tsx
+var calculateKeyboardInset = (height, safeAreaInsetBottom, isNewArchitecture) => {
+  "worklet";
+  return Math.max(0, height - safeAreaInsetBottom) ;
+};
 var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegendList2(props, forwardedRef) {
   const {
     contentInset: contentInsetProp,
     horizontal,
     onScroll: onScrollProp,
-    safeAreaInsetBottom = 0,
+    safeAreaInsets = { bottom: 0, top: 0 },
     style: styleProp,
     ...rest
   } = props;
@@ -70,10 +74,11 @@ var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegen
   const animatedOffsetY = reactNativeReanimated.useSharedValue(null);
   const scrollOffsetAtKeyboardStart = reactNativeReanimated.useSharedValue(0);
   const mode = reactNativeReanimated.useSharedValue("idle");
-  const keyboardInset = reactNativeReanimated.useSharedValue(0);
+  const keyboardInset = reactNativeReanimated.useSharedValue({ bottom: 0, top: 0 });
   const keyboardHeight = reactNativeReanimated.useSharedValue(0);
   const isOpening = reactNativeReanimated.useSharedValue(false);
   const didInteractive = reactNativeReanimated.useSharedValue(false);
+  const { top: safeAreaInsetTop, bottom: safeAreaInsetBottom } = safeAreaInsets;
   const isKeyboardOpen = reactNativeReanimated.useSharedValue(false);
   const scrollHandler = reactNativeReanimated.useAnimatedScrollHandler(
     (event) => {
@@ -120,7 +125,8 @@ var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegen
           didInteractive.set(true);
         }
         if (isAndroid && !horizontal) {
-          keyboardInset.set(Math.max(0, event.height - safeAreaInsetBottom));
+          const newInset = calculateKeyboardInset(event.height, safeAreaInsetBottom);
+          keyboardInset.set({ bottom: newInset, top: safeAreaInsetTop * 2 });
         }
       },
       onMove: (event) => {
@@ -136,7 +142,8 @@ var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegen
           scrollOffsetY.set(targetOffset);
           animatedOffsetY.set(targetOffset);
           if (!horizontal) {
-            keyboardInset.set(Math.max(0, event.height - safeAreaInsetBottom));
+            const newInset = calculateKeyboardInset(event.height, safeAreaInsetBottom);
+            keyboardInset.set({ bottom: newInset, top: 0  });
           }
         }
       },
@@ -160,11 +167,9 @@ var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegen
           didInteractive.set(false);
           isKeyboardOpen.set(event.height > 0);
           if (!horizontal) {
-            const newInset = Math.max(0, event.height - safeAreaInsetBottom);
-            if (newInset > 0) {
-              keyboardInset.set(newInset);
-            } else {
-              keyboardInset.set(newInset);
+            const newInset = calculateKeyboardInset(event.height, safeAreaInsetBottom);
+            keyboardInset.set({ bottom: newInset, top: 0  });
+            if (newInset <= 0) {
               animatedOffsetY.set(scrollOffsetY.get());
             }
           }
@@ -183,12 +188,13 @@ var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegen
         y: vAnimatedOffsetY
       }
     };
+    const { top: keyboardInsetTop, bottom: keyboardInsetBottom } = keyboardInset.get();
     return isIos ? Object.assign(baseProps, {
       contentInset: {
-        bottom: ((_a = contentInsetProp == null ? void 0 : contentInsetProp.bottom) != null ? _a : 0) + (horizontal ? 0 : keyboardInset.get()),
+        bottom: ((_a = contentInsetProp == null ? void 0 : contentInsetProp.bottom) != null ? _a : 0) + (horizontal ? 0 : keyboardInsetBottom),
         left: (_b = contentInsetProp == null ? void 0 : contentInsetProp.left) != null ? _b : 0,
         right: (_c = contentInsetProp == null ? void 0 : contentInsetProp.right) != null ? _c : 0,
-        top: (_d = contentInsetProp == null ? void 0 : contentInsetProp.top) != null ? _d : 0
+        top: ((_d = contentInsetProp == null ? void 0 : contentInsetProp.top) != null ? _d : 0) - keyboardInsetTop
       }
     }) : baseProps;
   });
@@ -197,7 +203,7 @@ var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegen
       var _a;
       return {
         ...styleFlattened || {},
-        marginBottom: (_a = keyboardInset.get()) != null ? _a : 0
+        marginBottom: (_a = keyboardInset.get().bottom) != null ? _a : 0
       };
     },
     [styleProp, keyboardInset]

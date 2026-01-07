@@ -30,12 +30,16 @@ var useCombinedRef = (...refs) => {
 };
 
 // src/integrations/keyboard.tsx
+var calculateKeyboardInset = (height, safeAreaInsetBottom, isNewArchitecture) => {
+  "worklet";
+  return Math.max(0, height - safeAreaInsetBottom) ;
+};
 var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2(props, forwardedRef) {
   const {
     contentInset: contentInsetProp,
     horizontal,
     onScroll: onScrollProp,
-    safeAreaInsetBottom = 0,
+    safeAreaInsets = { bottom: 0, top: 0 },
     style: styleProp,
     ...rest
   } = props;
@@ -49,10 +53,11 @@ var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2
   const animatedOffsetY = useSharedValue(null);
   const scrollOffsetAtKeyboardStart = useSharedValue(0);
   const mode = useSharedValue("idle");
-  const keyboardInset = useSharedValue(0);
+  const keyboardInset = useSharedValue({ bottom: 0, top: 0 });
   const keyboardHeight = useSharedValue(0);
   const isOpening = useSharedValue(false);
   const didInteractive = useSharedValue(false);
+  const { top: safeAreaInsetTop, bottom: safeAreaInsetBottom } = safeAreaInsets;
   const isKeyboardOpen = useSharedValue(false);
   const scrollHandler = useAnimatedScrollHandler(
     (event) => {
@@ -99,7 +104,8 @@ var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2
           didInteractive.set(true);
         }
         if (isAndroid && !horizontal) {
-          keyboardInset.set(Math.max(0, event.height - safeAreaInsetBottom));
+          const newInset = calculateKeyboardInset(event.height, safeAreaInsetBottom);
+          keyboardInset.set({ bottom: newInset, top: safeAreaInsetTop * 2 });
         }
       },
       onMove: (event) => {
@@ -115,7 +121,8 @@ var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2
           scrollOffsetY.set(targetOffset);
           animatedOffsetY.set(targetOffset);
           if (!horizontal) {
-            keyboardInset.set(Math.max(0, event.height - safeAreaInsetBottom));
+            const newInset = calculateKeyboardInset(event.height, safeAreaInsetBottom);
+            keyboardInset.set({ bottom: newInset, top: 0  });
           }
         }
       },
@@ -139,11 +146,9 @@ var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2
           didInteractive.set(false);
           isKeyboardOpen.set(event.height > 0);
           if (!horizontal) {
-            const newInset = Math.max(0, event.height - safeAreaInsetBottom);
-            if (newInset > 0) {
-              keyboardInset.set(newInset);
-            } else {
-              keyboardInset.set(newInset);
+            const newInset = calculateKeyboardInset(event.height, safeAreaInsetBottom);
+            keyboardInset.set({ bottom: newInset, top: 0  });
+            if (newInset <= 0) {
               animatedOffsetY.set(scrollOffsetY.get());
             }
           }
@@ -162,12 +167,13 @@ var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2
         y: vAnimatedOffsetY
       }
     };
+    const { top: keyboardInsetTop, bottom: keyboardInsetBottom } = keyboardInset.get();
     return isIos ? Object.assign(baseProps, {
       contentInset: {
-        bottom: ((_a = contentInsetProp == null ? void 0 : contentInsetProp.bottom) != null ? _a : 0) + (horizontal ? 0 : keyboardInset.get()),
+        bottom: ((_a = contentInsetProp == null ? void 0 : contentInsetProp.bottom) != null ? _a : 0) + (horizontal ? 0 : keyboardInsetBottom),
         left: (_b = contentInsetProp == null ? void 0 : contentInsetProp.left) != null ? _b : 0,
         right: (_c = contentInsetProp == null ? void 0 : contentInsetProp.right) != null ? _c : 0,
-        top: (_d = contentInsetProp == null ? void 0 : contentInsetProp.top) != null ? _d : 0
+        top: ((_d = contentInsetProp == null ? void 0 : contentInsetProp.top) != null ? _d : 0) - keyboardInsetTop
       }
     }) : baseProps;
   });
@@ -176,7 +182,7 @@ var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2
       var _a;
       return {
         ...styleFlattened || {},
-        marginBottom: (_a = keyboardInset.get()) != null ? _a : 0
+        marginBottom: (_a = keyboardInset.get().bottom) != null ? _a : 0
       };
     },
     [styleProp, keyboardInset]

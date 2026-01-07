@@ -70,13 +70,13 @@ var AnimatedLegendListComponent = Reanimated__default.default.createAnimatedComp
 var AnimatedLegendList = typedMemo(
   // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
   React__namespace.forwardRef(function AnimatedLegendList2(props, ref) {
-    const { refScrollView, animatedProps, ...rest } = props;
+    const { refScrollView, ...rest } = props;
+    const { animatedProps } = props;
     const refLegendList = React__namespace.useRef(null);
     const combinedRef = useCombinedRef(refLegendList, ref);
     return /* @__PURE__ */ React__namespace.createElement(
       AnimatedLegendListComponent,
       {
-        animatedProps,
         animatedPropsInternal: animatedProps,
         ref: refScrollView,
         refLegendList: combinedRef,

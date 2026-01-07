@@ -1,8 +1,7 @@
 import * as react_native from 'react-native';
 import { SectionListData, SectionBase, SectionListRenderItemInfo, SectionListScrollParams } from 'react-native';
 import * as React from 'react';
-import { a as LegendListRef, L as LegendListProps } from './types-CdqSrGnu.mjs';
-import 'react-native-reanimated';
+import { LegendListRef, LegendListProps } from '@legendapp/list';
 
 type SectionListSeparatorProps<ItemT, SectionT> = {
     leadingItem?: ItemT;

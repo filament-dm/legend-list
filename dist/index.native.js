@@ -339,6 +339,15 @@ function useValue$(key, params) {
 }
 var typedForwardRef = React2.forwardRef;
 var typedMemo = React2.memo;
+var getComponent = (Component) => {
+  if (React2__namespace.isValidElement(Component)) {
+    return Component;
+  }
+  if (Component) {
+    return /* @__PURE__ */ React2__namespace.createElement(Component, null);
+  }
+  return null;
+};
 
 // src/components/PositionView.native.tsx
 var PositionViewState = typedMemo(function PositionViewState2({
@@ -387,22 +396,45 @@ var PositionViewSticky = typedMemo(function PositionViewSticky2({
   animatedScrollY,
   stickyOffset,
   index,
+  stickyHeaderConfig,
+  children,
   ...rest
 }) {
   const [position = POSITION_OUT_OF_VIEW, headerSize] = useArr$([`containerPosition${id}`, "headerSize"]);
   const transform = React2__namespace.useMemo(() => {
+    var _a3;
     if (animatedScrollY && stickyOffset !== void 0) {
+      const stickyConfigOffset = (_a3 = stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.offset) != null ? _a3 : 0;
       const stickyPosition = animatedScrollY.interpolate({
         extrapolateLeft: "clamp",
         extrapolateRight: "extend",
-        inputRange: [position + headerSize, position + 5e3 + headerSize],
+        inputRange: [
+          position + headerSize - stickyConfigOffset - stickyOffset,
+          position + 5e3 + headerSize - stickyConfigOffset - stickyOffset
+        ],
         outputRange: [position, position + 5e3]
       });
       return horizontal ? [{ translateX: stickyPosition }] : [{ translateY: stickyPosition }];
     }
-  }, [animatedScrollY, headerSize, horizontal, stickyOffset, position]);
+  }, [animatedScrollY, headerSize, horizontal, stickyOffset, position, stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.offset]);
   const viewStyle = React2__namespace.useMemo(() => [style, { zIndex: index + 1e3 }, { transform }], [style, transform]);
-  return /* @__PURE__ */ React2__namespace.createElement(reactNative.Animated.View, { ref: refView, style: viewStyle, ...rest });
+  const renderStickyHeaderBackdrop = React2__namespace.useMemo(() => {
+    if (!(stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent)) {
+      return null;
+    }
+    return /* @__PURE__ */ React2__namespace.createElement(
+      reactNative.View,
+      {
+        style: {
+          inset: 0,
+          pointerEvents: "none",
+          position: "absolute"
+        }
+      },
+      getComponent(stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent)
+    );
+  }, [stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent]);
+  return /* @__PURE__ */ React2__namespace.createElement(reactNative.Animated.View, { ref: refView, style: viewStyle, ...rest }, renderStickyHeaderBackdrop, children);
 });
 var PositionView = IsNewArchitecture ? PositionViewState : PositionViewAnimated;
 function useInit(cb) {
@@ -603,7 +635,8 @@ var Container = typedMemo(function Container2({
   horizontal,
   getRenderedItem: getRenderedItem2,
   updateItemSize: updateItemSize2,
-  ItemSeparatorComponent
+  ItemSeparatorComponent,
+  stickyHeaderConfig
 }) {
   const ctx = useStateContext();
   const { columnWrapperStyle, animatedScrollY } = ctx;
@@ -746,6 +779,7 @@ var Container = typedMemo(function Container2({
       key: recycleItems ? void 0 : itemKey,
       onLayout,
       refView: ref,
+      stickyHeaderConfig,
       stickyOffset: isSticky ? stickyOffset : void 0,
       style
     },
@@ -883,15 +917,6 @@ var LayoutView = ({ onLayoutChange, refView, ...rest }) => {
 };
 
 // src/components/ListComponent.tsx
-var getComponent = (Component) => {
-  if (React2__namespace.isValidElement(Component)) {
-    return Component;
-  }
-  if (Component) {
-    return /* @__PURE__ */ React2__namespace.createElement(Component, null);
-  }
-  return null;
-};
 var ListComponent = typedMemo(function ListComponent2({
   canRender,
   style,
@@ -916,6 +941,7 @@ var ListComponent = typedMemo(function ListComponent2({
   scrollAdjustHandler,
   onLayoutHeader,
   snapToIndices,
+  stickyHeaderConfig,
   stickyHeaderIndices,
   ...rest
 }) {
@@ -956,6 +982,7 @@ var ListComponent = typedMemo(function ListComponent2({
         horizontal,
         ItemSeparatorComponent,
         recycleItems,
+        stickyHeaderConfig,
         updateItemSize: updateItemSize2,
         waitForInitialLayout
       }
@@ -1097,7 +1124,7 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
   let size;
   const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
   if (size === void 0) {
-    size = getEstimatedItemSize ? getEstimatedItemSize(index, data, itemType) : estimatedItemSize;
+    size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
   }
   setSize(ctx, key, size);
   return size;
@@ -1118,20 +1145,21 @@ function calculateOffsetWithOffsetPosition(ctx, offsetParam, params) {
   }
   return offset;
 }
+var Platform2 = reactNative.Platform;
+var PlatformAdjustBreaksScroll = Platform2.OS === "android";
 
 // src/core/clampScrollOffset.ts
 function clampScrollOffset(ctx, offset) {
   const state = ctx.state;
   const contentSize = getContentSize(ctx);
   let clampedOffset = offset;
-  if (Number.isFinite(contentSize) && Number.isFinite(state.scrollLength)) {
+  if (Number.isFinite(contentSize) && Number.isFinite(state.scrollLength) && (Platform2.OS !== "android" || state.lastLayout)) {
     const maxOffset = Math.max(0, contentSize - state.scrollLength);
     clampedOffset = Math.min(offset, maxOffset);
   }
   clampedOffset = Math.max(0, clampedOffset);
   return clampedOffset;
 }
-var Platform2 = reactNative.Platform;
 
 // src/utils/setInitialRenderState.ts
 function setInitialRenderState(ctx, {
@@ -1155,6 +1183,8 @@ function finishScrollTo(ctx) {
   var _a3, _b;
   const state = ctx.state;
   if (state == null ? void 0 : state.scrollingTo) {
+    const scrollingTo = state.scrollingTo;
+    const callback = scrollingTo.onComplete;
     state.scrollHistory.length = 0;
     state.initialScroll = void 0;
     state.initialAnchor = void 0;
@@ -1165,10 +1195,13 @@ function finishScrollTo(ctx) {
     if ((_a3 = state.props) == null ? void 0 : _a3.data) {
       (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true });
     }
-    if (Platform2.OS === "web") {
-      state.scrollAdjustHandler.commitPendingAdjust();
+    if (PlatformAdjustBreaksScroll) {
+      state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
     }
     setInitialRenderState(ctx, { didInitialScroll: true });
+    if (callback) {
+      callback();
+    }
   }
 }
 
@@ -1265,7 +1298,7 @@ function scrollTo(ctx, params) {
 
 // src/utils/checkThreshold.ts
 var HYSTERESIS_MULTIPLIER = 1.3;
-var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, context, onReached, setSnapshot) => {
+var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, context, onReached, setSnapshot, allowReentryOnChange) => {
   const absDistance = Math.abs(distance);
   const within = atThreshold || threshold > 0 && absDistance <= threshold;
   if (wasReached === null) {
@@ -1275,7 +1308,7 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
     return null;
   }
   const updateSnapshot = () => {
-    setSnapshot == null ? void 0 : setSnapshot({
+    setSnapshot({
       atThreshold,
       contentSize: context.contentSize,
       dataLength: context.dataLength,
@@ -1286,19 +1319,21 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
     if (!within) {
       return false;
     }
-    onReached == null ? void 0 : onReached(distance);
+    onReached(distance);
     updateSnapshot();
     return true;
   }
   const reset = !atThreshold && threshold > 0 && absDistance >= threshold * HYSTERESIS_MULTIPLIER || !atThreshold && threshold <= 0 && absDistance > 0;
   if (reset) {
-    setSnapshot == null ? void 0 : setSnapshot(void 0);
+    setSnapshot(void 0);
     return false;
   }
   if (within) {
     const changed = !snapshot || snapshot.atThreshold !== atThreshold || snapshot.contentSize !== context.contentSize || snapshot.dataLength !== context.dataLength;
     if (changed) {
-      onReached == null ? void 0 : onReached(distance);
+      if (allowReentryOnChange) {
+        onReached(distance);
+      }
       updateSnapshot();
     }
   }
@@ -1341,7 +1376,8 @@ function checkAtBottom(ctx) {
       },
       (snapshot) => {
         state.endReachedSnapshot = snapshot;
-      }
+      },
+      true
     );
   }
 }
@@ -1376,7 +1412,8 @@ function checkAtTop(state) {
     },
     (snapshot) => {
       state.startReachedSnapshot = snapshot;
-    }
+    },
+    false
   );
 }
 
@@ -1537,7 +1574,7 @@ function prepareMVCP(ctx, dataChanged) {
   const state = ctx.state;
   const { idsInView, positions, props } = state;
   const {
-    maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll }
+    maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition }
   } = props;
   const scrollingTo = state.scrollingTo;
   let prevPosition;
@@ -1572,8 +1609,16 @@ function prepareMVCP(ctx, dataChanged) {
     return () => {
       let positionDiff = 0;
       if (dataChanged && targetId === void 0 && mvcpData) {
+        const data = state.props.data;
         for (let i = 0; i < idsInViewWithPositions.length; i++) {
           const { id, position } = idsInViewWithPositions[i];
+          const index = indexByKey.get(id);
+          if (index !== void 0 && shouldRestorePosition) {
+            const item = data[index];
+            if (item === void 0 || !shouldRestorePosition(item, index, data)) {
+              continue;
+            }
+          }
           const newPosition = positions.get(id);
           if (newPosition !== void 0) {
             positionDiff = newPosition - position;
@@ -2184,7 +2229,7 @@ function comparatorByDistance(a, b) {
 }
 
 // src/core/scrollToIndex.ts
-function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition }) {
+function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition, onComplete }) {
   const state = ctx.state;
   const { data } = state.props;
   if (index >= data.length) {
@@ -2205,6 +2250,7 @@ function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPositi
     index,
     itemSize,
     offset: firstIndexOffset,
+    onComplete,
     viewOffset,
     viewPosition: viewPosition != null ? viewPosition : 0
   });
@@ -2226,20 +2272,13 @@ function setDidLayout(ctx) {
       onLoad({ elapsedTimeInMs: Date.now() - loadStartTime });
     }
   };
-  if (Platform2.OS === "android" && initialScroll) {
-    if (IsNewArchitecture) {
-      scrollToIndex(ctx, { ...initialScroll, animated: false });
-      requestAnimationFrame(() => {
-        scrollToIndex(ctx, { ...initialScroll, animated: false });
-        setIt();
-      });
-    } else {
-      scrollToIndex(ctx, { ...initialScroll, animated: false });
-      setIt();
-    }
-  } else {
-    setIt();
+  if ((initialScroll == null ? void 0 : initialScroll.index) !== void 0) {
+    const target = initialScroll;
+    const runScroll = () => scrollToIndex(ctx, { ...target, animated: false });
+    runScroll();
+    requestAnimationFrame(runScroll);
   }
+  setIt();
 }
 
 // src/core/calculateItemsInView.ts
@@ -2538,7 +2577,7 @@ function calculateItemsInView(ctx, params = {}) {
       if (needNewContainers.length > 0) {
         const requiredItemTypes = getItemType ? needNewContainers.map((i) => {
           const itemType = getItemType(data[i], i);
-          return itemType ? String(itemType) : "";
+          return itemType !== void 0 ? String(itemType) : "";
         }) : void 0;
         const availableContainers = findAvailableContainers(
           ctx,
@@ -2807,8 +2846,10 @@ function doInitialAllocateContainers(ctx) {
       const num = Math.min(20, data.length);
       for (let i = 0; i < num; i++) {
         const item = data[i];
-        const itemType = getItemType ? (_a3 = getItemType(item, i)) != null ? _a3 : "" : "";
-        totalSize += (_c = (_b = getFixedItemSize == null ? void 0 : getFixedItemSize(i, item, itemType)) != null ? _b : getEstimatedItemSize == null ? void 0 : getEstimatedItemSize(i, item, itemType)) != null ? _c : estimatedItemSize;
+        if (item !== void 0) {
+          const itemType = (_a3 = getItemType == null ? void 0 : getItemType(item, i)) != null ? _a3 : "";
+          totalSize += (_c = (_b = getFixedItemSize == null ? void 0 : getFixedItemSize(item, i, itemType)) != null ? _b : getEstimatedItemSize == null ? void 0 : getEstimatedItemSize(item, i, itemType)) != null ? _c : estimatedItemSize;
+        }
       }
       averageItemSize = totalSize / num;
     } else {
@@ -2924,7 +2965,7 @@ var ScrollAdjustHandler = class {
   }
   requestAdjust(add) {
     const scrollingTo = this.ctx.state.scrollingTo;
-    if (Platform2.OS === "web" && (scrollingTo == null ? void 0 : scrollingTo.animated) && !scrollingTo.isInitialScroll) {
+    if (PlatformAdjustBreaksScroll && (scrollingTo == null ? void 0 : scrollingTo.animated) && !scrollingTo.isInitialScroll) {
       this.pendingAdjust += add;
       set$(this.ctx, "scrollAdjustPending", this.pendingAdjust);
     } else {
@@ -2938,17 +2979,28 @@ var ScrollAdjustHandler = class {
   getAdjust() {
     return this.appliedAdjust;
   }
-  commitPendingAdjust() {
-    if (Platform2.OS === "web") {
+  commitPendingAdjust(scrollTarget) {
+    if (PlatformAdjustBreaksScroll) {
       const state = this.ctx.state;
       const pending = this.pendingAdjust;
+      this.pendingAdjust = 0;
       if (pending !== 0) {
-        this.pendingAdjust = 0;
-        this.appliedAdjust += pending;
-        state.scroll += pending;
-        state.scrollForNextCalculateItemsInView = void 0;
+        let targetScroll;
+        if ((scrollTarget == null ? void 0 : scrollTarget.index) !== void 0) {
+          const currentOffset = calculateOffsetForIndex(this.ctx, scrollTarget.index);
+          targetScroll = calculateOffsetWithOffsetPosition(this.ctx, currentOffset, scrollTarget);
+          targetScroll = clampScrollOffset(this.ctx, targetScroll);
+        } else {
+          targetScroll = clampScrollOffset(this.ctx, state.scroll + pending);
+        }
+        const adjustment = targetScroll - state.scroll;
+        if (Math.abs(adjustment) > 0.1 || Math.abs(pending) > 0.1) {
+          this.appliedAdjust += adjustment;
+          state.scroll = targetScroll;
+          state.scrollForNextCalculateItemsInView = void 0;
+          set$(this.ctx, "scrollAdjust", this.appliedAdjust);
+        }
         set$(this.ctx, "scrollAdjustPending", 0);
-        set$(this.ctx, "scrollAdjust", this.appliedAdjust);
         calculateItemsInView(this.ctx);
       }
     }
@@ -2983,7 +3035,7 @@ function updateItemSize(ctx, itemKey, sizeObj) {
       return;
     }
     const type = getItemType ? (_a3 = getItemType(itemData, index)) != null ? _a3 : "" : "";
-    const size2 = getFixedItemSize(index, itemData, type);
+    const size2 = getFixedItemSize(itemData, index, type);
     if (size2 !== void 0 && size2 === sizesKnown.get(itemKey)) {
       return;
     }
@@ -3089,6 +3141,12 @@ function updateOneItemSize(ctx, itemKey, sizeObj) {
   }
   return 0;
 }
+function useWrapIfItem(fn) {
+  return React2.useMemo(
+    () => fn ? (arg1, arg2, arg3) => arg1 !== void 0 && arg2 !== void 0 ? fn(arg1, arg2, arg3) : void 0 : void 0,
+    [fn]
+  );
+}
 var useCombinedRef = (...refs) => {
   const callback = React2.useCallback((element) => {
     for (const ref of refs) {
@@ -3154,15 +3212,18 @@ function createImperativeHandle(ctx) {
   const state = ctx.state;
   const scrollIndexIntoView = (options) => {
     if (state) {
-      const { index, ...rest } = options;
+      const { index, onComplete, ...rest } = options;
       const { startNoBuffer, endNoBuffer } = state;
       if (index < startNoBuffer || index > endNoBuffer) {
         const viewPosition = index < startNoBuffer ? 0 : 1;
         scrollToIndex(ctx, {
           ...rest,
           index,
+          onComplete,
           viewPosition
         });
+      } else if (onComplete) {
+        onComplete();
       }
     }
   };
@@ -3275,7 +3336,8 @@ function normalizeMaintainVisibleContentPosition(value) {
   if (value && typeof value === "object") {
     return {
       data: (_a3 = value.data) != null ? _a3 : false,
-      size: (_b = value.size) != null ? _b : true
+      size: (_b = value.size) != null ? _b : true,
+      shouldRestorePosition: value.shouldRestorePosition
     };
   }
   if (value === false) {
@@ -3407,6 +3469,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     viewabilityConfig,
     viewabilityConfigCallbackPairs,
     waitForInitialLayout = true,
+    stickyHeaderConfig,
     ...rest
   } = props;
   const animatedPropsInternal = props.animatedPropsInternal;
@@ -3419,7 +3482,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     maintainVisibleContentPositionProp
   );
   const [renderNum, setRenderNum] = React2.useState(0);
-  const initialScrollProp = initialScrollAtEnd ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? { index: initialScrollIndexProp.index || 0, viewOffset: initialScrollIndexProp.viewOffset || 0 } : { index: initialScrollIndexProp || 0, viewOffset: initialScrollOffsetProp || 0 } : void 0;
+  const initialScrollProp = initialScrollAtEnd ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? { index: initialScrollIndexProp.index || 0, viewOffset: initialScrollIndexProp.viewOffset || 0 } : { index: initialScrollIndexProp || 0, viewOffset: initialScrollOffsetProp || 0 } : void 0;
   const [canRender, setCanRender] = React2__namespace.useState(!IsNewArchitecture);
   const ctx = useStateContext();
   ctx.columnWrapperStyle = columnWrapperStyle || (contentContainerStyle ? createColumnWrapperStyle(contentContainerStyle) : void 0);
@@ -3524,13 +3587,13 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     data: dataProp,
     dataVersion,
     estimatedItemSize,
-    getEstimatedItemSize,
-    getFixedItemSize,
-    getItemType,
+    getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),
+    getFixedItemSize: useWrapIfItem(getFixedItemSize),
+    getItemType: useWrapIfItem(getItemType),
     horizontal: !!horizontal,
     initialContainerPoolRatio,
     itemsAreEqual,
-    keyExtractor,
+    keyExtractor: useWrapIfItem(keyExtractor),
     maintainScrollAtEnd,
     maintainScrollAtEndThreshold,
     maintainVisibleContentPosition: maintainVisibleContentPositionConfig,
@@ -3645,8 +3708,8 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     }
   }, []);
   const doInitialScroll = React2.useCallback(() => {
-    const initialScroll = state.initialScroll;
-    if (initialScroll) {
+    const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
+    if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
       scrollTo(ctx, {
         animated: false,
         index: initialScroll == null ? void 0 : initialScroll.index,
@@ -3761,6 +3824,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       scrollAdjustHandler: (_b = refState.current) == null ? void 0 : _b.scrollAdjustHandler,
       scrollEventThrottle: 0,
       snapToIndices,
+      stickyHeaderConfig,
       stickyHeaderIndices,
       style,
       updateItemSize: fns.updateItemSize,
@@ -3770,6 +3834,8 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
 });
 
 exports.LegendList = LegendList;
+exports.typedForwardRef = typedForwardRef;
+exports.typedMemo = typedMemo;
 exports.useIsLastItem = useIsLastItem;
 exports.useListScrollSize = useListScrollSize;
 exports.useRecyclingEffect = useRecyclingEffect;
