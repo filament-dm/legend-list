@@ -1426,8 +1426,12 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b;
+  var _a3, _b, _c;
   const state = ctx.state;
+  console.log("[LegendList:finishScrollTo]", {
+    hasCallback: !!((_a3 = state == null ? void 0 : state.scrollingTo) == null ? void 0 : _a3.onSettled),
+    hasScrollingTo: !!(state == null ? void 0 : state.scrollingTo)
+  });
   if (state == null ? void 0 : state.scrollingTo) {
     const scrollingTo = state.scrollingTo;
     const callback = scrollingTo.onSettled;
@@ -1438,17 +1442,64 @@ function finishScrollTo(ctx) {
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
-    if ((_a3 = state.props) == null ? void 0 : _a3.data) {
-      (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true });
+    if ((_b = state.props) == null ? void 0 : _b.data) {
+      (_c = state.triggerCalculateItemsInView) == null ? void 0 : _c.call(state, { forceFullItemPositions: true });
     }
     {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
     }
     setInitialRenderState(ctx, { didInitialScroll: true });
     if (callback) {
+      console.log("[LegendList:finishScrollTo:callback]", "Invoking onSettled callback");
       callback();
     }
   }
+}
+
+// src/core/checkFinishedScroll.ts
+function checkFinishedScroll(ctx) {
+  ctx.state.animFrameCheckFinishedScroll = requestAnimationFrame(() => checkFinishedScrollFrame(ctx));
+}
+function checkFinishedScrollFrame(ctx) {
+  const scrollingTo = ctx.state.scrollingTo;
+  if (scrollingTo) {
+    const { state } = ctx;
+    state.animFrameCheckFinishedScroll = void 0;
+    const scroll = state.scrollPending;
+    const adjust = state.scrollAdjustHandler.getAdjust();
+    const clampedTargetOffset = clampScrollOffset(ctx, scrollingTo.offset - (scrollingTo.viewOffset || 0));
+    const maxOffset = clampScrollOffset(ctx, scroll);
+    const diff1 = Math.abs(scroll - clampedTargetOffset);
+    const diff2 = Math.abs(diff1 - adjust);
+    const isNotOverscrolled = Math.abs(scroll - maxOffset) < 1;
+    if (isNotOverscrolled && (diff1 < 1 || diff2 < 1)) {
+      finishScrollTo(ctx);
+    }
+  }
+}
+function checkFinishedScrollFallback(ctx) {
+  const state = ctx.state;
+  const scrollingTo = state.scrollingTo;
+  const slowTimeout = (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll) || !state.didContainersLayout;
+  state.timeoutCheckFinishedScrollFallback = setTimeout(
+    () => {
+      let numChecks = 0;
+      const checkHasScrolled = () => {
+        state.timeoutCheckFinishedScrollFallback = void 0;
+        const isStillScrollingTo = state.scrollingTo;
+        if (isStillScrollingTo) {
+          numChecks++;
+          if (state.hasScrolled || numChecks > 5) {
+            finishScrollTo(ctx);
+          } else {
+            state.timeoutCheckFinishedScrollFallback = setTimeout(checkHasScrolled, 100);
+          }
+        }
+      };
+      checkHasScrolled();
+    },
+    slowTimeout ? 500 : 100
+  );
 }
 
 // src/core/doScrollTo.ts
@@ -1456,6 +1507,7 @@ var SCROLL_END_IDLE_MS = 80;
 var SCROLL_END_MAX_MS = 1500;
 var SMOOTH_SCROLL_DURATION_MS = 320;
 function doScrollTo(ctx, params) {
+  var _a3;
   const state = ctx.state;
   const { animated, horizontal, offset } = params;
   const scroller = state.refScroller.current;
@@ -1463,9 +1515,15 @@ function doScrollTo(ctx, params) {
   if (node) {
     const left = horizontal ? offset : 0;
     const top = horizontal ? 0 : offset;
+    console.log("[LegendList:doScrollTo]", {
+      animated,
+      hasCallback: !!((_a3 = ctx.state.scrollingTo) == null ? void 0 : _a3.onSettled),
+      offset
+    });
     node.scrollTo({ behavior: animated ? "smooth" : "auto", left, top });
     if (animated) {
       listenForScrollEnd(ctx, node);
+      checkFinishedScrollFallback(ctx);
     } else {
       state.scroll = offset;
       setTimeout(() => {
@@ -1480,7 +1538,15 @@ function listenForScrollEnd(ctx, node) {
   let maxTimeout;
   let settled = false;
   const targetToken = ctx.state.scrollingTo;
+  console.log("[LegendList:listenForScrollEnd]", {
+    mechanism: supportsScrollEnd ? "scrollend event" : "fallback timeouts",
+    supportsScrollEnd
+  });
   const finish = () => {
+    console.log("[LegendList:listenForScrollEnd:finish]", {
+      settled,
+      tokenMatch: targetToken === ctx.state.scrollingTo
+    });
     if (settled) return;
     settled = true;
     cleanup();
@@ -2879,52 +2945,6 @@ function checkActualChange(state, dataProp, previousData) {
     }
   }
   return false;
-}
-
-// src/core/checkFinishedScroll.ts
-function checkFinishedScroll(ctx) {
-  ctx.state.animFrameCheckFinishedScroll = requestAnimationFrame(() => checkFinishedScrollFrame(ctx));
-}
-function checkFinishedScrollFrame(ctx) {
-  const scrollingTo = ctx.state.scrollingTo;
-  if (scrollingTo) {
-    const { state } = ctx;
-    state.animFrameCheckFinishedScroll = void 0;
-    const scroll = state.scrollPending;
-    const adjust = state.scrollAdjustHandler.getAdjust();
-    const clampedTargetOffset = clampScrollOffset(ctx, scrollingTo.offset - (scrollingTo.viewOffset || 0));
-    const maxOffset = clampScrollOffset(ctx, scroll);
-    const diff1 = Math.abs(scroll - clampedTargetOffset);
-    const diff2 = Math.abs(diff1 - adjust);
-    const isNotOverscrolled = Math.abs(scroll - maxOffset) < 1;
-    if (isNotOverscrolled && (diff1 < 1 || diff2 < 1)) {
-      finishScrollTo(ctx);
-    }
-  }
-}
-function checkFinishedScrollFallback(ctx) {
-  const state = ctx.state;
-  const scrollingTo = state.scrollingTo;
-  const slowTimeout = (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll) || !state.didContainersLayout;
-  state.timeoutCheckFinishedScrollFallback = setTimeout(
-    () => {
-      let numChecks = 0;
-      const checkHasScrolled = () => {
-        state.timeoutCheckFinishedScrollFallback = void 0;
-        const isStillScrollingTo = state.scrollingTo;
-        if (isStillScrollingTo) {
-          numChecks++;
-          if (state.hasScrolled || numChecks > 5) {
-            finishScrollTo(ctx);
-          } else {
-            state.timeoutCheckFinishedScrollFallback = setTimeout(checkHasScrolled, 100);
-          }
-        }
-      };
-      checkHasScrolled();
-    },
-    slowTimeout ? 500 : 100
-  );
 }
 
 // src/core/doMaintainScrollAtEnd.ts

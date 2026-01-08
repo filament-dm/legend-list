@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Clean dist folder to prevent declaration file conflicts
+echo "Cleaning dist folder..."
+rm -rf dist
+
 echo "Building legend-list..."
 npx tsup
 

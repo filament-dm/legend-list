@@ -1180,8 +1180,12 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b;
+  var _a3, _b, _c;
   const state = ctx.state;
+  console.log("[LegendList:finishScrollTo]", {
+    hasCallback: !!((_a3 = state == null ? void 0 : state.scrollingTo) == null ? void 0 : _a3.onSettled),
+    hasScrollingTo: !!(state == null ? void 0 : state.scrollingTo)
+  });
   if (state == null ? void 0 : state.scrollingTo) {
     const scrollingTo = state.scrollingTo;
     const callback = scrollingTo.onSettled;
@@ -1192,14 +1196,15 @@ function finishScrollTo(ctx) {
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
-    if ((_a3 = state.props) == null ? void 0 : _a3.data) {
-      (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true });
+    if ((_b = state.props) == null ? void 0 : _b.data) {
+      (_c = state.triggerCalculateItemsInView) == null ? void 0 : _c.call(state, { forceFullItemPositions: true });
     }
     if (PlatformAdjustBreaksScroll) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
     }
     setInitialRenderState(ctx, { didInitialScroll: true });
     if (callback) {
+      console.log("[LegendList:finishScrollTo:callback]", "Invoking onSettled callback");
       callback();
     }
   }
