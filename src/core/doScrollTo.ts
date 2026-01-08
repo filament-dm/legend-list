@@ -1,5 +1,6 @@
 import { finishScrollTo } from "@/core/finishScrollTo";
 import type { StateContext } from "@/state/state";
+import { checkFinishedScrollFallback } from "./checkFinishedScroll";
 
 export interface DoScrollToParams {
     animated?: boolean;
@@ -23,10 +24,18 @@ export function doScrollTo(ctx: StateContext, params: DoScrollToParams) {
         const left = horizontal ? offset : 0;
         const top = horizontal ? 0 : offset;
 
+        console.log("[LegendList:doScrollTo]", {
+            animated,
+            hasCallback: !!ctx.state.scrollingTo?.onSettled,
+            offset,
+        });
+
         node.scrollTo({ behavior: animated ? "smooth" : "auto", left, top });
 
         if (animated) {
             listenForScrollEnd(ctx, node);
+            // Fallback check (matches native implementation)
+            checkFinishedScrollFallback(ctx);
         } else {
             state.scroll = offset;
             setTimeout(() => {
@@ -43,7 +52,17 @@ function listenForScrollEnd(ctx: StateContext, node: HTMLElement): () => void {
     let settled = false;
     const targetToken = ctx.state.scrollingTo;
 
+    console.log("[LegendList:listenForScrollEnd]", {
+        mechanism: supportsScrollEnd ? "scrollend event" : "fallback timeouts",
+        supportsScrollEnd,
+    });
+
     const finish = () => {
+        console.log("[LegendList:listenForScrollEnd:finish]", {
+            settled,
+            tokenMatch: targetToken === ctx.state.scrollingTo,
+        });
+
         if (settled) return;
         settled = true;
 
