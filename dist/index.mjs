@@ -1060,6 +1060,7 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
     return () => resizeObserver.disconnect();
   }, [onLayout]);
   const scrollViewStyle = {
+    height: horizontal ? void 0 : "100%",
     overflow: "auto",
     overflowX: horizontal ? "auto" : showsHorizontalScrollIndicator ? "auto" : "hidden",
     overflowY: horizontal ? showsVerticalScrollIndicator ? "auto" : "hidden" : "auto",
@@ -1067,6 +1068,7 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
     // Ensure proper positioning context
     WebkitOverflowScrolling: "touch",
     // iOS momentum scrolling
+    width: horizontal ? "100%" : void 0,
     ...StyleSheet.flatten(style)
   };
   const contentStyle = {
@@ -1311,7 +1313,7 @@ function updateAlignItemsPaddingTop(ctx) {
   } = state;
   if (alignItemsAtEnd) {
     let alignItemsPaddingTop = 0;
-    if ((data == null ? void 0 : data.length) > 0) {
+    if ((data == null ? void 0 : data.length) > 0 && scrollLength > 0) {
       const contentSize = getContentSize(ctx);
       alignItemsPaddingTop = Math.max(0, Math.floor(scrollLength - contentSize));
     }

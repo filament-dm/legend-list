@@ -1061,7 +1061,7 @@ function updateAlignItemsPaddingTop(ctx) {
   } = state;
   if (alignItemsAtEnd) {
     let alignItemsPaddingTop = 0;
-    if ((data == null ? void 0 : data.length) > 0) {
+    if ((data == null ? void 0 : data.length) > 0 && scrollLength > 0) {
       const contentSize = getContentSize(ctx);
       alignItemsPaddingTop = Math.max(0, Math.floor(scrollLength - contentSize));
     }
