@@ -182,14 +182,44 @@ describe("updateAlignItemsPaddingTop", () => {
     });
 
     describe("scrollLength variations", () => {
-        it("should handle zero scrollLength", () => {
+        it("should handle zero scrollLength by setting padding to 0 without calculating", () => {
             mockState.scrollLength = 0;
             getContentSizeSpy.mockReturnValue(100);
 
             updateAlignItemsPaddingTop(mockCtx);
 
+            // When scrollLength is 0, should not call getContentSize
+            expect(getContentSizeSpy).not.toHaveBeenCalled();
+            // Should still set padding to 0 to ensure initial state is correct
             expect(setPaddingTopSpy).toHaveBeenCalledWith(mockCtx, {
-                alignItemsPaddingTop: 0, // Math.max(0, Math.floor(0 - 100))
+                alignItemsPaddingTop: 0,
+            });
+        });
+
+        it("should correctly calculate padding after scrollLength changes from 0 to valid value", () => {
+            // Initial state: scrollLength is 0 (viewport not measured yet)
+            mockState.scrollLength = 0;
+            getContentSizeSpy.mockReturnValue(100);
+
+            updateAlignItemsPaddingTop(mockCtx);
+
+            expect(getContentSizeSpy).not.toHaveBeenCalled();
+            expect(setPaddingTopSpy).toHaveBeenCalledWith(mockCtx, {
+                alignItemsPaddingTop: 0,
+            });
+
+            // Viewport size becomes known
+            setPaddingTopSpy.mockClear();
+            getContentSizeSpy.mockClear();
+            mockState.scrollLength = 600; // Viewport measured as 600px
+            getContentSizeSpy.mockReturnValue(120); // Content is small (2 messages)
+
+            updateAlignItemsPaddingTop(mockCtx);
+
+            // Now it should calculate correctly
+            expect(getContentSizeSpy).toHaveBeenCalledWith(mockCtx);
+            expect(setPaddingTopSpy).toHaveBeenCalledWith(mockCtx, {
+                alignItemsPaddingTop: 480, // 600 - 120 = content aligned to bottom
             });
         });
 
