@@ -54,14 +54,14 @@ function getContentInsetEnd(state) {
 
 // src/state/getContentSize.ts
 function getContentSize(ctx) {
-  var _a3;
+  var _a3, _b;
   const { values, state } = ctx;
   const stylePaddingTop = values.get("stylePaddingTop") || 0;
   const stylePaddingBottom = state.props.stylePaddingBottom || 0;
   const headerSize = values.get("headerSize") || 0;
   const footerSize = values.get("footerSize") || 0;
   const contentInsetBottom = getContentInsetEnd(state);
-  const totalSize = (_a3 = state.pendingTotalSize) != null ? _a3 : values.get("totalSize");
+  const totalSize = (_b = (_a3 = state.pendingTotalSize) != null ? _a3 : values.get("totalSize")) != null ? _b : 0;
   return headerSize + footerSize + totalSize + stylePaddingTop + stylePaddingBottom + (contentInsetBottom || 0);
 }
 
