@@ -8,6 +8,6 @@ export function getContentSize(ctx: StateContext) {
     const headerSize: number = values.get("headerSize") || 0;
     const footerSize: number = values.get("footerSize") || 0;
     const contentInsetBottom = getContentInsetEnd(state);
-    const totalSize: number = state.pendingTotalSize ?? values.get("totalSize");
+    const totalSize: number = state.pendingTotalSize ?? values.get("totalSize") ?? 0;
     return headerSize + footerSize + totalSize + stylePaddingTop + stylePaddingBottom + (contentInsetBottom || 0);
 }
