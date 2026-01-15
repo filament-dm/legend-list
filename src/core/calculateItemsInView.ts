@@ -12,6 +12,8 @@ import { getContentSize } from "@/state/getContentSize";
 import { peek$, type StateContext, set$ } from "@/state/state";
 import type { InternalState } from "@/types";
 import { checkAllSizesKnown } from "@/utils/checkAllSizesKnown";
+import { checkAtBottom } from "@/utils/checkAtBottom";
+import { checkAtTop } from "@/utils/checkAtTop";
 import { findAvailableContainers } from "@/utils/findAvailableContainers";
 import { getId } from "@/utils/getId";
 import { getItemSize } from "@/utils/getItemSize";
@@ -653,5 +655,16 @@ export function calculateItemsInView(
 
     if (!IsNewArchitecture && state.initialAnchor) {
         ensureInitialAnchor(ctx);
+    }
+
+    // After state machine initialization (null → false), trigger threshold check to fire callbacks
+    // This handles the case where content is insufficient on initial load
+    if (state.isEndReached === false || state.isStartReached === false) {
+        requestAnimationFrame(() => {
+            checkAtTop(state);
+            if (!state.props.maintainScrollAtEnd) {
+                checkAtBottom(ctx);
+            }
+        });
     }
 }

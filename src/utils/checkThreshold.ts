@@ -31,6 +31,11 @@ export const checkThreshold = (
     // Before the threshold has ever been exited, treat wasReached as null to avoid
     // firing immediately on mount when starting inside the window.
     if (wasReached === null) {
+        // Special case: If content is insufficient (atThreshold explicitly set),
+        // initialize to false to enable the callback on the next check
+        if (atThreshold && threshold > 0) {
+            return false;
+        }
         // Overscroll (negative distance) should still be treated as within on the initial pass.
         if (!within && distance >= 0) {
             return false;
@@ -50,7 +55,7 @@ export const checkThreshold = (
         });
     };
 
-    if (!wasReached) {
+    if (wasReached === false) {
         // First time we enter this window: trigger and remember it
         if (!within) {
             return false;
