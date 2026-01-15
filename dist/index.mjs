@@ -1623,6 +1623,9 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
   const absDistance = Math.abs(distance);
   const within = atThreshold || threshold > 0 && absDistance <= threshold;
   if (wasReached === null) {
+    if (atThreshold && threshold > 0) {
+      return false;
+    }
     if (!within && distance >= 0) {
       return false;
     }
@@ -1636,7 +1639,7 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
       scrollPosition: context.scrollPosition
     });
   };
-  if (!wasReached) {
+  if (wasReached === false) {
     if (!within) {
       return false;
     }
@@ -2927,6 +2930,14 @@ function calculateItemsInView(ctx, params = {}) {
       }
     }
   });
+  if (state.isEndReached === false || state.isStartReached === false) {
+    requestAnimationFrame(() => {
+      checkAtTop(state);
+      if (!state.props.maintainScrollAtEnd) {
+        checkAtBottom(ctx);
+      }
+    });
+  }
 }
 
 // src/core/checkActualChange.ts
@@ -3046,12 +3057,35 @@ function checkResetContainers(ctx, dataProp) {
   calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
   const shouldMaintainScrollAtEnd = maintainScrollAtEnd === true || maintainScrollAtEnd.onDataChange;
   const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
-  if (!didMaintainScrollAtEnd && previousData && dataProp.length > previousData.length) {
-    state.isEndReached = false;
+  const contentSize = getContentSize(ctx);
+  const { scrollLength, scroll } = state;
+  const { onEndReachedThreshold, onStartReachedThreshold } = state.props;
+  const HYSTERESIS = 1.3;
+  const endThreshold = (onEndReachedThreshold != null ? onEndReachedThreshold : 0.5) * scrollLength;
+  const startThreshold = (onStartReachedThreshold != null ? onStartReachedThreshold : 0.5) * scrollLength;
+  const distanceFromEnd = contentSize - scroll - scrollLength;
+  const distanceFromStart = scroll;
+  if (maintainScrollAtEnd) {
+    const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS;
+    if (needsStartBuffer) {
+      state.isStartReached = false;
+    }
+  } else {
+    const needsEndBuffer = distanceFromEnd < endThreshold * HYSTERESIS;
+    const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS;
+    if (needsEndBuffer) {
+      state.isEndReached = false;
+    }
+    if (needsStartBuffer) {
+      state.isStartReached = false;
+    }
   }
-  if (!didMaintainScrollAtEnd) {
+  const needsThresholdCheck = maintainScrollAtEnd ? !didMaintainScrollAtEnd || distanceFromStart < startThreshold * HYSTERESIS : !didMaintainScrollAtEnd || distanceFromEnd < endThreshold * HYSTERESIS || distanceFromStart < startThreshold * HYSTERESIS;
+  if (needsThresholdCheck) {
     checkAtTop(state);
-    checkAtBottom(ctx);
+    if (!maintainScrollAtEnd) {
+      checkAtBottom(ctx);
+    }
   }
   delete state.previousData;
 }
