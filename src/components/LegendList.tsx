@@ -529,7 +529,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
             props: { data },
         } = state;
         const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
-        if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
+        if (!didAllocateContainers && (isFirst || didDataChange || didColumnsChange)) {
             checkResetContainers(ctx, data);
         }
         // Now that it's done, reset the flags
