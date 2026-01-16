@@ -3808,7 +3808,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       props: { data }
     } = state;
     const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
-    if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
+    if (!didAllocateContainers && (isFirst || didDataChange || didColumnsChange)) {
       checkResetContainers(ctx, data);
     }
     state.didColumnsChange = false;
