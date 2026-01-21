@@ -6,11 +6,6 @@ import { setInitialRenderState } from "@/utils/setInitialRenderState";
 export function finishScrollTo(ctx: StateContext) {
     const state = ctx.state;
 
-    console.log("[LegendList:finishScrollTo]", {
-        hasCallback: !!state?.scrollingTo?.onSettled,
-        hasScrollingTo: !!state?.scrollingTo,
-    });
-
     if (state?.scrollingTo) {
         // Save scrollingTo before clearing it so we can pass it to commitPendingAdjust
         const scrollingTo = state.scrollingTo;
@@ -26,7 +21,7 @@ export function finishScrollTo(ctx: StateContext) {
         }
 
         if (state.props?.data) {
-            state.triggerCalculateItemsInView?.({ forceFullItemPositions: true });
+            state.triggerCalculateItemsInView?.({ forceFullItemPositions: true, doMVCP: true });
         }
 
         if (PlatformAdjustBreaksScroll) {
@@ -37,7 +32,6 @@ export function finishScrollTo(ctx: StateContext) {
 
         // Invoke callback after all state cleanup and updates are complete
         if (callback) {
-            console.log("[LegendList:finishScrollTo:callback]", "Invoking onSettled callback");
             callback();
         }
     }

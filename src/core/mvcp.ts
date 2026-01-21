@@ -22,10 +22,19 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
     const indexByKey = state.indexByKey;
 
-    // console.log("prepareMVCP", ctx.contextNum, shouldMVCP, dataChanged, mvcpdataChanged, mvcpScroll);
 
     if (shouldMVCP) {
-        if (scrollTarget !== undefined) {
+        // ABSOLUTE PRIORITY: During initialization, lock to stabilization anchor
+        if (state.isInitializing && props.stabilizationAnchorId) {
+            const anchorIndex = indexByKey.get(props.stabilizationAnchorId);
+            const hasPosition = positions.has(props.stabilizationAnchorId);
+            // Only use anchor if it exists in data and has been rendered (in positions)
+            if (anchorIndex !== undefined && hasPosition) {
+                targetId = props.stabilizationAnchorId;
+            }
+        }
+        // Priority 1: Active scroll target (when not initializing)
+        else if (scrollTarget !== undefined) {
             if (!IsNewArchitecture && scrollingTo?.isInitialScroll) {
                 // In old architecture, we don't want to do MVCP for the initial scroll
                 // because it can cause inaccuracy
@@ -33,7 +42,9 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             }
             // If we're currently scrolling to a target index, do MVCP for its position
             targetId = getId(state, scrollTarget);
-        } else if (idsInView.length > 0 && state.didContainersLayout) {
+        }
+        // Priority 2: First visible item (default behavior)
+        else if (idsInView.length > 0 && state.didContainersLayout) {
             if (dataChanged) {
                 // Do MVCP for the first item fully in view
                 for (let i = 0; i < idsInView.length; i++) {

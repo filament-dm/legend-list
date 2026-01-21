@@ -59,6 +59,7 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
             endBuffered: state.endBuffered,
             isAtEnd: state.isAtEnd,
             isAtStart: state.isAtStart,
+            isInitializing: state.isInitializing,
             listen: <T extends LegendListListenerType>(signalName: T, cb: (value: ListenerTypeValueMap[T]) => void) =>
                 listen$(ctx, signalName, cb),
             listenToPosition: (key: string, cb: (value: number) => void) => listenPosition$(ctx, key, cb),

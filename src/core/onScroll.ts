@@ -2,6 +2,7 @@ import { checkFinishedScroll } from "@/core/checkFinishedScroll";
 import { clampScrollOffset } from "@/core/clampScrollOffset";
 import { scrollTo } from "@/core/scrollTo";
 import { updateScroll } from "@/core/updateScroll";
+import { Platform } from "@/platform/Platform";
 import type { NativeScrollEvent, NativeSyntheticEvent } from "@/platform/platform-types";
 import type { StateContext } from "@/state/state";
 
@@ -59,7 +60,14 @@ export function onScroll(ctx: StateContext, event: NativeSyntheticEvent<NativeSc
     updateScroll(ctx, newScroll, insetChanged);
 
     if (state.scrollingTo) {
-        checkFinishedScroll(ctx);
+        // On web, animated scrolls use listenForScrollEnd (scrollend event) to detect completion.
+        // checkFinishedScroll would race with that and call finishScrollTo prematurely,
+        // causing the scrollend handler's token check to fail.
+        // For native platforms or non-animated scrolls, checkFinishedScroll is still needed.
+        const isWebAnimatedScroll = Platform.OS === "web" && state.scrollingTo.animated;
+        if (!isWebAnimatedScroll) {
+            checkFinishedScroll(ctx);
+        }
     }
 
     // Cast to any since platform-types is a subset of react-native's event type

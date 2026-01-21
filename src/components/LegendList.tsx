@@ -147,6 +147,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         onScroll: onScrollProp,
         onStartReached,
         onStartReachedThreshold = 0.5,
+        onStabilizationComplete,
         onStickyHeaderChange,
         onViewableItemsChanged,
         progressViewOffset,
@@ -157,10 +158,12 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         renderItem,
         scrollEventThrottle,
         snapToIndices,
+        stabilizationAnchorId,
         stickyHeaderIndices: stickyHeaderIndicesProp,
         stickyIndices: stickyIndicesDeprecated, // TODOV3: Remove from v3 release
         style: styleProp,
         suggestEstimatedItemSize,
+        timelineId,
         viewabilityConfig,
         viewabilityConfigCallbackPairs,
         waitForInitialLayout = true,
@@ -271,7 +274,10 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 isAtStart: false,
                 isEndReached: null,
                 isFirst: true,
+                isInitializing: false,
                 isStartReached: null,
+                lastTimelineId: undefined,
+                stabilizationStableFrames: 0,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
                 lastScrollDelta: 0,
@@ -359,19 +365,29 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         onScroll: throttleScrollFn,
         onStartReached,
         onStartReachedThreshold,
+        onStabilizationComplete,
         onStickyHeaderChange,
         recycleItems: !!recycleItems,
         renderItem: renderItem!,
         scrollBuffer,
         snapToIndices,
+        stabilizationAnchorId,
         stickyIndicesArr: stickyHeaderIndices ?? [],
         stickyIndicesSet: useMemo(() => new Set(stickyHeaderIndices ?? []), [stickyHeaderIndices?.join(",")]),
         stylePaddingBottom: stylePaddingBottomState,
         stylePaddingTop: stylePaddingTopState,
         suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+        timelineId,
     };
 
     state.refScroller = refScroller;
+
+    // Detect timelineId change to enter initialization mode
+    if (timelineId !== state.lastTimelineId) {
+        state.lastTimelineId = timelineId;
+        state.isInitializing = true;
+        state.stabilizationStableFrames = 0;
+    }
 
     const memoizedLastItemKeys = useMemo(() => {
         if (!dataProp.length) return [];

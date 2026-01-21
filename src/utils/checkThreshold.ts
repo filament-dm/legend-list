@@ -1,6 +1,6 @@
 import type { ThresholdSnapshot } from "@/types";
 
-const HYSTERESIS_MULTIPLIER = 1.3;
+export const HYSTERESIS_MULTIPLIER = 1.3;
 
 interface ThresholdContext {
     scrollPosition: number;
@@ -30,16 +30,24 @@ export const checkThreshold = (
 
     // Before the threshold has ever been exited, treat wasReached as null to avoid
     // firing immediately on mount when starting inside the window.
+    // Transition null → false to allow state machine progression
     if (wasReached === null) {
         // Special case: If content is insufficient (atThreshold explicitly set),
         // initialize to false to enable the callback on the next check
         if (atThreshold && threshold > 0) {
             return false;
         }
-        // Overscroll (negative distance) should still be treated as within on the initial pass.
+        // Starting within threshold zone: transition to false
+        // This allows state machine to progress (null → false → true)
+        // while preventing callback from firing on mount (callbacks only fire on false → true)
+        if (within) {
+            return false;
+        }
+        // Starting outside threshold: also transition to false
         if (!within && distance >= 0) {
             return false;
         }
+        // Overscroll (negative distance) - wait one more frame
         return null;
     }
 

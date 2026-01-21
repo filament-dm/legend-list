@@ -45,6 +45,7 @@ export function scrollToIndex(
     scrollTo(ctx, {
         animated,
         index,
+        itemKey: targetId,
         itemSize,
         offset: firstIndexOffset,
         onSettled: wrappedOnSettled,

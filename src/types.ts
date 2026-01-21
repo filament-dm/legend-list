@@ -209,6 +209,42 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     maintainVisibleContentPosition?: boolean | MaintainVisibleContentPositionConfig<ItemT>;
 
     /**
+     * Timeline identifier that signals when the list is in initialization mode.
+     * When this value changes, the list enters initialization mode and will
+     * absolutely lock MVCP to the stabilizationAnchorId (if provided) until
+     * stabilization completes.
+     *
+     * Use case: Set to a unique identifier when navigating to a new timeline
+     * or jumping to a specific message. The changing value triggers initialization
+     * mode, preventing scroll jumps during pagination.
+     *
+     * Example: "conversation-123:message-456"
+     */
+    timelineId?: string;
+
+    /**
+     * Optional anchor ID to maintain on screen during initialization.
+     * When timelineId changes (entering initialization mode), MVCP will
+     * absolutely prioritize keeping this item stable while pagination fills
+     * the viewport, ignoring all other anchors.
+     *
+     * Use case: When loading a focused timeline or navigating to a specific message,
+     * set this to the target message ID along with a new timelineId.
+     */
+    stabilizationAnchorId?: string;
+
+    /**
+     * Callback fired when viewport filling completes and the list becomes stable.
+     * Fired when both isEndReached and isStartReached transition from false to true,
+     * indicating that sufficient content has been loaded to fill the viewport.
+     *
+     * Use case: Clear stabilizationAnchorId when this callback fires to return to
+     * normal MVCP behavior. The timelineId should remain unchanged so future data
+     * updates don't re-trigger initialization mode.
+     */
+    onStabilizationComplete?: () => void;
+
+    /**
      * Number of columns to render items in.
      * @default 1
      */
@@ -429,6 +465,11 @@ export interface ScrollTarget {
     animated?: boolean;
     index?: number;
     isInitialScroll?: boolean;
+    /**
+     * The item key (ID) for the target item. This allows looking up the current index
+     * after data changes (insertions, deletions, reordering), preventing stale index bugs.
+     */
+    itemKey?: string;
     itemSize?: number;
     offset: number;
     /**
@@ -472,7 +513,10 @@ export interface InternalState {
     isAtStart: boolean;
     isEndReached: boolean | null;
     isFirst?: boolean;
+    isInitializing: boolean;
     isStartReached: boolean | null;
+    lastTimelineId: string | undefined;
+    stabilizationStableFrames: number;
     lastBatchingAction: number;
     lastLayout: LayoutRectangle | undefined;
     lastScrollAdjustForHistory?: number;
@@ -550,16 +594,19 @@ export interface InternalState {
         onScroll: LegendListProps["onScroll"];
         onStartReached: LegendListProps["onStartReached"];
         onStartReachedThreshold: number | null | undefined;
+        onStabilizationComplete: LegendListProps["onStabilizationComplete"];
         onStickyHeaderChange: LegendListProps["onStickyHeaderChange"];
         recycleItems: boolean;
         renderItem: LegendListProps["renderItem"];
         scrollBuffer: number;
         snapToIndices: number[] | undefined;
+        stabilizationAnchorId: LegendListProps["stabilizationAnchorId"];
         stickyIndicesArr: number[];
         stickyIndicesSet: Set<number>;
         stylePaddingBottom: number | undefined;
         stylePaddingTop: number | undefined;
         suggestEstimatedItemSize: boolean;
+        timelineId: LegendListProps["timelineId"];
     };
 }
 
@@ -591,6 +638,7 @@ export type LegendListState = {
     endBuffered: number;
     isAtEnd: boolean;
     isAtStart: boolean;
+    isInitializing: boolean;
     listen: <T extends LegendListListenerType>(
         listenerType: T,
         callback: (value: ListenerTypeValueMap[T]) => void,

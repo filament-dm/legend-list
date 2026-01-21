@@ -14,6 +14,7 @@ import type { InternalState } from "@/types";
 import { checkAllSizesKnown } from "@/utils/checkAllSizesKnown";
 import { checkAtBottom } from "@/utils/checkAtBottom";
 import { checkAtTop } from "@/utils/checkAtTop";
+import { checkStabilizationComplete } from "@/utils/checkStabilizationComplete";
 import { findAvailableContainers } from "@/utils/findAvailableContainers";
 import { getId } from "@/utils/getId";
 import { getItemSize } from "@/utils/getItemSize";
@@ -657,14 +658,14 @@ export function calculateItemsInView(
         ensureInitialAnchor(ctx);
     }
 
-    // After state machine initialization (null → false), trigger threshold check to fire callbacks
-    // This handles the case where content is insufficient on initial load
-    if (state.isEndReached === false || state.isStartReached === false) {
+    // Trigger threshold checks whenever thresholds are not fully satisfied
+    // This ensures state machine can progress through all states: null → false → true
+    if (state.isEndReached !== true || state.isStartReached !== true) {
         requestAnimationFrame(() => {
             checkAtTop(state);
-            if (!state.props.maintainScrollAtEnd) {
-                checkAtBottom(ctx);
-            }
+            checkAtBottom(ctx);
+            // Check if stabilization completed and fire callback
+            checkStabilizationComplete(state, ctx);
         });
     }
 }

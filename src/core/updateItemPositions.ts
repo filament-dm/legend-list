@@ -63,7 +63,8 @@ export function updateItemPositions(
         state.scrollAdjustHandler.getAdjust() !== 0 ||
         (peek$(ctx, "scrollAdjustPending") ?? 0) !== 0;
 
-    let currentRowTop = 0;
+    const alignItemsPaddingTop = peek$(ctx, "alignItemsPaddingTop") || 0;
+    let currentRowTop = alignItemsPaddingTop;
     let column = 1;
     let maxSizeInRow = 0;
 

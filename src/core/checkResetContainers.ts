@@ -5,6 +5,8 @@ import type { StateContext } from "@/state/state";
 import type { MaintainScrollAtEndOptions } from "@/types";
 import { checkAtBottom } from "@/utils/checkAtBottom";
 import { checkAtTop } from "@/utils/checkAtTop";
+import { checkStabilizationComplete } from "@/utils/checkStabilizationComplete";
+import { HYSTERESIS_MULTIPLIER } from "@/utils/checkThreshold";
 import { updateAveragesOnDataChange } from "@/utils/updateAveragesOnDataChange";
 
 export function checkResetContainers(ctx: StateContext, dataProp: readonly unknown[]) {
@@ -23,59 +25,48 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
 
     const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
 
-    // Automatic viewport filling: Paginate until content extends beyond threshold zones
-    // This ensures the threshold state machine can properly initialize (null → false transition)
-    const contentSize = getContentSize(ctx);
-    const { scrollLength, scroll } = state;
-    const { onEndReachedThreshold, onStartReachedThreshold } = state.props;
+    // Always check thresholds after data changes to allow state machine to progress
+    checkAtTop(state, ctx);
+    checkAtBottom(ctx);
 
-    // Use hysteresis multiplier (1.3) to guarantee we're outside the threshold zone
-    // This prevents immediate re-entry after the user scrolls slightly
-    const HYSTERESIS = 1.3;
+    // During initialization: Force pagination until viewport is filled
+    // This drives the paginate-until-full loop by forcing flags to false
+    // when content is insufficient, ensuring callbacks fire again after each data load
+    if (state.isInitializing) {
+        const contentSize = getContentSize(ctx);
+        const { scrollLength, scroll } = state;
+        const { onEndReachedThreshold, onStartReachedThreshold } = state.props;
 
-    // Calculate thresholds with safety margin
-    const endThreshold = (onEndReachedThreshold ?? 0.5) * scrollLength;
-    const startThreshold = (onStartReachedThreshold ?? 0.5) * scrollLength;
+        // Use hysteresis multiplier to guarantee we're outside the threshold zone
+        // Content must extend beyond: scroll + viewport + (threshold * 130%)
+        const endThreshold = (onEndReachedThreshold ?? 0.5) * scrollLength;
+        const startThreshold = (onStartReachedThreshold ?? 0.5) * scrollLength;
 
-    // Measure actual distances from each edge
-    const distanceFromEnd = contentSize - scroll - scrollLength;
-    const distanceFromStart = scroll;
+        const distanceFromEnd = contentSize - scroll - scrollLength;
+        const distanceFromStart = scroll;
 
-    // Determine which directions need more content
-    if (maintainScrollAtEnd) {
-        // Live chat: only need backward buffer (older messages at index 0)
-        // User is at bottom visually, should only check top threshold (start)
-        const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS;
-        if (needsStartBuffer) {
-            state.isStartReached = false;
-        }
-    } else {
-        // Mid-timeline: check BOTH directions independently
-        // Must ensure buffer on both sides to position outside threshold zones
-        const needsEndBuffer = distanceFromEnd < endThreshold * HYSTERESIS;
-        const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS;
+        if (maintainScrollAtEnd) {
+            // Live chat: only need backward buffer (older messages at index 0)
+            const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS_MULTIPLIER;
+            if (needsStartBuffer) {
+                state.isStartReached = false;
+            }
+        } else {
+            // Mid-timeline: check both directions independently
+            const needsEndBuffer = distanceFromEnd < endThreshold * HYSTERESIS_MULTIPLIER;
+            const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS_MULTIPLIER;
 
-        if (needsEndBuffer) {
-            state.isEndReached = false;
-        }
-        if (needsStartBuffer) {
-            state.isStartReached = false;
-        }
-    }
-
-    // Check thresholds if we didn't just maintain scroll OR if the relevant direction needs filling
-    const needsThresholdCheck = maintainScrollAtEnd
-        ? !didMaintainScrollAtEnd || distanceFromStart < startThreshold * HYSTERESIS
-        : !didMaintainScrollAtEnd ||
-          distanceFromEnd < endThreshold * HYSTERESIS ||
-          distanceFromStart < startThreshold * HYSTERESIS;
-
-    if (needsThresholdCheck) {
-        checkAtTop(state);
-        if (!maintainScrollAtEnd) {
-            checkAtBottom(ctx);
+            if (needsEndBuffer) {
+                state.isEndReached = false;
+            }
+            if (needsStartBuffer) {
+                state.isStartReached = false;
+            }
         }
     }
+
+    // Check if stabilization completed and fire callback
+    checkStabilizationComplete(state, ctx);
 
     delete state.previousData;
 }

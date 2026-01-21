@@ -1,5 +1,6 @@
 import { getContentSize } from "@/state/getContentSize";
 import type { StateContext } from "@/state/state";
+import { checkStabilizationComplete } from "@/utils/checkStabilizationComplete";
 import { checkThreshold } from "@/utils/checkThreshold";
 
 export function checkAtBottom(ctx: StateContext) {
@@ -8,19 +9,23 @@ export function checkAtBottom(ctx: StateContext) {
         return;
     }
     const {
-        queuedInitialLayout,
         scrollLength,
         scroll,
         maintainingScrollAtEnd,
         props: { maintainScrollAtEndThreshold, onEndReachedThreshold },
     } = state;
     const contentSize = getContentSize(ctx);
-    if (contentSize > 0 && queuedInitialLayout && !maintainingScrollAtEnd) {
+
+    // Always check threshold, even with zero content or during animations
+    // The threshold state machine needs to progress (null → false → true)
+    // Skip only if actively animating scroll to end to avoid interference
+    if (!maintainingScrollAtEnd) {
         // Check if at end
         const distanceFromEnd = contentSize - scroll - scrollLength;
         const isContentLess = contentSize < scrollLength;
         state.isAtEnd = isContentLess || distanceFromEnd < scrollLength * maintainScrollAtEndThreshold!;
 
+        const prevIsEndReached = state.isEndReached;
         state.isEndReached = checkThreshold(
             distanceFromEnd,
             isContentLess,
@@ -32,11 +37,17 @@ export function checkAtBottom(ctx: StateContext) {
                 dataLength: state.props.data?.length,
                 scrollPosition: scroll,
             },
-            (distance) => state.props.onEndReached?.({ distanceFromEnd: distance }),
+            (distance) => {
+                state.props.onEndReached?.({ distanceFromEnd: distance });
+            },
             (snapshot) => {
                 state.endReachedSnapshot = snapshot;
             },
             true,
         );
+
+        // Always check stabilization after threshold updates
+        // This ensures initialization can complete even if RAF doesn't fire
+        checkStabilizationComplete(state, ctx);
     }
 }
