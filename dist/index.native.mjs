@@ -1159,12 +1159,8 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b, _c;
+  var _a3, _b;
   const state = ctx.state;
-  console.log("[LegendList:finishScrollTo]", {
-    hasCallback: !!((_a3 = state == null ? void 0 : state.scrollingTo) == null ? void 0 : _a3.onSettled),
-    hasScrollingTo: !!(state == null ? void 0 : state.scrollingTo)
-  });
   if (state == null ? void 0 : state.scrollingTo) {
     const scrollingTo = state.scrollingTo;
     const callback = scrollingTo.onSettled;
@@ -1175,15 +1171,14 @@ function finishScrollTo(ctx) {
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
-    if ((_b = state.props) == null ? void 0 : _b.data) {
-      (_c = state.triggerCalculateItemsInView) == null ? void 0 : _c.call(state, { forceFullItemPositions: true });
+    if ((_a3 = state.props) == null ? void 0 : _a3.data) {
+      (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true, doMVCP: true });
     }
     if (PlatformAdjustBreaksScroll) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
     }
     setInitialRenderState(ctx, { didInitialScroll: true });
     if (callback) {
-      console.log("[LegendList:finishScrollTo:callback]", "Invoking onSettled callback");
       callback();
     }
   }
@@ -1284,6 +1279,31 @@ function scrollTo(ctx, params) {
   }
 }
 
+// src/utils/checkStabilizationComplete.ts
+var STABILIZATION_FRAME_COUNT = 3;
+function checkStabilizationComplete(state, ctx) {
+  var _a3, _b, _c;
+  if (!state.isInitializing) {
+    return;
+  }
+  const { isEndReached, isStartReached } = state;
+  const isViewportFilled = isEndReached === true && isStartReached === true;
+  if (isViewportFilled) {
+    state.stabilizationStableFrames = ((_a3 = state.stabilizationStableFrames) != null ? _a3 : 0) + 1;
+    if (state.stabilizationStableFrames >= STABILIZATION_FRAME_COUNT) {
+      state.isInitializing = false;
+      state.stabilizationStableFrames = 0;
+      if (ctx && state.props.alignItemsAtEnd) {
+        updateAlignItemsPaddingTop(ctx);
+        calculateItemsInView(ctx, { forceFullItemPositions: true });
+      }
+      (_c = (_b = state.props).onStabilizationComplete) == null ? void 0 : _c.call(_b);
+    }
+  } else {
+    state.stabilizationStableFrames = 0;
+  }
+}
+
 // src/utils/checkThreshold.ts
 var HYSTERESIS_MULTIPLIER = 1.3;
 var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, context, onReached, setSnapshot, allowReentryOnChange) => {
@@ -1291,6 +1311,9 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
   const within = atThreshold || threshold > 0 && absDistance <= threshold;
   if (wasReached === null) {
     if (atThreshold && threshold > 0) {
+      return false;
+    }
+    if (within) {
       return false;
     }
     if (!within && distance >= 0) {
@@ -1339,17 +1362,17 @@ function checkAtBottom(ctx) {
     return;
   }
   const {
-    queuedInitialLayout,
     scrollLength,
     scroll,
     maintainingScrollAtEnd,
     props: { maintainScrollAtEndThreshold, onEndReachedThreshold }
   } = state;
   const contentSize = getContentSize(ctx);
-  if (contentSize > 0 && queuedInitialLayout && !maintainingScrollAtEnd) {
+  if (!maintainingScrollAtEnd) {
     const distanceFromEnd = contentSize - scroll - scrollLength;
     const isContentLess = contentSize < scrollLength;
     state.isAtEnd = isContentLess || distanceFromEnd < scrollLength * maintainScrollAtEndThreshold;
+    state.isEndReached;
     state.isEndReached = checkThreshold(
       distanceFromEnd,
       isContentLess,
@@ -1363,18 +1386,19 @@ function checkAtBottom(ctx) {
       },
       (distance) => {
         var _a4, _b;
-        return (_b = (_a4 = state.props).onEndReached) == null ? void 0 : _b.call(_a4, { distanceFromEnd: distance });
+        (_b = (_a4 = state.props).onEndReached) == null ? void 0 : _b.call(_a4, { distanceFromEnd: distance });
       },
       (snapshot) => {
         state.endReachedSnapshot = snapshot;
       },
       true
     );
+    checkStabilizationComplete(state, ctx);
   }
 }
 
 // src/utils/checkAtTop.ts
-function checkAtTop(state) {
+function checkAtTop(state, ctx) {
   var _a3;
   if (!state) {
     return;
@@ -1386,6 +1410,7 @@ function checkAtTop(state) {
   } = state;
   const distanceFromTop = scroll;
   state.isAtStart = distanceFromTop <= 0;
+  state.isStartReached;
   state.isStartReached = checkThreshold(
     distanceFromTop,
     false,
@@ -1399,13 +1424,14 @@ function checkAtTop(state) {
     },
     (distance) => {
       var _a4, _b;
-      return (_b = (_a4 = state.props).onStartReached) == null ? void 0 : _b.call(_a4, { distanceFromStart: distance });
+      (_b = (_a4 = state.props).onStartReached) == null ? void 0 : _b.call(_a4, { distanceFromStart: distance });
     },
     (snapshot) => {
       state.startReachedSnapshot = snapshot;
     },
     false
   );
+  checkStabilizationComplete(state, ctx);
 }
 
 // src/core/updateScroll.ts
@@ -1576,7 +1602,13 @@ function prepareMVCP(ctx, dataChanged) {
   const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
   const indexByKey = state.indexByKey;
   if (shouldMVCP) {
-    if (scrollTarget !== void 0) {
+    if (state.isInitializing && props.stabilizationAnchorId) {
+      const anchorIndex = indexByKey.get(props.stabilizationAnchorId);
+      const hasPosition = positions.has(props.stabilizationAnchorId);
+      if (anchorIndex !== void 0 && hasPosition) {
+        targetId = props.stabilizationAnchorId;
+      }
+    } else if (scrollTarget !== void 0) {
       if (!IsNewArchitecture && (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll)) {
         return void 0;
       }
@@ -1818,7 +1850,8 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   const shouldOptimize = !forceFullUpdate && !dataChanged && Math.abs(getScrollVelocity(state)) > 0;
   const maxVisibleArea = scrollBottomBuffered + 1e3;
   !doMVCP || dataChanged || state.scrollAdjustHandler.getAdjust() !== 0 || ((_a3 = peek$(ctx, "scrollAdjustPending")) != null ? _a3 : 0) !== 0;
-  let currentRowTop = 0;
+  const alignItemsPaddingTop = peek$(ctx, "alignItemsPaddingTop") || 0;
+  let currentRowTop = alignItemsPaddingTop;
   let column = 1;
   let maxSizeInRow = 0;
   if (startIndex > 0) {
@@ -2246,6 +2279,7 @@ function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPositi
   scrollTo(ctx, {
     animated,
     index,
+    itemKey: targetId,
     itemSize,
     offset: firstIndexOffset,
     onSettled: wrappedOnSettled,
@@ -2691,12 +2725,11 @@ function calculateItemsInView(ctx, params = {}) {
   if (!IsNewArchitecture && state.initialAnchor) {
     ensureInitialAnchor(ctx);
   }
-  if (state.isEndReached === false || state.isStartReached === false) {
+  if (state.isEndReached !== true || state.isStartReached !== true) {
     requestAnimationFrame(() => {
       checkAtTop(state);
-      if (!state.props.maintainScrollAtEnd) {
-        checkAtBottom(ctx);
-      }
+      checkAtBottom(ctx);
+      checkStabilizationComplete(state, ctx);
     });
   }
 }
@@ -2817,37 +2850,34 @@ function checkResetContainers(ctx, dataProp) {
   const { maintainScrollAtEnd } = state.props;
   calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
   const shouldMaintainScrollAtEnd = maintainScrollAtEnd === true || maintainScrollAtEnd.onDataChange;
-  const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
-  const contentSize = getContentSize(ctx);
-  const { scrollLength, scroll } = state;
-  const { onEndReachedThreshold, onStartReachedThreshold } = state.props;
-  const HYSTERESIS = 1.3;
-  const endThreshold = (onEndReachedThreshold != null ? onEndReachedThreshold : 0.5) * scrollLength;
-  const startThreshold = (onStartReachedThreshold != null ? onStartReachedThreshold : 0.5) * scrollLength;
-  const distanceFromEnd = contentSize - scroll - scrollLength;
-  const distanceFromStart = scroll;
-  if (maintainScrollAtEnd) {
-    const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS;
-    if (needsStartBuffer) {
-      state.isStartReached = false;
-    }
-  } else {
-    const needsEndBuffer = distanceFromEnd < endThreshold * HYSTERESIS;
-    const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS;
-    if (needsEndBuffer) {
-      state.isEndReached = false;
-    }
-    if (needsStartBuffer) {
-      state.isStartReached = false;
-    }
-  }
-  const needsThresholdCheck = maintainScrollAtEnd ? !didMaintainScrollAtEnd || distanceFromStart < startThreshold * HYSTERESIS : !didMaintainScrollAtEnd || distanceFromEnd < endThreshold * HYSTERESIS || distanceFromStart < startThreshold * HYSTERESIS;
-  if (needsThresholdCheck) {
-    checkAtTop(state);
-    if (!maintainScrollAtEnd) {
-      checkAtBottom(ctx);
+  shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
+  checkAtTop(state, ctx);
+  checkAtBottom(ctx);
+  if (state.isInitializing) {
+    const contentSize = getContentSize(ctx);
+    const { scrollLength, scroll } = state;
+    const { onEndReachedThreshold, onStartReachedThreshold } = state.props;
+    const endThreshold = (onEndReachedThreshold != null ? onEndReachedThreshold : 0.5) * scrollLength;
+    const startThreshold = (onStartReachedThreshold != null ? onStartReachedThreshold : 0.5) * scrollLength;
+    const distanceFromEnd = contentSize - scroll - scrollLength;
+    const distanceFromStart = scroll;
+    if (maintainScrollAtEnd) {
+      const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS_MULTIPLIER;
+      if (needsStartBuffer) {
+        state.isStartReached = false;
+      }
+    } else {
+      const needsEndBuffer = distanceFromEnd < endThreshold * HYSTERESIS_MULTIPLIER;
+      const needsStartBuffer = distanceFromStart < startThreshold * HYSTERESIS_MULTIPLIER;
+      if (needsEndBuffer) {
+        state.isEndReached = false;
+      }
+      if (needsStartBuffer) {
+        state.isStartReached = false;
+      }
     }
   }
+  checkStabilizationComplete(state, ctx);
   delete state.previousData;
 }
 
@@ -2980,7 +3010,10 @@ function onScroll(ctx, event) {
   state.scrollPending = newScroll;
   updateScroll(ctx, newScroll);
   if (state.scrollingTo) {
-    checkFinishedScroll(ctx);
+    const isWebAnimatedScroll = Platform2.OS === "web" && state.scrollingTo.animated;
+    if (!isWebAnimatedScroll) {
+      checkFinishedScroll(ctx);
+    }
   }
   onScrollProp == null ? void 0 : onScrollProp(event);
 }
@@ -3016,7 +3049,14 @@ var ScrollAdjustHandler = class {
       if (pending !== 0) {
         let targetScroll;
         if ((scrollTarget == null ? void 0 : scrollTarget.index) !== void 0) {
-          const currentOffset = calculateOffsetForIndex(this.ctx, scrollTarget.index);
+          let targetIndex = scrollTarget.index;
+          if (scrollTarget.itemKey !== void 0) {
+            const currentIndex = state.indexByKey.get(scrollTarget.itemKey);
+            if (currentIndex !== void 0) {
+              targetIndex = currentIndex;
+            }
+          }
+          const currentOffset = calculateOffsetForIndex(this.ctx, targetIndex);
           targetScroll = calculateOffsetWithOffsetPosition(this.ctx, currentOffset, scrollTarget);
           targetScroll = clampScrollOffset(this.ctx, targetScroll);
         } else {
@@ -3030,7 +3070,7 @@ var ScrollAdjustHandler = class {
           set$(this.ctx, "scrollAdjust", this.appliedAdjust);
         }
         set$(this.ctx, "scrollAdjustPending", 0);
-        calculateItemsInView(this.ctx);
+        calculateItemsInView(this.ctx, { doMVCP: true });
       }
     }
   }
@@ -3278,6 +3318,7 @@ function createImperativeHandle(ctx) {
       endBuffered: state.endBuffered,
       isAtEnd: state.isAtEnd,
       isAtStart: state.isAtStart,
+      isInitializing: state.isInitializing,
       listen: (signalName, cb) => listen$(ctx, signalName, cb),
       listenToPosition: (key, cb) => listenPosition$(ctx, key, cb),
       positionAtIndex: (index) => state.positions.get(getId(state, index)),
@@ -3496,6 +3537,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     onScroll: onScrollProp,
     onStartReached,
     onStartReachedThreshold = 0.5,
+    onStabilizationComplete,
     onStickyHeaderChange,
     onViewableItemsChanged,
     progressViewOffset,
@@ -3506,11 +3548,13 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     renderItem,
     scrollEventThrottle,
     snapToIndices,
+    stabilizationAnchorId,
     stickyHeaderIndices: stickyHeaderIndicesProp,
     stickyIndices: stickyIndicesDeprecated,
     // TODOV3: Remove from v3 release
     style: styleProp,
     suggestEstimatedItemSize,
+    timelineId,
     viewabilityConfig,
     viewabilityConfigCallbackPairs,
     waitForInitialLayout = true,
@@ -3576,7 +3620,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         isAtStart: false,
         isEndReached: null,
         isFirst: true,
+        isInitializing: false,
         isStartReached: null,
+        lastTimelineId: void 0,
+        stabilizationStableFrames: 0,
         lastBatchingAction: Date.now(),
         lastLayout: void 0,
         loadStartTime: Date.now(),
@@ -3650,18 +3697,26 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     onScroll: throttleScrollFn,
     onStartReached,
     onStartReachedThreshold,
+    onStabilizationComplete,
     onStickyHeaderChange,
     recycleItems: !!recycleItems,
     renderItem,
     scrollBuffer,
     snapToIndices,
+    stabilizationAnchorId,
     stickyIndicesArr: stickyHeaderIndices != null ? stickyHeaderIndices : [],
     stickyIndicesSet: useMemo(() => new Set(stickyHeaderIndices != null ? stickyHeaderIndices : []), [stickyHeaderIndices == null ? void 0 : stickyHeaderIndices.join(",")]),
     stylePaddingBottom: stylePaddingBottomState,
     stylePaddingTop: stylePaddingTopState,
-    suggestEstimatedItemSize: !!suggestEstimatedItemSize
+    suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+    timelineId
   };
   state.refScroller = refScroller;
+  if (timelineId !== state.lastTimelineId) {
+    state.lastTimelineId = timelineId;
+    state.isInitializing = true;
+    state.stabilizationStableFrames = 0;
+  }
   const memoizedLastItemKeys = useMemo(() => {
     if (!dataProp.length) return [];
     return Array.from(
