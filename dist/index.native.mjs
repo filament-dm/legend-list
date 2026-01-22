@@ -1172,7 +1172,7 @@ function finishScrollTo(ctx) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
     if ((_a3 = state.props) == null ? void 0 : _a3.data) {
-      (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true, doMVCP: true });
+      (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { doMVCP: true, forceFullItemPositions: true });
     }
     if (PlatformAdjustBreaksScroll) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
@@ -1279,31 +1279,6 @@ function scrollTo(ctx, params) {
   }
 }
 
-// src/utils/checkStabilizationComplete.ts
-var STABILIZATION_FRAME_COUNT = 3;
-function checkStabilizationComplete(state, ctx) {
-  var _a3, _b, _c;
-  if (!state.isInitializing) {
-    return;
-  }
-  const { isEndReached, isStartReached } = state;
-  const isViewportFilled = isEndReached === true && isStartReached === true;
-  if (isViewportFilled) {
-    state.stabilizationStableFrames = ((_a3 = state.stabilizationStableFrames) != null ? _a3 : 0) + 1;
-    if (state.stabilizationStableFrames >= STABILIZATION_FRAME_COUNT) {
-      state.isInitializing = false;
-      state.stabilizationStableFrames = 0;
-      if (ctx && state.props.alignItemsAtEnd) {
-        updateAlignItemsPaddingTop(ctx);
-        calculateItemsInView(ctx, { forceFullItemPositions: true });
-      }
-      (_c = (_b = state.props).onStabilizationComplete) == null ? void 0 : _c.call(_b);
-    }
-  } else {
-    state.stabilizationStableFrames = 0;
-  }
-}
-
 // src/utils/checkThreshold.ts
 var HYSTERESIS_MULTIPLIER = 1.3;
 var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, context, onReached, setSnapshot, allowReentryOnChange) => {
@@ -1386,6 +1361,9 @@ function checkAtBottom(ctx) {
       },
       (distance) => {
         var _a4, _b;
+        if (state.isInitializing) {
+          state.pendingEndRequest = true;
+        }
         (_b = (_a4 = state.props).onEndReached) == null ? void 0 : _b.call(_a4, { distanceFromEnd: distance });
       },
       (snapshot) => {
@@ -1393,7 +1371,6 @@ function checkAtBottom(ctx) {
       },
       true
     );
-    checkStabilizationComplete(state, ctx);
   }
 }
 
@@ -1424,6 +1401,9 @@ function checkAtTop(state, ctx) {
     },
     (distance) => {
       var _a4, _b;
+      if (state.isInitializing) {
+        state.pendingStartRequest = true;
+      }
       (_b = (_a4 = state.props).onStartReached) == null ? void 0 : _b.call(_a4, { distanceFromStart: distance });
     },
     (snapshot) => {
@@ -1431,7 +1411,6 @@ function checkAtTop(state, ctx) {
     },
     false
   );
-  checkStabilizationComplete(state, ctx);
 }
 
 // src/core/updateScroll.ts
@@ -1500,6 +1479,9 @@ function requestAdjust(ctx, positionDiff, dataChanged) {
     };
     state.scroll += positionDiff;
     state.scrollForNextCalculateItemsInView = void 0;
+    if (state.isInitializing) {
+      state.stabilizationStableFrames = 0;
+    }
     const readyToRender = peek$(ctx, "readyToRender");
     if (readyToRender) {
       doit();
@@ -2130,6 +2112,31 @@ function checkAllSizesKnown(state) {
   return false;
 }
 
+// src/utils/checkStabilizationComplete.ts
+var STABILIZATION_FRAME_COUNT = 3;
+function checkStabilizationComplete(state, ctx) {
+  var _a3, _b, _c;
+  if (!state.isInitializing) {
+    return;
+  }
+  const { isEndReached, isStartReached, pendingStartRequest, pendingEndRequest } = state;
+  const isViewportFilled = isEndReached === true && isStartReached === true && !pendingStartRequest && !pendingEndRequest;
+  if (isViewportFilled) {
+    state.stabilizationStableFrames = ((_a3 = state.stabilizationStableFrames) != null ? _a3 : 0) + 1;
+    if (state.stabilizationStableFrames >= STABILIZATION_FRAME_COUNT) {
+      state.isInitializing = false;
+      state.stabilizationStableFrames = 0;
+      if (ctx && state.props.alignItemsAtEnd) {
+        updateAlignItemsPaddingTop(ctx);
+        calculateItemsInView(ctx, { forceFullItemPositions: true });
+      }
+      (_c = (_b = state.props).onStabilizationComplete) == null ? void 0 : _c.call(_b);
+    }
+  } else {
+    state.stabilizationStableFrames = 0;
+  }
+}
+
 // src/utils/findAvailableContainers.ts
 function findAvailableContainers(ctx, numNeeded, startBuffered, endBuffered, pendingRemoval, requiredItemTypes, needNewContainers) {
   const numContainers = peek$(ctx, "numContainers");
@@ -2455,6 +2462,10 @@ function calculateItemsInView(ctx, params = {}) {
       scrollBufferTop = scrollBuffer * 1.5;
       scrollBufferBottom = scrollBuffer * 0.5;
     }
+    if (state.isInitializing) {
+      scrollBufferTop *= 4;
+      scrollBufferBottom *= 4;
+    }
     const scrollTopBuffered = scroll - scrollBufferTop;
     const scrollBottom = scroll + scrollLength + (scroll < 0 ? -scroll : 0);
     const scrollBottomBuffered = scrollBottom + scrollBufferBottom;
@@ -2489,7 +2500,7 @@ function calculateItemsInView(ctx, params = {}) {
     let startBufferedId = null;
     let endNoBuffer = null;
     let endBuffered = null;
-    let loopStart = !dataChanged && startBufferedIdOrig ? indexByKey.get(startBufferedIdOrig) || 0 : 0;
+    let loopStart = !dataChanged && !forceFullItemPositions && startBufferedIdOrig ? indexByKey.get(startBufferedIdOrig) || 0 : 0;
     for (let i = loopStart; i >= 0; i--) {
       const id = (_c = idCache[i]) != null ? _c : getId(state, i);
       const top = positions.get(id);
@@ -2690,7 +2701,7 @@ function calculateItemsInView(ctx, params = {}) {
             const prevPos = peek$(ctx, `containerPosition${i}`);
             const prevColumn = peek$(ctx, `containerColumn${i}`);
             const prevData = peek$(ctx, `containerItemData${i}`);
-            if (position > POSITION_OUT_OF_VIEW && position !== prevPos) {
+            if (position !== prevPos) {
               set$(ctx, `containerPosition${i}`, position);
               didChangePositions = true;
             }
@@ -2726,11 +2737,13 @@ function calculateItemsInView(ctx, params = {}) {
     ensureInitialAnchor(ctx);
   }
   if (state.isEndReached !== true || state.isStartReached !== true) {
-    requestAnimationFrame(() => {
-      checkAtTop(state);
-      checkAtBottom(ctx);
-      checkStabilizationComplete(state, ctx);
-    });
+    if (!state.isInitializing || !params.dataChanged) {
+      requestAnimationFrame(() => {
+        checkAtTop(state);
+        checkAtBottom(ctx);
+        checkStabilizationComplete(state, ctx);
+      });
+    }
   }
 }
 
@@ -2848,10 +2861,14 @@ function checkResetContainers(ctx, dataProp) {
     updateAveragesOnDataChange(state, previousData, dataProp);
   }
   const { maintainScrollAtEnd } = state.props;
+  if (state.isInitializing) {
+    state.pendingStartRequest = false;
+    state.pendingEndRequest = false;
+  }
   calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
   const shouldMaintainScrollAtEnd = maintainScrollAtEnd === true || maintainScrollAtEnd.onDataChange;
   shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
-  checkAtTop(state, ctx);
+  checkAtTop(state);
   checkAtBottom(ctx);
   if (state.isInitializing) {
     const contentSize = getContentSize(ctx);
@@ -3422,8 +3439,8 @@ function normalizeMaintainVisibleContentPosition(value) {
   if (value && typeof value === "object") {
     return {
       data: (_a3 = value.data) != null ? _a3 : false,
-      size: (_b = value.size) != null ? _b : true,
-      shouldRestorePosition: value.shouldRestorePosition
+      shouldRestorePosition: value.shouldRestorePosition,
+      size: (_b = value.size) != null ? _b : true
     };
   }
   if (value === false) {
@@ -3622,13 +3639,14 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         isFirst: true,
         isInitializing: false,
         isStartReached: null,
-        lastTimelineId: void 0,
-        stabilizationStableFrames: 0,
         lastBatchingAction: Date.now(),
         lastLayout: void 0,
+        lastTimelineId: void 0,
         loadStartTime: Date.now(),
         minIndexSizeChanged: 0,
         nativeMarginTop: 0,
+        pendingEndRequest: false,
+        pendingStartRequest: false,
         positions: /* @__PURE__ */ new Map(),
         props: {},
         queuedCalculateItemsInView: 0,
@@ -3645,6 +3663,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         scrollTime: 0,
         sizes: /* @__PURE__ */ new Map(),
         sizesKnown: /* @__PURE__ */ new Map(),
+        stabilizationStableFrames: 0,
         startBuffered: -1,
         startNoBuffer: -1,
         startReachedSnapshot: void 0,
@@ -3695,9 +3714,9 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     onItemSizeChanged,
     onLoad,
     onScroll: throttleScrollFn,
+    onStabilizationComplete,
     onStartReached,
     onStartReachedThreshold,
-    onStabilizationComplete,
     onStickyHeaderChange,
     recycleItems: !!recycleItems,
     renderItem,
@@ -3716,6 +3735,18 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     state.lastTimelineId = timelineId;
     state.isInitializing = true;
     state.stabilizationStableFrames = 0;
+    state.pendingStartRequest = false;
+    state.pendingEndRequest = false;
+    if (stabilizationAnchorId && !initialScrollProp && dataProp && dataProp.length > 0) {
+      const anchorIndex = dataProp.findIndex((item, index) => keyExtractor(item, index) === stabilizationAnchorId);
+      if (anchorIndex >= 0) {
+        state.initialScroll = {
+          index: anchorIndex,
+          viewPosition: 0.5
+          // Position in middle of viewport
+        };
+      }
+    }
   }
   const memoizedLastItemKeys = useMemo(() => {
     if (!dataProp.length) return [];
