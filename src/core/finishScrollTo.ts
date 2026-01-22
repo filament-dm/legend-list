@@ -21,7 +21,7 @@ export function finishScrollTo(ctx: StateContext) {
         }
 
         if (state.props?.data) {
-            state.triggerCalculateItemsInView?.({ forceFullItemPositions: true, doMVCP: true });
+            state.triggerCalculateItemsInView?.({ doMVCP: true, forceFullItemPositions: true });
         }
 
         if (PlatformAdjustBreaksScroll) {

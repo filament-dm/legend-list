@@ -27,6 +27,12 @@ export function requestAdjust(ctx: StateContext, positionDiff: number, dataChang
         state.scroll += positionDiff;
         state.scrollForNextCalculateItemsInView = undefined;
 
+        // Reset stabilization counter when MVCP adjusts during initialization
+        // This ensures 3 stable frames occur AFTER the scroll adjustment is applied
+        if (state.isInitializing) {
+            state.stabilizationStableFrames = 0;
+        }
+
         const readyToRender = peek$(ctx, "readyToRender");
 
         if (readyToRender) {

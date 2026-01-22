@@ -516,6 +516,8 @@ export interface InternalState {
     isInitializing: boolean;
     isStartReached: boolean | null;
     lastTimelineId: string | undefined;
+    pendingEndRequest: boolean;
+    pendingStartRequest: boolean;
     stabilizationStableFrames: number;
     lastBatchingAction: number;
     lastLayout: LayoutRectangle | undefined;

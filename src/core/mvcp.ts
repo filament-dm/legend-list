@@ -22,7 +22,6 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
     const indexByKey = state.indexByKey;
 
-
     if (shouldMVCP) {
         // ABSOLUTE PRIORITY: During initialization, lock to stabilization anchor
         if (state.isInitializing && props.stabilizationAnchorId) {

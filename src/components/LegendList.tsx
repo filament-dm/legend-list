@@ -276,15 +276,16 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 isFirst: true,
                 isInitializing: false,
                 isStartReached: null,
-                lastTimelineId: undefined,
-                stabilizationStableFrames: 0,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
                 lastScrollDelta: 0,
                 loadStartTime: Date.now(),
+                lastTimelineId: undefined,
                 minIndexSizeChanged: 0,
                 nativeContentInset: undefined,
                 nativeMarginTop: 0,
+                pendingEndRequest: false,
+                pendingStartRequest: false,
                 positions: new Map(),
                 props: {} as any,
                 queuedCalculateItemsInView: 0,
@@ -301,6 +302,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 scrollTime: 0,
                 sizes: new Map(),
                 sizesKnown: new Map(),
+                stabilizationStableFrames: 0,
                 startBuffered: -1,
                 startNoBuffer: -1,
                 startReachedSnapshot: undefined,
@@ -363,9 +365,9 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         onItemSizeChanged,
         onLoad,
         onScroll: throttleScrollFn,
+        onStabilizationComplete,
         onStartReached,
         onStartReachedThreshold,
-        onStabilizationComplete,
         onStickyHeaderChange,
         recycleItems: !!recycleItems,
         renderItem: renderItem!,
@@ -387,6 +389,22 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         state.lastTimelineId = timelineId;
         state.isInitializing = true;
         state.stabilizationStableFrames = 0;
+        state.pendingStartRequest = false;
+        state.pendingEndRequest = false;
+        // When stabilizationAnchorId is provided without an initialScrollIndex,
+        // automatically scroll to that message and position it in the middle of the viewport
+        if (stabilizationAnchorId && !initialScrollProp && dataProp && dataProp.length > 0) {
+            // Find the index of the stabilization anchor
+            const anchorIndex = dataProp.findIndex((item, index) => keyExtractor(item, index) === stabilizationAnchorId);
+
+            if (anchorIndex >= 0) {
+                // Set initialScroll to position this item in middle of viewport
+                state.initialScroll = {
+                    index: anchorIndex,
+                    viewPosition: 0.5, // Position in middle of viewport
+                };
+            }
+        }
     }
 
     const memoizedLastItemKeys = useMemo(() => {

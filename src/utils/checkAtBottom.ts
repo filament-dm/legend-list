@@ -1,6 +1,5 @@
 import { getContentSize } from "@/state/getContentSize";
 import type { StateContext } from "@/state/state";
-import { checkStabilizationComplete } from "@/utils/checkStabilizationComplete";
 import { checkThreshold } from "@/utils/checkThreshold";
 
 export function checkAtBottom(ctx: StateContext) {
@@ -38,6 +37,10 @@ export function checkAtBottom(ctx: StateContext) {
                 scrollPosition: scroll,
             },
             (distance) => {
+                // Set pending flag during initialization to prevent premature stabilization
+                if (state.isInitializing) {
+                    state.pendingEndRequest = true;
+                }
                 state.props.onEndReached?.({ distanceFromEnd: distance });
             },
             (snapshot) => {
@@ -45,9 +48,5 @@ export function checkAtBottom(ctx: StateContext) {
             },
             true,
         );
-
-        // Always check stabilization after threshold updates
-        // This ensures initialization can complete even if RAF doesn't fire
-        checkStabilizationComplete(state, ctx);
     }
 }

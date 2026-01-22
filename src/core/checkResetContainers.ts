@@ -18,6 +18,13 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
     }
     const { maintainScrollAtEnd } = state.props;
 
+    // Clear pending pagination flags when data arrives
+    // This indicates that the async pagination request has completed
+    if (state.isInitializing) {
+        state.pendingStartRequest = false;
+        state.pendingEndRequest = false;
+    }
+
     calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
 
     const shouldMaintainScrollAtEnd =

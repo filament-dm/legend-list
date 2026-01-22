@@ -26,15 +26,16 @@ export function checkStabilizationComplete(state: InternalState, ctx?: StateCont
         return;
     }
 
-    const { isEndReached, isStartReached } = state;
+    const { isEndReached, isStartReached, pendingStartRequest, pendingEndRequest } = state;
 
     // Check if viewport is filled (both pagination thresholds satisfied)
-    const isViewportFilled = isEndReached === true && isStartReached === true;
+    // AND no pending pagination requests (prevents premature stabilization during async data loads)
+    const isViewportFilled =
+        isEndReached === true && isStartReached === true && !pendingStartRequest && !pendingEndRequest;
 
     if (isViewportFilled) {
         // Increment stable frame counter
         state.stabilizationStableFrames = (state.stabilizationStableFrames ?? 0) + 1;
-
         // Fire callback and exit initialization mode after N consecutive stable frames
         if (state.stabilizationStableFrames >= STABILIZATION_FRAME_COUNT) {
             state.isInitializing = false;

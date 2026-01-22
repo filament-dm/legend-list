@@ -239,6 +239,14 @@ export function calculateItemsInView(
             scrollBufferBottom = scrollBuffer * 0.5;
         }
 
+        // During initialization, use a much larger buffer to account for scroll position uncertainty
+        // caused by pending MVCP adjustments. This ensures all actually-visible items are included
+        // in the buffered range despite scroll position being in flux.
+        if (state.isInitializing) {
+            scrollBufferTop *= 4;
+            scrollBufferBottom *= 4;
+        }
+
         const scrollTopBuffered = scroll - scrollBufferTop;
         const scrollBottom = scroll + scrollLength + (scroll < 0 ? -scroll : 0);
         const scrollBottomBuffered = scrollBottom + scrollBufferBottom;
@@ -295,7 +303,12 @@ export function calculateItemsInView(
         let endNoBuffer: number | null = null;
         let endBuffered: number | null = null;
 
-        let loopStart: number = !dataChanged && startBufferedIdOrig ? indexByKey.get(startBufferedIdOrig) || 0 : 0;
+        // When forceFullItemPositions is true, we need to recalculate the buffered range from scratch
+        // This is critical when alignItemsPaddingTop changes after stabilization, as all item positions shift
+        let loopStart: number =
+            !dataChanged && !forceFullItemPositions && startBufferedIdOrig
+                ? indexByKey.get(startBufferedIdOrig) || 0
+                : 0;
 
         // Go backwards from the last start position to find the first item that is in view
         // This is an optimization to avoid looping through all items, which could slow down
@@ -606,7 +619,9 @@ export function calculateItemsInView(
                         const prevColumn = peek$(ctx, `containerColumn${i}`);
                         const prevData = peek$(ctx, `containerItemData${i}`);
 
-                        if (position > POSITION_OUT_OF_VIEW && position !== prevPos) {
+                        // Update position if it changed, regardless of whether it's at POSITION_OUT_OF_VIEW
+                        // This fixes an issue where items with boundary positions weren't being updated
+                        if (position !== prevPos) {
                             set$(ctx, `containerPosition${i}`, position);
                             didChangePositions = true;
                         }
@@ -660,12 +675,16 @@ export function calculateItemsInView(
 
     // Trigger threshold checks whenever thresholds are not fully satisfied
     // This ensures state machine can progress through all states: null → false → true
+    // Skip redundant checks during initialization data changes - checkResetContainers already handles these
     if (state.isEndReached !== true || state.isStartReached !== true) {
-        requestAnimationFrame(() => {
-            checkAtTop(state);
-            checkAtBottom(ctx);
-            // Check if stabilization completed and fire callback
-            checkStabilizationComplete(state, ctx);
-        });
+        // During initialization with data changes, skip these checks to avoid bypassing forced-pagination logic
+        if (!state.isInitializing || !params.dataChanged) {
+            requestAnimationFrame(() => {
+                checkAtTop(state);
+                checkAtBottom(ctx);
+                // Check if stabilization completed and fire callback
+                checkStabilizationComplete(state, ctx);
+            });
+        }
     }
 }

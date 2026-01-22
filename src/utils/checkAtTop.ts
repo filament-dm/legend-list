@@ -1,6 +1,5 @@
 import type { StateContext } from "@/state/state";
 import type { InternalState } from "@/types";
-import { checkStabilizationComplete } from "@/utils/checkStabilizationComplete";
 import { checkThreshold } from "@/utils/checkThreshold";
 
 export function checkAtTop(state: InternalState, ctx?: StateContext) {
@@ -28,6 +27,10 @@ export function checkAtTop(state: InternalState, ctx?: StateContext) {
             scrollPosition: scroll,
         },
         (distance) => {
+            // Set pending flag during initialization to prevent premature stabilization
+            if (state.isInitializing) {
+                state.pendingStartRequest = true;
+            }
             state.props.onStartReached?.({ distanceFromStart: distance });
         },
         (snapshot) => {
@@ -35,8 +38,4 @@ export function checkAtTop(state: InternalState, ctx?: StateContext) {
         },
         false,
     );
-
-    // Always check stabilization after threshold updates
-    // This ensures initialization can complete even if not called from context-aware location
-    checkStabilizationComplete(state, ctx);
 }
