@@ -29,8 +29,13 @@ export function checkAtTop(state: InternalState, ctx?: StateContext) {
         (distance) => {
             // Set pending flag during initialization to prevent premature stabilization
             if (state.isInitializing) {
+                console.log("[PAGINATE-1] onStartReached callback firing (will set pendingStartRequest):", {
+                    distance,
+                    isInitializing: state.isInitializing,
+                });
                 state.pendingStartRequest = true;
             }
+            console.log("[PAGINATE-2] Calling app's onStartReached callback:", { distance });
             state.props.onStartReached?.({ distanceFromStart: distance });
         },
         (snapshot) => {
@@ -38,4 +43,12 @@ export function checkAtTop(state: InternalState, ctx?: StateContext) {
         },
         false,
     );
+
+    if (prevIsStartReached !== state.isStartReached) {
+        console.log("[PAGINATE-3] isStartReached state changed:", {
+            from: prevIsStartReached,
+            to: state.isStartReached,
+            isInitializing: state.isInitializing,
+        });
+    }
 }

@@ -27,9 +27,19 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
         if (state.isInitializing && props.stabilizationAnchorId) {
             const anchorIndex = indexByKey.get(props.stabilizationAnchorId);
             const hasPosition = positions.has(props.stabilizationAnchorId);
+            console.log("[MVCP-1] Initialization mode: checking stabilization anchor:", {
+                stabilizationAnchorId: props.stabilizationAnchorId,
+                anchorIndex,
+                hasPosition,
+                willLock: anchorIndex !== undefined && hasPosition,
+            });
             // Only use anchor if it exists in data and has been rendered (in positions)
             if (anchorIndex !== undefined && hasPosition) {
                 targetId = props.stabilizationAnchorId;
+                console.log("[MVCP-2] LOCKED to stabilization anchor:", {
+                    targetId,
+                    anchorIndex,
+                });
             }
         }
         // Priority 1: Active scroll target (when not initializing)

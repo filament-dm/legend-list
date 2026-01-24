@@ -6,10 +6,17 @@ import { setInitialRenderState } from "@/utils/setInitialRenderState";
 export function finishScrollTo(ctx: StateContext) {
     const state = ctx.state;
 
+    // console.log("[finishScrollTo] Called:", {
+    //     hasScrollingTo: !!state?.scrollingTo,
+    //     hasCallback: !!state?.scrollingTo?.onSettled,
+    // });
+
     if (state?.scrollingTo) {
         // Save scrollingTo before clearing it so we can pass it to commitPendingAdjust
         const scrollingTo = state.scrollingTo;
         const callback = scrollingTo.onSettled;
+
+        // console.log("[finishScrollTo] Processing:", { hasCallback: !!callback });
 
         state.scrollHistory.length = 0;
         state.initialScroll = undefined;
@@ -32,7 +39,13 @@ export function finishScrollTo(ctx: StateContext) {
 
         // Invoke callback after all state cleanup and updates are complete
         if (callback) {
+            // console.log("[finishScrollTo] Invoking callback");
             callback();
+            // console.log("[finishScrollTo] Callback invoked");
+        } else {
+            // console.log("[finishScrollTo] No callback to invoke");
         }
+    } else {
+        // console.warn("[finishScrollTo] Called but no scrollingTo state!");
     }
 }

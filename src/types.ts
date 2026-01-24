@@ -296,6 +296,30 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     onStartReachedThreshold?: number | null | undefined;
 
     /**
+     * Indicates whether more data is available in the start direction (towards index 0).
+     * When false during initialization, the start direction is considered complete
+     * even if the buffer is insufficient, allowing stabilization to proceed.
+     *
+     * Use case: Set to false when your pagination callback determines there are no
+     * more items to load in the backwards/older direction.
+     *
+     * @default true
+     */
+    hasMoreStart?: boolean;
+
+    /**
+     * Indicates whether more data is available in the end direction (towards last index).
+     * When false during initialization, the end direction is considered complete
+     * even if the buffer is insufficient, allowing stabilization to proceed.
+     *
+     * Use case: Set to false when your pagination callback determines there are no
+     * more items to load in the forwards/newer direction.
+     *
+     * @default true
+     */
+    hasMoreEnd?: boolean;
+
+    /**
      * Called when the sticky header changes.
      */
     onStickyHeaderChange?: (info: { index: number; item: any }) => void;
@@ -514,6 +538,8 @@ export interface InternalState {
     isEndReached: boolean | null;
     isFirst?: boolean;
     isInitializing: boolean;
+    isEndBufferSufficient: boolean;
+    isStartBufferSufficient: boolean;
     isStartReached: boolean | null;
     lastTimelineId: string | undefined;
     pendingEndRequest: boolean;
@@ -597,6 +623,8 @@ export interface InternalState {
         onStartReached: LegendListProps["onStartReached"];
         onStartReachedThreshold: number | null | undefined;
         onStabilizationComplete: LegendListProps["onStabilizationComplete"];
+        hasMoreStart: boolean;
+        hasMoreEnd: boolean;
         onStickyHeaderChange: LegendListProps["onStickyHeaderChange"];
         recycleItems: boolean;
         renderItem: LegendListProps["renderItem"];

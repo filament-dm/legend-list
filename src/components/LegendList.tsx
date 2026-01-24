@@ -123,6 +123,8 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         getEstimatedItemSize,
         getFixedItemSize,
         getItemType,
+        hasMoreEnd,
+        hasMoreStart,
         horizontal,
         initialContainerPoolRatio = 2,
         initialScrollAtEnd = false,
@@ -275,6 +277,8 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 isEndReached: null,
                 isFirst: true,
                 isInitializing: false,
+                isEndBufferSufficient: false,
+                isStartBufferSufficient: false,
                 isStartReached: null,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
@@ -352,6 +356,8 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),
         getFixedItemSize: useWrapIfItem(getFixedItemSize),
         getItemType: useWrapIfItem(getItemType),
+        hasMoreEnd: hasMoreEnd ?? true,
+        hasMoreStart: hasMoreStart ?? true,
         horizontal: !!horizontal,
         initialContainerPoolRatio,
         itemsAreEqual,
@@ -386,6 +392,13 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
 
     // Detect timelineId change to enter initialization mode
     if (timelineId !== state.lastTimelineId) {
+        console.log("[INIT-1] timelineId changed, ENTERING INITIALIZATION MODE:", {
+            oldTimelineId: state.lastTimelineId,
+            newTimelineId: timelineId,
+            stabilizationAnchorId,
+            hasInitialScrollProp: !!initialScrollProp,
+            dataLength: dataProp.length,
+        });
         state.lastTimelineId = timelineId;
         state.isInitializing = true;
         state.stabilizationStableFrames = 0;
@@ -395,14 +408,24 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         // automatically scroll to that message and position it in the middle of the viewport
         if (stabilizationAnchorId && !initialScrollProp && dataProp && dataProp.length > 0) {
             // Find the index of the stabilization anchor
-            const anchorIndex = dataProp.findIndex((item, index) => keyExtractor(item, index) === stabilizationAnchorId);
+            const anchorIndex = dataProp.findIndex(
+                (item, index) => keyExtractor(item, index) === stabilizationAnchorId,
+            );
 
             if (anchorIndex >= 0) {
+                console.log("[INIT-2] Setting initialScroll for stabilizationAnchorId:", {
+                    anchorIndex,
+                    stabilizationAnchorId,
+                    viewPosition: 0.5,
+                    dataLength: dataProp.length,
+                });
                 // Set initialScroll to position this item in middle of viewport
                 state.initialScroll = {
                     index: anchorIndex,
                     viewPosition: 0.5, // Position in middle of viewport
                 };
+            } else {
+                console.warn("[INIT-ERROR] stabilizationAnchorId not found in data:", stabilizationAnchorId);
             }
         }
     }

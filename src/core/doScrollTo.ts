@@ -21,13 +21,25 @@ export function doScrollTo(ctx: StateContext, params: DoScrollToParams) {
     const node: HTMLElement | null =
         typeof scroller?.getScrollableNode === "function" ? scroller.getScrollableNode() : scroller;
 
+    // console.log("[doScrollTo] Called with:", {
+    //     animated,
+    //     horizontal,
+    //     offset,
+    //     hasScroller: !!scroller,
+    //     hasNode: !!node,
+    //     currentScroll: state.scroll,
+    //     hasOnSettled: !!state.scrollingTo?.onSettled,
+    // });
+
     if (node) {
         const left = horizontal ? offset : 0;
         const top = horizontal ? 0 : offset;
 
+        // console.log("[doScrollTo] Calling node.scrollTo");
         node.scrollTo({ behavior: animated ? "smooth" : "auto", left, top });
 
         if (animated) {
+            // console.log("[doScrollTo] Setting up listenForScrollEnd");
             listenForScrollEnd(ctx, node);
             // Only use fallback timeout on native platforms where scrollend events aren't reliable.
             // On web, listenForScrollEnd provides proper event-based handling (scrollend event + idle timeout + max timeout).
@@ -36,11 +48,15 @@ export function doScrollTo(ctx: StateContext, params: DoScrollToParams) {
                 checkFinishedScrollFallback(ctx);
             }
         } else {
+            // console.log("[doScrollTo] Non-animated, setting 100ms timeout");
             state.scroll = offset;
             setTimeout(() => {
+                // console.log("[doScrollTo] Timeout fired, calling finishScrollTo");
                 finishScrollTo(ctx);
             }, 100);
         }
+    } else {
+        // console.error("[doScrollTo] No node found!", { hasScroller: !!scroller });
     }
 }
 
@@ -51,28 +67,52 @@ function listenForScrollEnd(ctx: StateContext, node: HTMLElement): () => void {
     let settled = false;
     const targetToken = ctx.state.scrollingTo;
 
-    const finish = () => {
-        if (settled) return;
+    // console.log("[listenForScrollEnd] Setup:", {
+    //     supportsScrollEnd,
+    //     hasToken: !!targetToken,
+    //     hasCallback: !!targetToken?.onSettled,
+    // });
+
+    const finish = (reason: string) => {
+        if (settled) {
+            // console.log("[listenForScrollEnd] finish() already settled, ignoring:", reason);
+            return;
+        }
         settled = true;
+
+        // console.log("[listenForScrollEnd] finish() called:", {
+        //     reason,
+        //     tokenMatch: targetToken === ctx.state.scrollingTo,
+        //     hasCallback: !!ctx.state.scrollingTo?.onSettled,
+        // });
 
         cleanup();
 
         // If another scrollTo wasn't triggered since this started, finish the scrollTo
         if (targetToken === ctx.state.scrollingTo) {
+            // console.log("[listenForScrollEnd] Token matches, calling finishScrollTo");
             finishScrollTo(ctx);
+        } else {
+            // console.warn("[listenForScrollEnd] Token mismatch! Invoking orphaned callback anyway");
+            // CRITICAL FIX: Don't lose callbacks on token mismatch
+            if (targetToken?.onSettled) {
+                targetToken.onSettled();
+            }
         }
     };
 
     const onScroll = () => {
+        // console.log("[listenForScrollEnd] scroll event, resetting idle timeout");
         if (idleTimeout) {
             clearTimeout(idleTimeout);
         }
-        idleTimeout = setTimeout(finish, SCROLL_END_IDLE_MS);
+        idleTimeout = setTimeout(() => finish("idle-timeout"), SCROLL_END_IDLE_MS);
     };
 
     const cleanup = () => {
+        // console.log("[listenForScrollEnd] Cleaning up");
         if (supportsScrollEnd) {
-            node.removeEventListener("scrollend", finish);
+            node.removeEventListener("scrollend", finish as any);
         } else {
             (node as HTMLElement).removeEventListener("scroll", onScroll);
         }
@@ -86,11 +126,15 @@ function listenForScrollEnd(ctx: StateContext, node: HTMLElement): () => void {
     };
 
     if (supportsScrollEnd) {
-        node.addEventListener("scrollend", finish, { once: true });
+        // console.log("[listenForScrollEnd] Using scrollend event + max timeout fallback");
+        node.addEventListener("scrollend", () => finish("scrollend-event"), { once: true });
+        // CRITICAL FIX: Add max timeout even for scrollend to prevent callback loss
+        maxTimeout = setTimeout(() => finish("max-timeout-scrollend"), SCROLL_END_MAX_MS);
     } else {
+        // console.log("[listenForScrollEnd] Using scroll events + timeouts");
         (node as HTMLElement).addEventListener("scroll", onScroll);
-        idleTimeout = setTimeout(finish, SMOOTH_SCROLL_DURATION_MS);
-        maxTimeout = setTimeout(finish, SCROLL_END_MAX_MS);
+        idleTimeout = setTimeout(() => finish("initial-timeout"), SMOOTH_SCROLL_DURATION_MS);
+        maxTimeout = setTimeout(() => finish("max-timeout"), SCROLL_END_MAX_MS);
     }
 
     return cleanup;

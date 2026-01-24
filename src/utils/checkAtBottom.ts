@@ -39,8 +39,13 @@ export function checkAtBottom(ctx: StateContext) {
             (distance) => {
                 // Set pending flag during initialization to prevent premature stabilization
                 if (state.isInitializing) {
+                    console.log("[PAGINATE-4] onEndReached callback firing (will set pendingEndRequest):", {
+                        distance,
+                        isInitializing: state.isInitializing,
+                    });
                     state.pendingEndRequest = true;
                 }
+                console.log("[PAGINATE-5] Calling app's onEndReached callback:", { distance });
                 state.props.onEndReached?.({ distanceFromEnd: distance });
             },
             (snapshot) => {
@@ -48,5 +53,13 @@ export function checkAtBottom(ctx: StateContext) {
             },
             true,
         );
+
+        if (prevIsEndReached !== state.isEndReached) {
+            console.log("[PAGINATE-6] isEndReached state changed:", {
+                from: prevIsEndReached,
+                to: state.isEndReached,
+                isInitializing: state.isInitializing,
+            });
+        }
     }
 }

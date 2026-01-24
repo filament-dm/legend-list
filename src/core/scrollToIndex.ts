@@ -13,6 +13,17 @@ export function scrollToIndex(
 ) {
     const state = ctx.state;
     const { data } = state.props;
+
+    console.log("[SCROLL-1] scrollToIndex called:", {
+        index,
+        animated,
+        viewPosition,
+        viewOffset,
+        hasCallback: !!onSettled,
+        isInitializing: state.isInitializing,
+        stabilizationAnchorId: state.props.stabilizationAnchorId,
+    });
+
     if (index >= data.length) {
         index = data.length - 1;
     } else if (index < 0) {
@@ -31,17 +42,29 @@ export function scrollToIndex(
     const targetId = getId(state, index);
     const itemSize = getItemSize(ctx, targetId, index, state.props.data[index!]);
 
+    console.log("[SCROLL-2] scrollToIndex params calculated:", {
+        adjustedIndex: index,
+        targetId,
+        itemSize,
+        viewPosition,
+        isAnchor: targetId === state.props.stabilizationAnchorId,
+    });
+
     // Wrap onSettled in double RAF to ensure layout has settled before callback fires
     const wrappedOnSettled = onSettled
         ? () => {
+              console.log("[SCROLL-3] scrollToIndex onSettled wrapper starting double RAF");
               requestAnimationFrame(() => {
+                  console.log("[SCROLL-4] scrollToIndex first RAF");
                   requestAnimationFrame(() => {
+                      console.log("[SCROLL-5] scrollToIndex second RAF, calling original callback");
                       onSettled();
                   });
               });
           }
         : undefined;
 
+    console.log("[SCROLL-6] scrollToIndex calling scrollTo");
     scrollTo(ctx, {
         animated,
         index,
