@@ -1,5 +1,6 @@
 import { calculateItemsInView } from "@/core/calculateItemsInView";
 import { doMaintainScrollAtEnd } from "@/core/doMaintainScrollAtEnd";
+import { scrollToIndex } from "@/core/scrollToIndex";
 import { getContentSize } from "@/state/getContentSize";
 import type { StateContext } from "@/state/state";
 import type { MaintainScrollAtEndOptions } from "@/types";
@@ -32,11 +33,35 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
 
     calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
 
-    console.log("[BUFFER-2] ⚠️  CRITICAL: After data arrives - NO RE-CENTERING OF ANCHOR!", {
+    // After MVCP has maintained position, re-center anchor during initialization
+    if (state.isInitializing && state.props.stabilizationAnchorId && !maintainScrollAtEnd && state.didFinishInitialScroll) {
+        const anchorId = state.props.stabilizationAnchorId;
+        const anchorIndex = state.indexByKey.get(anchorId);
+        const anchorPosition = state.positions.get(anchorId);
+
+        // Only re-center if anchor exists and has been positioned
+        if (anchorIndex !== undefined && anchorPosition !== undefined) {
+            console.log("[RECENTER-1] Re-centering anchor during initialization:", {
+                anchorId,
+                anchorIndex,
+                anchorPosition,
+                currentScroll: state.scroll,
+            });
+
+            scrollToIndex(ctx, {
+                index: anchorIndex,
+                viewPosition: 0.5, // Center in viewport
+                animated: false, // Instant scroll during pagination
+            });
+
+            console.log("[RECENTER-2] Re-center scroll requested");
+        }
+    }
+
+    console.log("[BUFFER-2] After data arrives, MVCP maintained position and anchor was re-centered", {
         isInitializing: state.isInitializing,
         stabilizationAnchorId: state.props.stabilizationAnchorId,
-        expectedBehavior: "Should call scrollToIndex with viewPosition: 0.5 here",
-        actualBehavior: "Only MVCP maintains position, no re-centering happens",
+        behavior: "MVCP maintains position, then re-centering logic adjusts to viewPosition: 0.5",
     });
 
     const shouldMaintainScrollAtEnd =

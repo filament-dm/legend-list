@@ -73,6 +73,7 @@ export function checkStabilizationComplete(state: InternalState, ctx?: StateCont
             console.log("[STABLE-3] 🎉 STABILIZATION COMPLETE! Exiting initialization mode");
             state.isInitializing = false;
             state.stabilizationStableFrames = 0;
+            state.initialAnchor = undefined; // Stop re-centering
 
             // Now that initialization is complete, calculate alignItemsPaddingTop if needed
             // Then force recalculation of item positions to account for the updated padding

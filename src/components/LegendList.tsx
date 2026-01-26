@@ -547,8 +547,18 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     }, []);
 
     const doInitialScroll = useCallback(() => {
-        const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
-        if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+        console.log("[INIT-SCROLL] doInitialScroll called");
+        const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo, didContainersLayout, scrollLength } = state;
+        console.log("[INIT-SCROLL] State:", {
+            initialScroll,
+            didFinishInitialScroll,
+            queuedInitialLayout,
+            scrollingTo,
+            didContainersLayout,
+            scrollLength,
+        });
+        if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo && didContainersLayout && scrollLength > 0) {
+            console.log("[INIT-SCROLL] Performing initial scroll to:", initialScroll, initialContentOffset, scrollLength);
             scrollTo(ctx, {
                 animated: false,
                 index: initialScroll?.index,
