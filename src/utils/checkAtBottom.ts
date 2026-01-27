@@ -1,3 +1,4 @@
+import { InitializationPhase } from "@/core/initialization/types";
 import { getContentSize } from "@/state/getContentSize";
 import type { StateContext } from "@/state/state";
 import { checkThreshold } from "@/utils/checkThreshold";
@@ -37,13 +38,36 @@ export function checkAtBottom(ctx: StateContext) {
                 scrollPosition: scroll,
             },
             (distance) => {
-                // Set pending flag during initialization to prevent premature stabilization
-                if (state.isInitializing) {
+                // Block pagination during early initialization phases
+                if (state.isInitializing && ctx?.initializationManager) {
+                    const phase = ctx.initializationManager.getCurrentPhase();
+
+                    // Block during SCROLLING phase - wait for initial scroll to complete
+                    if (phase === InitializationPhase.SCROLLING) {
+                        console.log("[PAGINATE-4] BLOCKED: onEndReached during SCROLLING phase");
+                        return;
+                    }
+
+                    // Block during FILLING phase if initial scroll hasn't completed
+                    if (
+                        phase === InitializationPhase.FILLING &&
+                        !ctx.initializationManager.didCompleteInitialScroll()
+                    ) {
+                        console.log("[PAGINATE-4] BLOCKED: onEndReached during FILLING (pre-scroll) phase");
+                        return;
+                    }
+
+                    const dataCount = state.props.data?.length ?? 0;
                     console.log("[PAGINATE-4] onEndReached callback firing (will set pendingEndRequest):", {
+                        dataCount,
                         distance,
                         isInitializing: state.isInitializing,
+                        phase,
                     });
                     state.pendingEndRequest = true;
+
+                    // Notify InitializationManager of pagination request
+                    ctx.initializationManager.onPaginationRequested("end", dataCount);
                 }
                 console.log("[PAGINATE-5] Calling app's onEndReached callback:", { distance });
                 state.props.onEndReached?.({ distanceFromEnd: distance });
@@ -57,8 +81,8 @@ export function checkAtBottom(ctx: StateContext) {
         if (prevIsEndReached !== state.isEndReached) {
             console.log("[PAGINATE-6] isEndReached state changed:", {
                 from: prevIsEndReached,
-                to: state.isEndReached,
                 isInitializing: state.isInitializing,
+                to: state.isEndReached,
             });
         }
     }

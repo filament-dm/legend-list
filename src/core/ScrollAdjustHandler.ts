@@ -41,6 +41,12 @@ export class ScrollAdjustHandler {
             const state = this.ctx.state;
             const pending = this.pendingAdjust;
 
+            console.log("[COMMIT-ADJUST-1] commitPendingAdjust called:", {
+                currentScroll: state.scroll,
+                pending,
+                scrollTarget,
+            });
+
             // Clear pending state
             this.pendingAdjust = 0;
 
@@ -57,6 +63,11 @@ export class ScrollAdjustHandler {
                     if (scrollTarget.itemKey !== undefined) {
                         const currentIndex = state.indexByKey.get(scrollTarget.itemKey);
                         if (currentIndex !== undefined) {
+                            console.log("[COMMIT-ADJUST-2] Updated index from itemKey:", {
+                                itemKey: scrollTarget.itemKey,
+                                newIndex: currentIndex,
+                                oldIndex: targetIndex,
+                            });
                             targetIndex = currentIndex;
                         }
                     }
@@ -66,6 +77,14 @@ export class ScrollAdjustHandler {
                     // Apply viewOffset and viewPosition to get the final scroll position
                     targetScroll = calculateOffsetWithOffsetPosition(this.ctx, currentOffset, scrollTarget);
                     targetScroll = clampScrollOffset(this.ctx, targetScroll);
+
+                    console.log("[COMMIT-ADJUST-3] Recalculated target scroll:", {
+                        adjustment: targetScroll - state.scroll,
+                        currentOffset,
+                        scrollBefore: state.scroll,
+                        targetIndex,
+                        targetScroll,
+                    });
                 } else {
                     // Fallback: just add pending to current scroll
                     targetScroll = clampScrollOffset(this.ctx, state.scroll + pending);

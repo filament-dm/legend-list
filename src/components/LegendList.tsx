@@ -274,17 +274,17 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 initialScroll: initialScrollProp,
                 isAtEnd: false,
                 isAtStart: false,
+                isEndBufferSufficient: false,
                 isEndReached: null,
                 isFirst: true,
                 isInitializing: false,
-                isEndBufferSufficient: false,
                 isStartBufferSufficient: false,
                 isStartReached: null,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
                 lastScrollDelta: 0,
-                loadStartTime: Date.now(),
                 lastTimelineId: undefined,
+                loadStartTime: Date.now(),
                 minIndexSizeChanged: 0,
                 nativeContentInset: undefined,
                 nativeMarginTop: 0,
@@ -393,39 +393,31 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     // Detect timelineId change to enter initialization mode
     if (timelineId !== state.lastTimelineId) {
         console.log("[INIT-1] timelineId changed, ENTERING INITIALIZATION MODE:", {
-            oldTimelineId: state.lastTimelineId,
-            newTimelineId: timelineId,
-            stabilizationAnchorId,
-            hasInitialScrollProp: !!initialScrollProp,
             dataLength: dataProp.length,
+            hasInitialScrollProp: !!initialScrollProp,
+            maintainScrollAtEnd,
+            newTimelineId: timelineId,
+            oldTimelineId: state.lastTimelineId,
+            stabilizationAnchorId,
         });
         state.lastTimelineId = timelineId;
-        state.isInitializing = true;
-        state.stabilizationStableFrames = 0;
-        state.pendingStartRequest = false;
-        state.pendingEndRequest = false;
-        // When stabilizationAnchorId is provided without an initialScrollIndex,
-        // automatically scroll to that message and position it in the middle of the viewport
-        if (stabilizationAnchorId && !initialScrollProp && dataProp && dataProp.length > 0) {
-            // Find the index of the stabilization anchor
-            const anchorIndex = dataProp.findIndex(
-                (item, index) => keyExtractor(item, index) === stabilizationAnchorId,
+
+        // Enter initialization via the InitializationManager
+        ctx.initializationManager.enterInitialization({
+            anchorId: stabilizationAnchorId,
+            timelineId: timelineId || "",
+        });
+
+        // Prepare initial scroll if we have data and no explicit initialScroll prop
+        if (!initialScrollProp && dataProp && dataProp.length > 0) {
+            const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+                dataProp as readonly unknown[],
+                keyExtractor as (item: unknown, index: number) => string,
             );
 
-            if (anchorIndex >= 0) {
-                console.log("[INIT-2] Setting initialScroll for stabilizationAnchorId:", {
-                    anchorIndex,
-                    stabilizationAnchorId,
-                    viewPosition: 0.5,
-                    dataLength: dataProp.length,
-                });
-                // Set initialScroll to position this item in middle of viewport
-                state.initialScroll = {
-                    index: anchorIndex,
-                    viewPosition: 0.5, // Position in middle of viewport
-                };
-            } else {
-                console.warn("[INIT-ERROR] stabilizationAnchorId not found in data:", stabilizationAnchorId);
+            // If initial scroll was prepared, enter SCROLLING phase
+            if (scrollPrepared) {
+                ctx.initializationManager.enterScrollingPhase();
             }
         }
     }
@@ -548,17 +540,36 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
 
     const doInitialScroll = useCallback(() => {
         console.log("[INIT-SCROLL] doInitialScroll called");
-        const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo, didContainersLayout, scrollLength } = state;
-        console.log("[INIT-SCROLL] State:", {
+        const {
             initialScroll,
             didFinishInitialScroll,
             queuedInitialLayout,
             scrollingTo,
             didContainersLayout,
             scrollLength,
+        } = state;
+        console.log("[INIT-SCROLL] State:", {
+            didContainersLayout,
+            didFinishInitialScroll,
+            initialScroll,
+            queuedInitialLayout,
+            scrollingTo,
+            scrollLength,
         });
-        if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo && didContainersLayout && scrollLength > 0) {
-            console.log("[INIT-SCROLL] Performing initial scroll to:", initialScroll, initialContentOffset, scrollLength);
+        if (
+            initialScroll &&
+            !queuedInitialLayout &&
+            !didFinishInitialScroll &&
+            !scrollingTo &&
+            didContainersLayout &&
+            scrollLength > 0
+        ) {
+            console.log(
+                "[INIT-SCROLL] Performing initial scroll to:",
+                initialScroll,
+                initialContentOffset,
+                scrollLength,
+            );
             scrollTo(ctx, {
                 animated: false,
                 index: initialScroll?.index,

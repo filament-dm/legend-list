@@ -2,6 +2,7 @@ import * as React from "react";
 import type { View } from "react-native";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 
+import { InitializationManager } from "@/core/initialization/InitializationManager";
 import { type AnimatedValue, createAnimatedValue } from "@/platform/Animated";
 import type {
     ColumnWrapperStyle,
@@ -108,6 +109,7 @@ export interface StateContext {
     animatedScrollY: AnimatedValue;
     columnWrapperStyle: ColumnWrapperStyle | undefined;
     contextNum: number; // For debug checking that it's the right context
+    initializationManager: InitializationManager;
     listeners: Map<ListenerType, Set<(value: any) => void>>;
     mapViewabilityCallbacks: Map<string, ViewabilityCallback>;
     mapViewabilityValues: Map<string, ViewToken>;
@@ -134,29 +136,38 @@ const ContextState = React.createContext<StateContext | null>(null);
 let contextNum = 0;
 
 export function StateProvider({ children }: { children: React.ReactNode }) {
-    const [value] = React.useState<StateContext>(() => ({
-        animatedScrollY: createAnimatedValue(0),
-        columnWrapperStyle: undefined,
-        contextNum: contextNum++,
-        listeners: new Map(),
-        mapViewabilityAmountCallbacks: new Map<number, ViewabilityAmountCallback>(),
-        mapViewabilityAmountValues: new Map<number, ViewAmountToken>(),
-        mapViewabilityCallbacks: new Map<string, ViewabilityCallback>(),
-        mapViewabilityConfigStates: new Map(),
-        mapViewabilityValues: new Map<string, ViewToken>(),
-        positionListeners: new Map(),
-        state: undefined as any,
-        values: new Map<ListenerType, any>([
-            ["alignItemsPaddingTop", 0],
-            ["stylePaddingTop", 0],
-            ["headerSize", 0],
-            ["numContainers", 0],
-            ["activeStickyIndex", -1],
-            ["totalSize", 0],
-            ["scrollAdjustPending", 0],
-        ]),
-        viewRefs: new Map<number, React.RefObject<View>>(),
-    }));
+    const [value] = React.useState<StateContext>(() => {
+        // Create the context object first
+        const ctx: Partial<StateContext> = {
+            animatedScrollY: createAnimatedValue(0),
+            columnWrapperStyle: undefined,
+            contextNum: contextNum++,
+            listeners: new Map(),
+            mapViewabilityAmountCallbacks: new Map<number, ViewabilityAmountCallback>(),
+            mapViewabilityAmountValues: new Map<number, ViewAmountToken>(),
+            mapViewabilityCallbacks: new Map<string, ViewabilityCallback>(),
+            mapViewabilityConfigStates: new Map(),
+            mapViewabilityValues: new Map<string, ViewToken>(),
+            positionListeners: new Map(),
+            state: undefined as any,
+            values: new Map<ListenerType, any>([
+                ["alignItemsPaddingTop", 0],
+                ["stylePaddingTop", 0],
+                ["headerSize", 0],
+                ["numContainers", 0],
+                ["activeStickyIndex", -1],
+                ["totalSize", 0],
+                ["scrollAdjustPending", 0],
+            ]),
+            viewRefs: new Map<number, React.RefObject<View>>(),
+        };
+
+        // Create InitializationManager with the context
+        // Cast to StateContext since we're about to complete it
+        ctx.initializationManager = new InitializationManager(ctx as StateContext);
+
+        return ctx as StateContext;
+    });
     return <ContextState.Provider value={value}>{children}</ContextState.Provider>;
 }
 

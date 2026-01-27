@@ -15,13 +15,13 @@ export function scrollToIndex(
     const { data } = state.props;
 
     console.log("[SCROLL-1] scrollToIndex called:", {
-        index,
         animated,
-        viewPosition,
-        viewOffset,
         hasCallback: !!onSettled,
+        index,
         isInitializing: state.isInitializing,
         stabilizationAnchorId: state.props.stabilizationAnchorId,
+        viewOffset,
+        viewPosition,
     });
 
     if (index >= data.length) {
@@ -44,10 +44,10 @@ export function scrollToIndex(
 
     console.log("[SCROLL-2] scrollToIndex params calculated:", {
         adjustedIndex: index,
-        targetId,
-        itemSize,
-        viewPosition,
         isAnchor: targetId === state.props.stabilizationAnchorId,
+        itemSize,
+        targetId,
+        viewPosition,
     });
 
     // Wrap onSettled in double RAF to ensure layout has settled before callback fires
@@ -68,6 +68,7 @@ export function scrollToIndex(
     scrollTo(ctx, {
         animated,
         index,
+        isInitialScroll: state.initialScroll !== undefined && state.initialScroll.index === index,
         itemKey: targetId,
         itemSize,
         offset: firstIndexOffset,

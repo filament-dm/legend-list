@@ -37,6 +37,13 @@ export function finishScrollTo(ctx: StateContext) {
 
         setInitialRenderState(ctx, { didInitialScroll: true });
 
+        // Notify initialization manager that initial scroll completed
+        if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+            ctx.initializationManager.markInitialScrollComplete();
+            // Transition from SCROLLING to FILLING phase to enable MVCP and pagination
+            ctx.initializationManager.transitionToFillingPhase();
+        }
+
         // Invoke callback after all state cleanup and updates are complete
         if (callback) {
             // console.log("[finishScrollTo] Invoking callback");

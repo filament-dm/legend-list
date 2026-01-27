@@ -41,18 +41,18 @@ export function checkStabilizationComplete(state: InternalState, ctx?: StateCont
     const isStartComplete = state.isStartBufferSufficient;
 
     console.log("[STABLE-1] Checking stabilization conditions:", {
-        isEndReached,
-        isStartReached,
         hasMoreEnd,
         hasMoreStart,
         isEndBufferSufficient: state.isEndBufferSufficient,
-        isStartBufferSufficient: state.isStartBufferSufficient,
         isEndComplete,
+        isEndReached,
+        isStartBufferSufficient: state.isStartBufferSufficient,
         isStartComplete,
-        pendingStartRequest,
+        isStartReached,
         pendingEndRequest,
-        stabilizationStableFrames: state.stabilizationStableFrames ?? 0,
+        pendingStartRequest,
         requiredFrames: STABILIZATION_FRAME_COUNT,
+        stabilizationStableFrames: state.stabilizationStableFrames ?? 0,
     });
 
     // Check if viewport is filled (both directions complete)
@@ -63,8 +63,8 @@ export function checkStabilizationComplete(state: InternalState, ctx?: StateCont
         // Increment stable frame counter
         state.stabilizationStableFrames = (state.stabilizationStableFrames ?? 0) + 1;
         console.log("[STABLE-2] Viewport filled! Incrementing stable frame counter:", {
-            stableFrames: state.stabilizationStableFrames,
             requiredFrames: STABILIZATION_FRAME_COUNT,
+            stableFrames: state.stabilizationStableFrames,
             willComplete: state.stabilizationStableFrames >= STABILIZATION_FRAME_COUNT,
         });
 
@@ -93,13 +93,13 @@ export function checkStabilizationComplete(state: InternalState, ctx?: StateCont
         if (state.stabilizationStableFrames > 0) {
             console.log("[STABLE-6] NOT stable anymore, resetting counter:", {
                 from: state.stabilizationStableFrames,
-                to: 0,
                 reason: {
                     isEndComplete,
                     isStartComplete,
-                    pendingStartRequest,
                     pendingEndRequest,
+                    pendingStartRequest,
                 },
+                to: 0,
             });
         }
         state.stabilizationStableFrames = 0;

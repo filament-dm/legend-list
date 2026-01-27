@@ -7,6 +7,15 @@ import { peek$, type StateContext } from "@/state/state";
 export function requestAdjust(ctx: StateContext, positionDiff: number, dataChanged?: boolean) {
     const state = ctx.state;
     if (Math.abs(positionDiff) > 0.1) {
+        console.log("[REQUEST-ADJUST-1] Adjusting scroll position:", {
+            dataChanged,
+            isInitializing: state.isInitializing,
+            positionDiff,
+            scrollAfter: state.scroll + positionDiff,
+            scrollBefore: state.scroll,
+            stack: new Error().stack?.split("\n").slice(1, 5).join("\n"),
+        });
+
         const needsScrollWorkaround =
             Platform.OS === "android" && !IsNewArchitecture && dataChanged && state.scroll <= positionDiff;
 
@@ -30,7 +39,7 @@ export function requestAdjust(ctx: StateContext, positionDiff: number, dataChang
         // Reset stabilization counter when MVCP adjusts during initialization
         // This ensures 3 stable frames occur AFTER the scroll adjustment is applied
         if (state.isInitializing) {
-            state.stabilizationStableFrames = 0;
+            ctx.initializationManager.onMVCPAdjusted();
         }
 
         const readyToRender = peek$(ctx, "readyToRender");

@@ -21,22 +21,24 @@ export function doScrollTo(ctx: StateContext, params: DoScrollToParams) {
     const node: HTMLElement | null =
         typeof scroller?.getScrollableNode === "function" ? scroller.getScrollableNode() : scroller;
 
-    // console.log("[doScrollTo] Called with:", {
-    //     animated,
-    //     horizontal,
-    //     offset,
-    //     hasScroller: !!scroller,
-    //     hasNode: !!node,
-    //     currentScroll: state.scroll,
-    //     hasOnSettled: !!state.scrollingTo?.onSettled,
-    // });
+    console.log("[doScrollTo] Called with:", {
+        animated,
+        currentScroll: state.scroll,
+        hasNode: !!node,
+        hasOnSettled: !!state.scrollingTo?.onSettled,
+        hasScroller: !!scroller,
+        horizontal,
+        nodeCurrentScrollTop: node?.scrollTop,
+        offset,
+    });
 
     if (node) {
         const left = horizontal ? offset : 0;
         const top = horizontal ? 0 : offset;
 
-        // console.log("[doScrollTo] Calling node.scrollTo");
+        console.log("[doScrollTo] Calling node.scrollTo with:", { behavior: animated ? "smooth" : "auto", left, top });
         node.scrollTo({ behavior: animated ? "smooth" : "auto", left, top });
+        console.log("[doScrollTo] After scrollTo, node.scrollTop:", node.scrollTop);
 
         if (animated) {
             // console.log("[doScrollTo] Setting up listenForScrollEnd");

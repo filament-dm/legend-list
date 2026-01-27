@@ -3,6 +3,10 @@ import { IsNewArchitecture } from "@/constants-platform";
 import { calculateOffsetForIndex } from "@/core/calculateOffsetForIndex";
 import { calculateOffsetWithOffsetPosition } from "@/core/calculateOffsetWithOffsetPosition";
 import { ensureInitialAnchor } from "@/core/ensureInitialAnchor";
+import { calculateBufferSizes } from "@/core/initialization/calculateBuffers";
+import { checkStabilizationComplete } from "@/core/initialization/checkStabilization";
+import { prepareInitializationMVCP, shouldUseInitializationMVCP } from "@/core/initialization/mvcpInitialization";
+import { InitializationPhase } from "@/core/initialization/types";
 import { prepareMVCP } from "@/core/mvcp";
 import { updateItemPositions } from "@/core/updateItemPositions";
 import { updateViewableItems } from "@/core/viewability";
@@ -14,7 +18,6 @@ import type { InternalState } from "@/types";
 import { checkAllSizesKnown } from "@/utils/checkAllSizesKnown";
 import { checkAtBottom } from "@/utils/checkAtBottom";
 import { checkAtTop } from "@/utils/checkAtTop";
-import { checkStabilizationComplete } from "@/utils/checkStabilizationComplete";
 import { findAvailableContainers } from "@/utils/findAvailableContainers";
 import { getId } from "@/utils/getId";
 import { getItemSize } from "@/utils/getItemSize";
@@ -227,25 +230,15 @@ export function calculateItemsInView(
             set$(ctx, "activeStickyIndex", nextActiveStickyIndex);
         }
 
-        let scrollBufferTop = scrollBuffer;
-        let scrollBufferBottom = scrollBuffer;
-
-        if (speed > 0 || (speed === 0 && scroll < Math.max(50, scrollBuffer))) {
-            // If we're scrolling fast, or we're at the top of the list and not scrolling
-            scrollBufferTop = scrollBuffer * 0.5;
-            scrollBufferBottom = scrollBuffer * 1.5;
-        } else {
-            scrollBufferTop = scrollBuffer * 1.5;
-            scrollBufferBottom = scrollBuffer * 0.5;
-        }
-
-        // During initialization, use a much larger buffer to account for scroll position uncertainty
-        // caused by pending MVCP adjustments. This ensures all actually-visible items are included
-        // in the buffered range despite scroll position being in flux.
-        if (state.isInitializing) {
-            scrollBufferTop *= 4;
-            scrollBufferBottom *= 4;
-        }
+        // Calculate buffer sizes based on scroll velocity and initialization state
+        const { scrollBufferTop, scrollBufferBottom } = calculateBufferSizes(
+            {
+                isInitializing: state.isInitializing,
+                scrollBuffer,
+                scrollVelocity: speed,
+            },
+            scroll,
+        );
 
         const scrollTopBuffered = scroll - scrollBufferTop;
         const scrollBottom = scroll + scrollLength + (scroll < 0 ? -scroll : 0);
@@ -269,7 +262,12 @@ export function calculateItemsInView(
 
         ////// Update item positions and do MVCP
         // Handle maintainVisibleContentPosition adjustment early
-        const checkMVCP = doMVCP ? prepareMVCP(ctx, dataChanged) : undefined;
+        // Use initialization-specific MVCP during initialization, otherwise use regular MVCP
+        const checkMVCP = doMVCP
+            ? shouldUseInitializationMVCP(ctx)
+                ? prepareInitializationMVCP(ctx)
+                : prepareMVCP(ctx, dataChanged)
+            : undefined;
 
         if (dataChanged) {
             indexByKey.clear();
@@ -612,7 +610,11 @@ export function calculateItemsInView(
                         // so we need to set it to out of view
                         set$(ctx, `containerPosition${i}`, POSITION_OUT_OF_VIEW);
                     } else {
-                        const position = (positionValue || 0) - scrollAdjustPending;
+                        // During initialization with initialScroll, don't apply scrollAdjustPending
+                        // because scrollState is already overridden with the target position
+                        // Applying it here would cause a coordinate mismatch (double-adjustment)
+                        const shouldApplyAdjust = queuedInitialLayout || !initialScroll;
+                        const position = (positionValue || 0) - (shouldApplyAdjust ? scrollAdjustPending : 0);
                         const column = columns.get(id) || 1;
 
                         const prevPos = peek$(ctx, `containerPosition${i}`);
@@ -677,10 +679,29 @@ export function calculateItemsInView(
     // This ensures state machine can progress through all states: null → false → true
     // Skip redundant checks during initialization data changes - checkResetContainers already handles these
     if (state.isEndReached !== true || state.isStartReached !== true) {
+        let shouldSkipChecks = false;
+
         // During initialization with data changes, skip these checks to avoid bypassing forced-pagination logic
-        if (!state.isInitializing || !params.dataChanged) {
+        if (state.isInitializing) {
+            if (params.dataChanged) {
+                shouldSkipChecks = true;
+            } else if (ctx.initializationManager) {
+                const phase = ctx.initializationManager.getCurrentPhase();
+                // Also skip during SCROLLING phase and FILLING (pre-scroll) to prevent premature pagination
+                if (phase === InitializationPhase.SCROLLING) {
+                    shouldSkipChecks = true;
+                } else if (
+                    phase === InitializationPhase.FILLING &&
+                    !ctx.initializationManager.didCompleteInitialScroll()
+                ) {
+                    shouldSkipChecks = true;
+                }
+            }
+        }
+
+        if (!shouldSkipChecks) {
             requestAnimationFrame(() => {
-                checkAtTop(state);
+                checkAtTop(state, ctx);
                 checkAtBottom(ctx);
                 // Check if stabilization completed and fire callback
                 checkStabilizationComplete(state, ctx);
