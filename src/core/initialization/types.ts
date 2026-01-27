@@ -1,21 +1,20 @@
 /**
  * Initialization system type definitions
  *
- * The initialization system handles the complex process of filling the viewport
- * when navigating to a specific timeline position (e.g., jumping to a message in chat history).
+ * The initialization system handles scrolling to a specific timeline position
+ * (e.g., jumping to a message in chat history) and stabilizing the viewport
+ * while items resize.
  */
 
 /**
  * Phases of the initialization process
  * - IDLE: Not initializing, normal list operation
  * - SCROLLING: Positioning to the anchor item
- * - FILLING: Paginating until viewport buffers are sufficient
- * - STABILIZING: Waiting for scroll position to stabilize (3 frame debounce)
+ * - STABILIZING: Waiting for scroll position to stabilize (3 consecutive stable frames)
  */
 export enum InitializationPhase {
     IDLE = "IDLE",
     SCROLLING = "SCROLLING",
-    FILLING = "FILLING",
     STABILIZING = "STABILIZING",
 }
 
@@ -87,30 +86,6 @@ export interface InitializationState {
 
     /** Number of consecutive stable frames observed */
     stabilizationFrames: number;
-
-    /** Whether a start pagination request is pending */
-    pendingStartRequest: boolean;
-
-    /** Whether an end pagination request is pending */
-    pendingEndRequest: boolean;
-
-    /** Whether the start buffer meets the required threshold */
-    isStartBufferSufficient: boolean;
-
-    /** Whether the end buffer meets the required threshold */
-    isEndBufferSufficient: boolean;
-
-    /** Timestamp when start pagination was last requested */
-    startRequestTimestamp: number | undefined;
-
-    /** Timestamp when end pagination was last requested */
-    endRequestTimestamp: number | undefined;
-
-    /** Number of items in the data array when start pagination was requested */
-    startRequestDataCount: number | undefined;
-
-    /** Number of items in the data array when end pagination was requested */
-    endRequestDataCount: number | undefined;
 }
 
 /**

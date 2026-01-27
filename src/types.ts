@@ -234,15 +234,13 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     stabilizationAnchorId?: string;
 
     /**
-     * Callback fired when viewport filling completes and the list becomes stable.
-     * Fired when both isEndReached and isStartReached transition from false to true,
-     * indicating that sufficient content has been loaded to fill the viewport.
+     * Callback fired when initialization completes.
      *
      * Use case: Clear stabilizationAnchorId when this callback fires to return to
      * normal MVCP behavior. The timelineId should remain unchanged so future data
      * updates don't re-trigger initialization mode.
      */
-    onStabilizationComplete?: () => void;
+    onInitializationComplete?: () => void;
 
     /**
      * Number of columns to render items in.
@@ -542,6 +540,7 @@ export interface InternalState {
     isStartBufferSufficient: boolean;
     isStartReached: boolean | null;
     lastTimelineId: string | undefined;
+    lastStabilizationAnchorId: string | undefined;
     pendingEndRequest: boolean;
     pendingStartRequest: boolean;
     stabilizationStableFrames: number;
@@ -622,7 +621,7 @@ export interface InternalState {
         onScroll: LegendListProps["onScroll"];
         onStartReached: LegendListProps["onStartReached"];
         onStartReachedThreshold: number | null | undefined;
-        onStabilizationComplete: LegendListProps["onStabilizationComplete"];
+        onInitializationComplete: LegendListProps["onInitializationComplete"];
         hasMoreStart: boolean;
         hasMoreEnd: boolean;
         onStickyHeaderChange: LegendListProps["onStickyHeaderChange"];

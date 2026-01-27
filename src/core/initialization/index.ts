@@ -13,7 +13,6 @@
  */
 
 export * from "./calculateBuffers";
-export * from "./checkStabilization";
 export * from "./detectDataDirection";
 export * from "./forcePagination";
 export * from "./InitializationManager";

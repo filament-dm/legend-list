@@ -140,6 +140,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         numColumns: numColumnsProp = 1,
         onEndReached,
         onEndReachedThreshold = 0.5,
+        onInitializationComplete,
         onItemSizeChanged,
         onMetricsChange,
         onLayout: onLayoutProp,
@@ -149,7 +150,6 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         onScroll: onScrollProp,
         onStartReached,
         onStartReachedThreshold = 0.5,
-        onStabilizationComplete,
         onStickyHeaderChange,
         onViewableItemsChanged,
         progressViewOffset,
@@ -284,6 +284,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 lastLayout: undefined,
                 lastScrollDelta: 0,
                 lastTimelineId: undefined,
+                lastStabilizationAnchorId: undefined,
                 loadStartTime: Date.now(),
                 minIndexSizeChanged: 0,
                 nativeContentInset: undefined,
@@ -368,10 +369,10 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         numColumns: numColumnsProp,
         onEndReached,
         onEndReachedThreshold,
+        onInitializationComplete,
         onItemSizeChanged,
         onLoad,
         onScroll: throttleScrollFn,
-        onStabilizationComplete,
         onStartReached,
         onStartReachedThreshold,
         onStickyHeaderChange,
@@ -390,35 +391,56 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
 
     state.refScroller = refScroller;
 
-    // Detect timelineId change to enter initialization mode
-    if (timelineId !== state.lastTimelineId) {
-        console.log("[INIT-1] timelineId changed, ENTERING INITIALIZATION MODE:", {
+    // Detect timeline or anchor changes to determine if we need to enter initialization mode
+    const timelineChanged = timelineId !== state.lastTimelineId;
+    const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+
+    // Only initialize if we have a NEW anchor to scroll to (anchor is defined and different)
+    const shouldInitialize = stabilizationAnchorId && anchorChanged;
+
+    // Always track timeline changes for other purposes
+    if (timelineChanged) {
+        state.lastTimelineId = timelineId;
+    }
+
+    // Handle anchor changes
+    if (anchorChanged) {
+        console.log("[INIT-1] Anchor changed:", {
             dataLength: dataProp.length,
             hasInitialScrollProp: !!initialScrollProp,
             maintainScrollAtEnd,
-            newTimelineId: timelineId,
-            oldTimelineId: state.lastTimelineId,
-            stabilizationAnchorId,
-        });
-        state.lastTimelineId = timelineId;
-
-        // Enter initialization via the InitializationManager
-        ctx.initializationManager.enterInitialization({
-            anchorId: stabilizationAnchorId,
-            timelineId: timelineId || "",
+            timelineId,
+            oldAnchor: state.lastStabilizationAnchorId,
+            newAnchor: stabilizationAnchorId,
+            shouldInitialize,
         });
 
-        // Prepare initial scroll if we have data and no explicit initialScroll prop
-        if (!initialScrollProp && dataProp && dataProp.length > 0) {
-            const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
-                dataProp as readonly unknown[],
-                keyExtractor as (item: unknown, index: number) => string,
-            );
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
 
-            // If initial scroll was prepared, enter SCROLLING phase
-            if (scrollPrepared) {
-                ctx.initializationManager.enterScrollingPhase();
+        // Only enter initialization if anchor is defined (we have a target to scroll to)
+        if (shouldInitialize) {
+            console.log("[INIT-1] ENTERING INITIALIZATION MODE for new anchor");
+
+            // Enter initialization via the InitializationManager
+            ctx.initializationManager.enterInitialization({
+                anchorId: stabilizationAnchorId,
+                timelineId: timelineId || "",
+            });
+
+            // Prepare initial scroll if we have data and no explicit initialScroll prop
+            if (!initialScrollProp && dataProp && dataProp.length > 0) {
+                const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+                    dataProp as readonly unknown[],
+                    keyExtractor as (item: unknown, index: number) => string,
+                );
+
+                // If initial scroll was prepared, enter SCROLLING phase
+                if (scrollPrepared) {
+                    ctx.initializationManager.enterScrollingPhase();
+                }
             }
+        } else if (!stabilizationAnchorId && state.lastStabilizationAnchorId) {
+            console.log("[INIT-1] Anchor cleared (timeout or scroll to live), skipping initialization");
         }
     }
 

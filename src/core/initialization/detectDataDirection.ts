@@ -9,7 +9,7 @@
  * - No structural changes occurred (content updates only)
  */
 
-import type { DataArrivalInfo, PaginationDirection } from "./types";
+import { PaginationDirection, type DataArrivalInfo } from "./types";
 
 /**
  * Detects pagination direction by comparing old and new data arrays
@@ -30,7 +30,7 @@ export function detectDataDirection(
     // Edge case: First data load (empty -> populated)
     if (oldCount === 0 && newCount > 0) {
         return {
-            direction: "both",
+            direction: PaginationDirection.BOTH,
             isEndEmpty: false,
             isStartEmpty: false,
             itemsAddedAtEnd: newCount,
@@ -44,7 +44,7 @@ export function detectDataDirection(
     // Edge case: Data cleared (populated -> empty)
     if (oldCount > 0 && newCount === 0) {
         return {
-            direction: "replacement",
+            direction: PaginationDirection.REPLACEMENT,
             isEndEmpty: true,
             isStartEmpty: true,
             itemsAddedAtEnd: 0,
@@ -66,7 +66,7 @@ export function detectDataDirection(
         if (oldFirstKey === newFirstKey && oldLastKey === newLastKey) {
             // Same boundaries, likely just content updates
             return {
-                direction: "none",
+                direction: PaginationDirection.NONE,
                 isEndEmpty: false,
                 isStartEmpty: false,
                 itemsAddedAtEnd: 0,
@@ -79,7 +79,7 @@ export function detectDataDirection(
 
         // Boundaries changed with same count - replacement
         return {
-            direction: "replacement",
+            direction: PaginationDirection.REPLACEMENT,
             isEndEmpty: false,
             isStartEmpty: false,
             itemsAddedAtEnd: 0,
@@ -126,7 +126,7 @@ export function detectDataDirection(
     // No overlap found - complete replacement
     if (commonStartIndex === -1 || commonEndIndex === -1) {
         return {
-            direction: "replacement",
+            direction: PaginationDirection.REPLACEMENT,
             isEndEmpty: false,
             isStartEmpty: false,
             itemsAddedAtEnd: newCount,
@@ -147,15 +147,15 @@ export function detectDataDirection(
     // Determine direction
     let direction: PaginationDirection;
     if (itemsAddedAtStart > 0 && itemsAddedAtEnd > 0) {
-        direction = "both";
+        direction = PaginationDirection.BOTH;
     } else if (itemsAddedAtStart > 0) {
-        direction = "start";
+        direction = PaginationDirection.START;
     } else if (itemsAddedAtEnd > 0) {
-        direction = "end";
+        direction = PaginationDirection.END;
     } else if (itemsRemoved > 0) {
-        direction = "replacement";
+        direction = PaginationDirection.REPLACEMENT;
     } else {
-        direction = "none";
+        direction = PaginationDirection.NONE;
     }
 
     // Detect empty responses
@@ -163,8 +163,8 @@ export function detectDataDirection(
     // it might indicate the server returned empty (no more data available)
     // However, we can't determine this with certainty without request context,
     // so we'll use a heuristic: if data count increased but not in expected direction
-    const isStartEmpty = direction !== "start" && direction !== "both" && newCount === oldCount;
-    const isEndEmpty = direction !== "end" && direction !== "both" && newCount === oldCount;
+    const isStartEmpty = direction !== PaginationDirection.START && direction !== PaginationDirection.BOTH && newCount === oldCount;
+    const isEndEmpty = direction !== PaginationDirection.END && direction !== PaginationDirection.BOTH && newCount === oldCount;
 
     return {
         direction,

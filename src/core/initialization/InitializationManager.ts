@@ -2,23 +2,19 @@
  * Initialization Manager
  *
  * Centralizes all initialization state and logic. The initialization system handles
- * the complex process of filling the viewport when navigating to a specific timeline
- * position (e.g., jumping to a message in chat history).
+ * scrolling to a specific timeline position (e.g., jumping to a message in chat history)
+ * and stabilizing the viewport while items resize.
  *
  * This manager provides a single source of truth for initialization state and
  * clear interfaces for the rest of the system to interact with initialization behavior.
  */
 
-import { getContentSize } from "@/state/getContentSize";
-import type { StateContext } from "@/state/state";
-import { checkForcePagination, type ForcePaginationConfig } from "./forcePagination";
+import { MvcpMode, type StateContext, set$ } from "@/state/state";
 import {
-    type DataArrivalInfo,
     type InitializationConfig,
     InitializationMode,
     InitializationPhase,
     type InitializationState,
-    PaginationDirection,
 } from "./types";
 
 /**
@@ -35,17 +31,9 @@ export class InitializationManager {
             anchorIndex: undefined,
             didCompleteInitialScroll: false,
             didInitialRecenter: false,
-            endRequestDataCount: undefined,
-            endRequestTimestamp: undefined,
-            isEndBufferSufficient: false,
-            isStartBufferSufficient: false,
             mode: InitializationMode.IDLE,
-            pendingEndRequest: false,
-            pendingStartRequest: false,
             phase: InitializationPhase.IDLE,
             stabilizationFrames: 0,
-            startRequestDataCount: undefined,
-            startRequestTimestamp: undefined,
             targetScroll: undefined,
             targetViewPosition: undefined,
             timelineId: undefined,
@@ -55,9 +43,23 @@ export class InitializationManager {
     // ===== Phase Management =====
 
     /**
+     * Set MVCP mode declaratively based on initialization phase
+     */
+    private setMvcpMode(mode: MvcpMode): void {
+        console.log(`[INIT-MVCP] Setting MVCP mode: ${mode}`);
+        set$(this.ctx, "mvcpMode", mode);
+    }
+
+    /**
      * Enter initialization mode for a new timeline
      */
     enterInitialization(config: InitializationConfig): void {
+        // Guard against re-entry while already initializing
+        if (this.isInitializing()) {
+            console.warn("[INIT-MANAGER] Already initializing, ignoring duplicate call");
+            return;
+        }
+
         // Detect mode from props and config using three-case logic
         let mode: InitializationMode;
 
@@ -93,7 +95,8 @@ export class InitializationManager {
             timelineId: config.timelineId,
         });
 
-        this.state.phase = InitializationPhase.FILLING;
+        this.state.phase = InitializationPhase.SCROLLING;
+        console.log("[INIT-PHASE] 🔄 Phase transition: IDLE → SCROLLING");
         this.state.mode = mode;
         this.state.timelineId = config.timelineId;
         this.state.anchorId = config.anchorId;
@@ -101,17 +104,14 @@ export class InitializationManager {
         this.state.didCompleteInitialScroll = false;
         this.state.didInitialRecenter = false;
         this.state.stabilizationFrames = 0;
-        this.state.pendingStartRequest = false;
-        this.state.pendingEndRequest = false;
-        this.state.isStartBufferSufficient = false;
-        this.state.isEndBufferSufficient = false;
 
         // Sync to InternalState
         this.ctx.state.isInitializing = true;
         this.ctx.state.lastTimelineId = config.timelineId;
         this.ctx.state.stabilizationStableFrames = 0;
-        this.ctx.state.pendingStartRequest = false;
-        this.ctx.state.pendingEndRequest = false;
+
+        // Set MVCP mode: disable during SCROLLING phase
+        this.setMvcpMode(MvcpMode.NONE);
     }
 
     /**
@@ -232,38 +232,49 @@ export class InitializationManager {
     }
 
     /**
-     * Transition from SCROLLING to FILLING phase - called after initial scroll completes
-     * This enables MVCP lock and forced pagination
-     */
-    transitionToFillingPhase(): void {
-        if (!this.isInitializing()) {
-            console.warn("[INIT-PHASE] Cannot transition to FILLING phase - not initializing");
-            return;
-        }
-
-        console.log("[INIT-PHASE] Transitioning to FILLING (post-scroll) phase");
-        this.state.phase = InitializationPhase.FILLING;
-    }
-
-    /**
-     * Transition to STABILIZING phase - called when buffers are sufficient
-     * This begins counting stable frames before completion
+     * Transition from SCROLLING to STABILIZING phase - called after initial scroll completes
+     * Skips FILLING phase since app provides sufficient data upfront (no pagination needed)
      */
     transitionToStabilizingPhase(): void {
         if (!this.isInitializing()) {
-            console.warn("[INIT-PHASE] Cannot transition to STABILIZING phase - not initializing");
+            console.warn("[INIT-PHASE] ❌ Cannot transition - not initializing");
             return;
         }
 
-        console.log("[INIT-PHASE] Transitioning to STABILIZING phase");
+        const currentPhase = this.state.phase;
+        console.log("[INIT-PHASE] 🔄 Phase transition: SCROLLING → STABILIZING", {
+            currentPhase,
+            expectedPhase: InitializationPhase.SCROLLING,
+            isCorrectPhase: currentPhase === InitializationPhase.SCROLLING,
+        });
+
+        if (currentPhase !== InitializationPhase.SCROLLING) {
+            console.warn("[INIT-PHASE] ⚠️ Unexpected phase transition - expected SCROLLING", {
+                actualPhase: currentPhase,
+            });
+        }
+
+        // Skip FILLING phase - app provides sufficient data upfront, no pagination needed
         this.state.phase = InitializationPhase.STABILIZING;
+        // Set MVCP mode: enable initialization MVCP during STABILIZING phase
+        this.setMvcpMode(MvcpMode.INITIALIZATION);
+		console.log("[INIT-PHASE-STABILIZING] MVCP set to INITIALIZATION mode for STABILIZING phase");
+		console.log("[INIT-PHASE-STABILIZING] Triggering items in view calculation to apply initialization MVCP");
+		this.ctx.state.triggerCalculateItemsInView?.({ doMVCP: true, forceFullItemPositions: true });
     }
+
 
     /**
      * Exit initialization mode
      */
     exitInitialization(): void {
-        console.log("[INIT-MANAGER-2] Exiting initialization mode");
+        const currentPhase = this.state.phase;
+        console.log("[INIT-PHASE] 🔄 Phase transition: → IDLE (EXIT)", {
+            currentPhase,
+            note: "Simplified mode - exiting from any phase",
+        });
+
+        console.log("[INIT-MANAGER-2] 🎉 Exiting initialization mode - returning to normal operation");
 
         this.state.phase = InitializationPhase.IDLE;
         this.state.mode = InitializationMode.IDLE;
@@ -280,6 +291,11 @@ export class InitializationManager {
         this.ctx.state.isInitializing = false;
         this.ctx.state.stabilizationStableFrames = 0;
         this.ctx.state.initialAnchor = undefined;
+
+        // Set MVCP mode: restore regular MVCP after initialization
+        this.setMvcpMode(MvcpMode.REGULAR);
+
+        this.ctx.state.props.onInitializationComplete?.();
     }
 
     // ===== State Queries =====
@@ -317,18 +333,25 @@ export class InitializationManager {
      * Check if MVCP should be locked to anchor
      */
     shouldLockMVCP(): boolean {
-        if (!this.isInitializing()) return false;
-        if (!this.state.anchorId) return false;
+        if (!this.isInitializing() || !this.state.anchorId) {
+			return false;
+		}
 
         // Don't lock during SCROLLING phase - wait for initial scroll to complete
-        if (this.state.phase === InitializationPhase.SCROLLING) return false;
-
-        // Don't lock until initial scroll has completed
-        if (!this.state.didCompleteInitialScroll) return false;
+        if (this.state.phase === InitializationPhase.SCROLLING || !this.state.didCompleteInitialScroll) {
+			return false;
+		}
 
         // Check if anchor is ready (exists in data and has position)
         const anchorIndex = this.ctx.state.indexByKey.get(this.state.anchorId);
         const hasPosition = this.ctx.state.positions.has(this.state.anchorId);
+
+        // Detect anchor loss - exit initialization gracefully if anchor was removed
+        if (anchorIndex === undefined) {
+            console.warn("[INIT-MVCP] Anchor lost during initialization, exiting gracefully");
+            this.exitInitialization();
+            return false;
+        }
 
         return anchorIndex !== undefined && hasPosition;
     }
@@ -396,163 +419,8 @@ export class InitializationManager {
         this.state.didInitialRecenter = true;
     }
 
-    /**
-     * Check if buffer forcing should be active
-     * Returns true during FILLING phase
-     */
-    shouldForceBufferCheck(): boolean {
-        return this.state.phase === InitializationPhase.FILLING;
-    }
 
     // ===== Event Handlers =====
-
-    /**
-     * Handle pagination data arrival during initialization
-     * Clears pending pagination flags based on which direction data arrived from
-     *
-     * @param info - Information about the data arrival including direction and counts
-     */
-    onPaginationDataArrived(info: DataArrivalInfo): void {
-        if (!this.isInitializing()) return;
-
-        console.log("[INIT-MANAGER-3] Pagination data arrived:", {
-            direction: info.direction,
-            isEndEmpty: info.isEndEmpty,
-            isStartEmpty: info.isStartEmpty,
-            itemsAddedAtEnd: info.itemsAddedAtEnd,
-            itemsAddedAtStart: info.itemsAddedAtStart,
-            itemsRemoved: info.itemsRemoved,
-            newCount: info.newCount,
-            oldCount: info.oldCount,
-        });
-
-        // Handle based on direction
-        switch (info.direction) {
-            case PaginationDirection.START:
-                // Data arrived from start pagination
-                console.log("[INIT-MANAGER-3] Clearing pendingStartRequest");
-                this.state.pendingStartRequest = false;
-                this.ctx.state.pendingStartRequest = false;
-
-                // If empty response, mark start buffer as sufficient (no more data)
-                if (info.isStartEmpty || info.itemsAddedAtStart === 0) {
-                    console.log("[INIT-MANAGER-3] Start returned empty, marking start buffer sufficient");
-                    this.state.isStartBufferSufficient = true;
-                    this.ctx.state.isStartBufferSufficient = true;
-                }
-                break;
-
-            case PaginationDirection.END:
-                // Data arrived from end pagination
-                console.log("[INIT-MANAGER-3] Clearing pendingEndRequest");
-                this.state.pendingEndRequest = false;
-                this.ctx.state.pendingEndRequest = false;
-
-                // If empty response, mark end buffer as sufficient (no more data)
-                if (info.isEndEmpty || info.itemsAddedAtEnd === 0) {
-                    console.log("[INIT-MANAGER-3] End returned empty, marking end buffer sufficient");
-                    this.state.isEndBufferSufficient = true;
-                    this.ctx.state.isEndBufferSufficient = true;
-                }
-                break;
-
-            case PaginationDirection.BOTH:
-                // Data arrived in both directions (initial load or simultaneous pagination)
-                console.log("[INIT-MANAGER-3] Clearing both pending flags");
-                this.state.pendingStartRequest = false;
-                this.state.pendingEndRequest = false;
-                this.ctx.state.pendingStartRequest = false;
-                this.ctx.state.pendingEndRequest = false;
-
-                // Check for empty responses in each direction
-                if (info.isStartEmpty || info.itemsAddedAtStart === 0) {
-                    this.state.isStartBufferSufficient = true;
-                    this.ctx.state.isStartBufferSufficient = true;
-                }
-                if (info.isEndEmpty || info.itemsAddedAtEnd === 0) {
-                    this.state.isEndBufferSufficient = true;
-                    this.ctx.state.isEndBufferSufficient = true;
-                }
-                break;
-
-            case PaginationDirection.REPLACEMENT:
-                // Complete data replacement (timeline switch)
-                // Don't clear pending flags - let forced pagination re-evaluate
-                console.log("[INIT-MANAGER-3] Data replacement detected, keeping pending flags for re-evaluation");
-                break;
-
-            case PaginationDirection.NONE:
-                // No structural changes (content updates only)
-                // Don't clear pending flags - pagination not complete
-                console.log("[INIT-MANAGER-3] No structural changes, keeping pending flags");
-                break;
-        }
-
-        // Clear request metadata after processing
-        if (info.direction === PaginationDirection.START || info.direction === PaginationDirection.BOTH) {
-            this.state.startRequestTimestamp = undefined;
-            this.state.startRequestDataCount = undefined;
-        }
-        if (info.direction === PaginationDirection.END || info.direction === PaginationDirection.BOTH) {
-            this.state.endRequestTimestamp = undefined;
-            this.state.endRequestDataCount = undefined;
-        }
-    }
-
-    /**
-     * Handle MVCP adjustment during initialization
-     * Resets stabilization frame counter
-     */
-    onMVCPAdjusted(): void {
-        if (!this.isInitializing()) return;
-
-        console.log("[INIT-MANAGER-4] MVCP adjusted, resetting stabilization counter");
-
-        this.state.stabilizationFrames = 0;
-
-        // Sync to InternalState
-        this.ctx.state.stabilizationStableFrames = 0;
-    }
-
-    /**
-     * Handle pagination request
-     * Sets pending flag for the direction and tracks request metadata
-     */
-    onPaginationRequested(direction: "start" | "end", dataCount?: number): void {
-        if (!this.isInitializing()) return;
-
-        const timestamp = Date.now();
-
-        console.log(`[INIT-MANAGER-5] Pagination requested for ${direction}, setting pending flag`, {
-            dataCount,
-            timestamp,
-        });
-
-        if (direction === "start") {
-            this.state.pendingStartRequest = true;
-            this.ctx.state.pendingStartRequest = true;
-            this.state.startRequestTimestamp = timestamp;
-            this.state.startRequestDataCount = dataCount;
-        } else {
-            this.state.pendingEndRequest = true;
-            this.ctx.state.pendingEndRequest = true;
-            this.state.endRequestTimestamp = timestamp;
-            this.state.endRequestDataCount = dataCount;
-        }
-    }
-
-    /**
-     * Update buffer sufficiency flags
-     * Called by forced pagination logic
-     */
-    updateBufferSufficiency(isStartSufficient: boolean, isEndSufficient: boolean): void {
-        this.state.isStartBufferSufficient = isStartSufficient;
-        this.state.isEndBufferSufficient = isEndSufficient;
-
-        // Sync to InternalState
-        this.ctx.state.isStartBufferSufficient = isStartSufficient;
-        this.ctx.state.isEndBufferSufficient = isEndSufficient;
-    }
 
     // ===== Stabilization =====
 
@@ -580,156 +448,67 @@ export class InitializationManager {
     }
 
     /**
-     * Check if pending requests are active
-     */
-    hasPendingRequests(): boolean {
-        return this.state.pendingStartRequest || this.state.pendingEndRequest;
-    }
-
-    /**
-     * Get buffer sufficiency status
-     */
-    getBufferSufficiency(): {
-        isStartBufferSufficient: boolean;
-        isEndBufferSufficient: boolean;
-    } {
-        return {
-            isEndBufferSufficient: this.state.isEndBufferSufficient,
-            isStartBufferSufficient: this.state.isStartBufferSufficient,
-        };
-    }
-
-    // ===== Buffer Forcing =====
-
-    /**
-     * Check buffer sufficiency and determine if forced pagination is needed
-     * This centralizes the buffer forcing logic during initialization
+     * Handle MVCP adjustment during initialization
+     * Resets stabilization frame counter when scroll position is adjusted significantly.
      *
-     * @returns Object indicating which pagination callbacks should be forced
+     * Note: Called from requestAdjust() only for adjustments > 1px to avoid infinite
+     * loops caused by sub-pixel position changes during data updates.
      */
-    checkAndForceBuffers(): {
-        shouldForceStartReached: boolean;
-        shouldForceEndReached: boolean;
-    } {
-        if (!this.isInitializing()) {
-            return { shouldForceEndReached: false, shouldForceStartReached: false };
-        }
+    onMVCPAdjusted(): void {
+        if (!this.isInitializing()) return;
 
-        // Block forced pagination during SCROLLING phase
-        if (this.state.phase === InitializationPhase.SCROLLING) {
-            return { shouldForceEndReached: false, shouldForceStartReached: false };
-        }
+        console.log("[INIT-MANAGER] MVCP adjusted, resetting stabilization counter");
 
-        const state = this.ctx.state;
-        const contentSize = getContentSize(this.ctx);
-        const { scroll, scrollLength } = state;
-        const { hasMoreEnd, hasMoreStart, onEndReachedThreshold, onStartReachedThreshold } = state.props;
-
-        // Get anchor position if available
-        const anchorPosition = this.state.anchorId ? state.positions.get(this.state.anchorId) : undefined;
-
-        // Build config for force pagination check
-        const config: ForcePaginationConfig = {
-            anchorPosition,
-            contentSize,
-            hasMoreEnd: hasMoreEnd ?? true,
-            hasMoreStart: hasMoreStart ?? true,
-            maintainScrollAtEnd: !!state.props.maintainScrollAtEnd,
-            onEndReachedThreshold: onEndReachedThreshold ?? 0.5,
-            onStartReachedThreshold: onStartReachedThreshold ?? 0.5,
-            scroll,
-            scrollLength,
-        };
-
-        // Check if buffers are sufficient and if pagination should be forced
-        const result = checkForcePagination(config);
-
-        // Update buffer sufficiency flags
-        this.state.isStartBufferSufficient = result.isStartBufferSufficient;
-        this.state.isEndBufferSufficient = result.isEndBufferSufficient;
-        this.ctx.state.isStartBufferSufficient = result.isStartBufferSufficient;
-        this.ctx.state.isEndBufferSufficient = result.isEndBufferSufficient;
-
-        // For chat and chat-with-target modes, immediately mark end buffer as sufficient
-        // These modes are on live timelines where we're already at the end and can only paginate backward
-        if (this.state.mode === "chat" || this.state.mode === "chat-with-target") {
-            this.state.isEndBufferSufficient = true;
-            this.ctx.state.isEndBufferSufficient = true;
-            console.log("[INIT-MANAGER-BUFFERS] Chat mode: marking end buffer as sufficient (live timeline)");
-        }
-
-        console.log("[INIT-MANAGER-BUFFERS] Buffer check complete:", {
-            anchorPosition,
-            contentSize,
-            distanceFromAnchorToEnd: anchorPosition !== undefined ? contentSize - anchorPosition : undefined,
-            distanceFromAnchorToStart: anchorPosition,
-            isEndBufferSufficient: this.state.isEndBufferSufficient,
-            isStartBufferSufficient: this.state.isStartBufferSufficient,
-            mode: this.state.mode,
-            shouldForceEndReached: result.shouldForceEndReached,
-            shouldForceStartReached: result.shouldForceStartReached,
-        });
-
-        return {
-            shouldForceEndReached: result.shouldForceEndReached ?? false,
-            shouldForceStartReached: result.shouldForceStartReached ?? false,
-        };
+        this.state.stabilizationFrames = 0;
+        this.ctx.state.stabilizationStableFrames = 0;
     }
 
     // ===== Stabilization Check =====
 
     /**
-     * Check if initialization should complete based on stabilization criteria
-     * This centralizes the stabilization detection logic
+     * After initial layout, items may resize or shift due to images loading, fonts rendering,
+	 * url previews expanding, etc. This can cause the target message to move away from the
+	 * intended viewport position. During STABILIZING phase, initializationMVCP is active to
+	 * keep the target item at the correct viewport position.
+	 *
+	 * This method counts 3 consecutive stable frames (no MVCP adjustments needed) before
+	 * declaring initialization complete. The counter is reset by onMVCPAdjusted() whenever
+	 * scroll position needs adjustment due to item resizing.
      *
      * @returns true if stabilization is complete and initialization exited
      */
     checkStabilization(): boolean {
-        if (!this.isInitializing()) return false;
+        if (!this.isInitializing()) {
+            return false;
+        }
 
-        // Check if viewport is filled (buffers sufficient AND no pending requests)
-        const isViewportFilled =
-            this.state.isStartBufferSufficient &&
-            this.state.isEndBufferSufficient &&
-            !this.state.pendingStartRequest &&
-            !this.state.pendingEndRequest;
+        // Only stabilize during STABILIZING phase
+        if (this.state.phase !== InitializationPhase.STABILIZING) {
+            return false;
+        }
 
-        if (isViewportFilled) {
-            // Transition to STABILIZING phase if we're in FILLING
-            if (this.state.phase === InitializationPhase.FILLING) {
-                this.transitionToStabilizingPhase();
-            }
+        // Increment stable frame counter
+        // This gets reset by onMVCPAdjusted() if scroll position needs adjustment
+        this.state.stabilizationFrames++;
+        this.ctx.state.stabilizationStableFrames = this.state.stabilizationFrames;
 
-            // Increment stable frame counter
-            this.state.stabilizationFrames++;
-            this.ctx.state.stabilizationStableFrames = this.state.stabilizationFrames;
+        console.log("[INIT-STABILIZATION] 📊 Stable frames:", {
+            count: this.state.stabilizationFrames,
+            needed: 3,
+            remaining: 3 - this.state.stabilizationFrames,
+        });
 
-            console.log("[INIT-MANAGER-STABILIZATION] Viewport filled, stable frames:", this.state.stabilizationFrames);
+        // Check if we've reached 3 consecutive stable frames
+        if (this.state.stabilizationFrames >= 3) {
+            console.log("[INIT-STABILIZATION] 🎉 Stabilization complete! Exiting initialization");
 
-            // Check if we've reached 3 consecutive stable frames
-            if (this.state.stabilizationFrames >= 3) {
-                console.log("[INIT-MANAGER-STABILIZATION] Stabilization complete, exiting initialization");
+            // Exit initialization mode
+            this.exitInitialization();
 
-                // Exit initialization mode
-                this.exitInitialization();
+            // Fire completion callback
+            this.ctx.state.props.onInitializationComplete?.();
 
-                // Fire completion callback
-                this.ctx.state.props.onStabilizationComplete?.();
-
-                return true;
-            }
-        } else {
-            // Reset counter if conditions are not met
-            if (this.state.stabilizationFrames > 0) {
-                console.log("[INIT-MANAGER-STABILIZATION] Conditions not met, resetting stable frames:", {
-                    isEndBufferSufficient: this.state.isEndBufferSufficient,
-                    isStartBufferSufficient: this.state.isStartBufferSufficient,
-                    pendingEndRequest: this.state.pendingEndRequest,
-                    pendingStartRequest: this.state.pendingStartRequest,
-                });
-                this.state.stabilizationFrames = 0;
-                this.ctx.state.stabilizationStableFrames = 0;
-            }
+            return true;
         }
 
         return false;

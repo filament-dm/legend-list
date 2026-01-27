@@ -75,5 +75,6 @@ export function scrollToIndex(
         onSettled: wrappedOnSettled,
         viewOffset,
         viewPosition: viewPosition ?? 0,
+        forceScroll: true,
     });
 }

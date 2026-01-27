@@ -1,6 +1,5 @@
 import { calculateItemsInView } from "@/core/calculateItemsInView";
 import { doMaintainScrollAtEnd } from "@/core/doMaintainScrollAtEnd";
-import { detectDataDirection } from "@/core/initialization/detectDataDirection";
 import type { StateContext } from "@/state/state";
 import type { MaintainScrollAtEndOptions } from "@/types";
 import { checkAtBottom } from "@/utils/checkAtBottom";
@@ -17,13 +16,8 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
     const { maintainScrollAtEnd } = state.props;
 
     // Detect pagination direction and update pending flags when data arrives during initialization
-    if (state.isInitializing && previousData) {
-        const keyExtractor = state.props.keyExtractor || ((item: unknown, index: number) => String(index));
-        const arrivalInfo = detectDataDirection(previousData, dataProp, keyExtractor);
-
-        // Delegate to InitializationManager to handle directional flag clearing
-        ctx.initializationManager.onPaginationDataArrived(arrivalInfo);
-    }
+    // During initialization, no pagination tracking needed
+    // App provides sufficient data upfront
 
     calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
 
@@ -39,24 +33,25 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
         doMaintainScrollAtEnd(ctx, false);
     }
 
-    // Always check thresholds after data changes to allow state machine to progress
-    checkAtTop(state, ctx);
+    // Always check thresholds after data changes
+    checkAtTop(state);
     checkAtBottom(ctx);
 
-    // During initialization: Force pagination until viewport is filled
-    if (state.isInitializing) {
-        const result = ctx.initializationManager.checkAndForceBuffers();
-
-        if (result.shouldForceStartReached) {
-            state.isStartReached = false;
-            state.pendingStartRequest = true;
-        }
-
-        if (result.shouldForceEndReached) {
-            state.isEndReached = false;
-            state.pendingEndRequest = true;
-        }
-    }
+    // NOTE: Forced pagination during initialization is disabled
+    // App now provides sufficient data upfront, so no pagination needed during init
+    // if (state.isInitializing) {
+    //     const result = ctx.initializationManager.checkAndForceBuffers();
+    //
+    //     if (result.shouldForceStartReached) {
+    //         state.isStartReached = false;
+    //         state.pendingStartRequest = true;
+    //     }
+    //
+    //     if (result.shouldForceEndReached) {
+    //         state.isEndReached = false;
+    //         state.pendingEndRequest = true;
+    //     }
+    // }
 
     // Check if stabilization completed and fire callback
     ctx.initializationManager.checkStabilization();

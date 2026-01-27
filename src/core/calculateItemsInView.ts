@@ -4,8 +4,7 @@ import { calculateOffsetForIndex } from "@/core/calculateOffsetForIndex";
 import { calculateOffsetWithOffsetPosition } from "@/core/calculateOffsetWithOffsetPosition";
 import { ensureInitialAnchor } from "@/core/ensureInitialAnchor";
 import { calculateBufferSizes } from "@/core/initialization/calculateBuffers";
-import { checkStabilizationComplete } from "@/core/initialization/checkStabilization";
-import { prepareInitializationMVCP, shouldUseInitializationMVCP } from "@/core/initialization/mvcpInitialization";
+import { prepareInitializationMVCP } from "@/core/initialization/mvcpInitialization";
 import { InitializationPhase } from "@/core/initialization/types";
 import { prepareMVCP } from "@/core/mvcp";
 import { updateItemPositions } from "@/core/updateItemPositions";
@@ -13,7 +12,7 @@ import { updateViewableItems } from "@/core/viewability";
 import { batchedUpdates } from "@/platform/batchedUpdates";
 import { Platform } from "@/platform/Platform";
 import { getContentSize } from "@/state/getContentSize";
-import { peek$, type StateContext, set$ } from "@/state/state";
+import { MvcpMode, peek$, type StateContext, set$ } from "@/state/state";
 import type { InternalState } from "@/types";
 import { checkAllSizesKnown } from "@/utils/checkAllSizesKnown";
 import { checkAtBottom } from "@/utils/checkAtBottom";
@@ -134,6 +133,23 @@ function handleStickyRecycling(
         if (shouldRecycle) {
             pendingRemoval.push(containerIndex);
         }
+    }
+}
+
+/**
+ * Get MVCP handler based on current mode
+ * Declarative approach - mode is set by InitializationManager during phase transitions
+ */
+function getMvcpHandler(ctx: StateContext, mode: MvcpMode, dataChanged?: boolean): (() => void) | undefined {
+    switch (mode) {
+        case MvcpMode.NONE:
+            return undefined;
+        case MvcpMode.REGULAR:
+            return prepareMVCP(ctx, dataChanged);
+        case MvcpMode.INITIALIZATION:
+            return prepareInitializationMVCP(ctx);
+        default:
+            return undefined;
     }
 }
 
@@ -261,13 +277,13 @@ export function calculateItemsInView(
         }
 
         ////// Update item positions and do MVCP
-        // Handle maintainVisibleContentPosition adjustment early
-        // Use initialization-specific MVCP during initialization, otherwise use regular MVCP
-        const checkMVCP = doMVCP
-            ? shouldUseInitializationMVCP(ctx)
-                ? prepareInitializationMVCP(ctx)
-                : prepareMVCP(ctx, dataChanged)
-            : undefined;
+        // Handle maintainVisibleContentPosition adjustment
+        // MVCP mode is set declaratively by InitializationManager during phase transitions:
+        // - SCROLLING phase: NONE (no MVCP)
+        // - STABILIZING phase: INITIALIZATION (anchor-locked MVCP)
+        // - IDLE phase: REGULAR (normal MVCP)
+        const mvcpMode = peek$(ctx, "mvcpMode");
+        const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : undefined;
 
         if (dataChanged) {
             indexByKey.clear();
@@ -675,37 +691,8 @@ export function calculateItemsInView(
         ensureInitialAnchor(ctx);
     }
 
-    // Trigger threshold checks whenever thresholds are not fully satisfied
-    // This ensures state machine can progress through all states: null → false → true
-    // Skip redundant checks during initialization data changes - checkResetContainers already handles these
-    if (state.isEndReached !== true || state.isStartReached !== true) {
-        let shouldSkipChecks = false;
-
-        // During initialization with data changes, skip these checks to avoid bypassing forced-pagination logic
-        if (state.isInitializing) {
-            if (params.dataChanged) {
-                shouldSkipChecks = true;
-            } else if (ctx.initializationManager) {
-                const phase = ctx.initializationManager.getCurrentPhase();
-                // Also skip during SCROLLING phase and FILLING (pre-scroll) to prevent premature pagination
-                if (phase === InitializationPhase.SCROLLING) {
-                    shouldSkipChecks = true;
-                } else if (
-                    phase === InitializationPhase.FILLING &&
-                    !ctx.initializationManager.didCompleteInitialScroll()
-                ) {
-                    shouldSkipChecks = true;
-                }
-            }
-        }
-
-        if (!shouldSkipChecks) {
-            requestAnimationFrame(() => {
-                checkAtTop(state, ctx);
-                checkAtBottom(ctx);
-                // Check if stabilization completed and fire callback
-                checkStabilizationComplete(state, ctx);
-            });
-        }
+    if (state.isInitializing && ctx.initializationManager.getCurrentPhase() === InitializationPhase.STABILIZING) {
+        console.log('[CalculateItemsInView] Checking stabilization');
+        ctx.initializationManager?.checkStabilization();
     }
 }

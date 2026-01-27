@@ -14,6 +14,12 @@ import type {
     ViewToken,
 } from "@/types";
 
+export enum MvcpMode {
+    NONE = "none",
+    REGULAR = "regular",
+    INITIALIZATION = "initialization",
+}
+
 // This is an implementation of a simple state management system, inspired by Legend State.
 // It stores values and listeners in Maps, with peek$ and set$ functions to get and set values.
 // The set$ function also triggers the listeners.
@@ -33,6 +39,7 @@ export type ListenerType =
     | "lastItemKeys"
     | "lastPositionUpdate"
     | "maintainVisibleContentPosition"
+    | "mvcpMode"
     | "numColumns"
     | "numContainers"
     | "numContainersPooled"
@@ -79,6 +86,7 @@ export type ListenerTypeValueMap = {
     lastItemKeys: string[];
     lastPositionUpdate: number;
     maintainVisibleContentPosition: MaintainVisibleContentPositionNormalized;
+    mvcpMode: MvcpMode;
     numColumns: number;
     numContainers: number;
     numContainersPooled: number;
@@ -158,6 +166,7 @@ export function StateProvider({ children }: { children: React.ReactNode }) {
                 ["activeStickyIndex", -1],
                 ["totalSize", 0],
                 ["scrollAdjustPending", 0],
+                ["mvcpMode", MvcpMode.REGULAR],
             ]),
             viewRefs: new Map<number, React.RefObject<View>>(),
         };

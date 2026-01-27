@@ -6,17 +6,23 @@ import { setInitialRenderState } from "@/utils/setInitialRenderState";
 export function finishScrollTo(ctx: StateContext) {
     const state = ctx.state;
 
-    // console.log("[finishScrollTo] Called:", {
-    //     hasScrollingTo: !!state?.scrollingTo,
-    //     hasCallback: !!state?.scrollingTo?.onSettled,
-    // });
+    console.log("[FINISH-SCROLL-TO] 🏁 Called:", {
+        hasScrollingTo: !!state?.scrollingTo,
+        isInitialScroll: !!state?.scrollingTo?.isInitialScroll,
+        isInitializing: ctx.initializationManager?.isInitializing(),
+        currentPhase: ctx.initializationManager?.getCurrentPhase(),
+        hasCallback: !!state?.scrollingTo?.onSettled,
+    });
 
     if (state?.scrollingTo) {
         // Save scrollingTo before clearing it so we can pass it to commitPendingAdjust
         const scrollingTo = state.scrollingTo;
         const callback = scrollingTo.onSettled;
 
-        // console.log("[finishScrollTo] Processing:", { hasCallback: !!callback });
+        console.log("[FINISH-SCROLL-TO] Processing scroll completion:", {
+            isInitialScroll: scrollingTo.isInitialScroll,
+            hasCallback: !!callback,
+        });
 
         state.scrollHistory.length = 0;
         state.initialScroll = undefined;
@@ -38,10 +44,18 @@ export function finishScrollTo(ctx: StateContext) {
         setInitialRenderState(ctx, { didInitialScroll: true });
 
         // Notify initialization manager that initial scroll completed
+        console.log("[FINISH-SCROLL-TO] 🔍 Checking if should transition to STABILIZING phase:", {
+            isInitialScroll: scrollingTo.isInitialScroll,
+            isInitializing: ctx.initializationManager.isInitializing(),
+            shouldTransition: scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing(),
+        });
+
         if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+            console.log("[FINISH-SCROLL-TO] ✅ This is initial scroll completion. Moving on to STABILIZING phase.");
             ctx.initializationManager.markInitialScrollComplete();
-            // Transition from SCROLLING to FILLING phase to enable MVCP and pagination
-            ctx.initializationManager.transitionToFillingPhase();
+            ctx.initializationManager.transitionToStabilizingPhase();
+        } else {
+            console.log("[FINISH-SCROLL-TO] ℹ️ Not initial scroll or not initializing - no phase transition");
         }
 
         // Invoke callback after all state cleanup and updates are complete

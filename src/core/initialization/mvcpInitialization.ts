@@ -10,13 +10,12 @@
  * - Single target: Always tracks the stabilization anchor (no switching)
  * - Absolute positioning: Centers anchor at targetViewPosition (not "maintain first visible")
  * - Simpler algorithm: Calculate target scroll from anchor position directly
- * - Initialization-only: Only active during FILLING phase after initial scroll
+ * - Initialization-only: Only active during STABILIZING phase after initial scroll
  */
 
 import { getContentSize } from "@/state/getContentSize";
 import type { StateContext } from "@/state/state";
 import { requestAdjust } from "@/utils/requestAdjust";
-import { InitializationPhase } from "./types";
 
 /**
  * Prepare initialization MVCP adjustment
@@ -24,17 +23,15 @@ import { InitializationPhase } from "./types";
  * This captures the anchor's current position before updateItemPositions runs.
  * Returns a function that recalculates the adjustment after positions change.
  *
+ * Note: This function is only called when mvcpMode is INITIALIZATION, which is set
+ * by InitializationManager during the STABILIZING phase. No need for phase checks here.
+ *
  * @param ctx - State context
  * @returns Function to apply MVCP adjustment, or undefined if not applicable
  */
 export function prepareInitializationMVCP(ctx: StateContext): (() => void) | undefined {
     const state = ctx.state;
     const manager = ctx.initializationManager;
-
-    // Only run during FILLING phase after initial scroll completes
-    if (!manager.isInitializing()) return undefined;
-    if (manager.getCurrentPhase() !== InitializationPhase.FILLING) return undefined;
-    if (!manager.didCompleteInitialScroll()) return undefined;
 
     // Get anchor configuration
     const anchorId = manager.getMVCPAnchorOverride();
@@ -102,32 +99,4 @@ export function prepareInitializationMVCP(ctx: StateContext): (() => void) | und
             requestAdjust(ctx, scrollAdjustment, false);
         }
     };
-}
-
-/**
- * Check if initialization MVCP should be used instead of regular MVCP
- *
- * This is called from calculateItemsInView to determine which MVCP system to use.
- *
- * @param ctx - State context
- * @returns true if initialization MVCP should be used
- */
-export function shouldUseInitializationMVCP(ctx: StateContext): boolean {
-    console.log("[MVCP-INIT-CHECK] Checking if initialization MVCP should be used");
-    const manager = ctx.initializationManager;
-
-    if (!manager.isInitializing()) {
-        console.log("[MVCP-INIT-CHECK] Not initializing, skipping initialization MVCP");
-        return false;
-    }
-    if (manager.getCurrentPhase() !== InitializationPhase.FILLING) {
-        console.log("[MVCP-INIT-CHECK] Current phase is not FILLING, skipping initialization MVCP");
-        return false;
-    }
-    if (!manager.didCompleteInitialScroll()) {
-        console.log("[MVCP-INIT-CHECK] Initial scroll not completed, skipping initialization MVCP");
-        return false;
-    }
-
-    return manager.shouldLockMVCP();
 }

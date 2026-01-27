@@ -7,16 +7,6 @@ import { requestAdjust } from "@/utils/requestAdjust";
 
 export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => void) | undefined {
     const state = ctx.state;
-
-    // Defensive check: prepareMVCP should not be called during initialization
-    // During initialization, prepareInitializationMVCP should be used instead
-    if (state.isInitializing) {
-        console.warn(
-            "[MVCP] prepareMVCP called during initialization. This should not happen - " +
-                "prepareInitializationMVCP should be used instead. Check calculateItemsInView routing logic.",
-        );
-    }
-
     const { idsInView, positions, props } = state;
     const {
         maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition },
