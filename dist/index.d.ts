@@ -1,11 +1,197 @@
 import * as React$1 from 'react';
 import { ComponentProps, Key, ReactNode, Dispatch, SetStateAction } from 'react';
-import { View, ScrollView, Animated, LayoutRectangle, ScrollViewProps, Insets, ScrollViewComponent, ScrollResponderMixin, StyleProp, ViewStyle, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, ScrollView, Animated, LayoutRectangle, Insets, ScrollViewProps, ScrollViewComponent, ScrollResponderMixin, StyleProp, ViewStyle, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import Reanimated from 'react-native-reanimated';
+
+/**
+ * Initialization system type definitions
+ *
+ * The initialization system handles scrolling to a specific timeline position
+ * (e.g., jumping to a message in chat history) and stabilizing the viewport
+ * while items resize.
+ */
+/**
+ * Phases of the initialization process
+ * - IDLE: Not initializing, normal list operation
+ * - SCROLLING: Positioning to the anchor item
+ * - STABILIZING: Waiting for scroll position to stabilize (3 consecutive stable frames)
+ */
+declare enum InitializationPhase {
+    IDLE = "IDLE",
+    SCROLLING = "SCROLLING",
+    STABILIZING = "STABILIZING"
+}
+/**
+ * Initialization mode - determines positioning behavior
+ *
+ * - "mid-timeline": Focused timeline with target message. Center target at viewPosition 0.5,
+ *   paginate bidirectionally until both thresholds met.
+ * - "chat": Live timeline without target. Position most recent message at bottom (viewPosition 1.0),
+ *   paginate backward only (onStartReached) until threshold met.
+ * - "chat-with-target": Live timeline with target message. Attempt to position target
+ *   (constrained by available content), paginate backward only until threshold met.
+ * - "idle": Not initializing.
+ */
+declare enum InitializationMode {
+    CHAT = "chat",
+    MID_TIMELINE = "mid-timeline",
+    CHAT_WITH_TARGET = "chat-with-target",
+    IDLE = "idle"
+}
+/**
+ * Configuration for entering initialization mode
+ */
+interface InitializationConfig {
+    /** Unique ID for the timeline being initialized */
+    timelineId: string;
+    /** Optional anchor item ID to lock to during initialization */
+    anchorId?: string;
+    /** Initialization mode (inferred from props if not specified) */
+    mode?: InitializationMode;
+    /** Target viewport position for anchor (0.5 = center, 1.0 = bottom) */
+    targetViewPosition?: number;
+}
+
+/**
+ * Initialization Manager
+ *
+ * Centralizes all initialization state and logic. The initialization system handles
+ * scrolling to a specific timeline position (e.g., jumping to a message in chat history)
+ * and stabilizing the viewport while items resize.
+ *
+ * This manager provides a single source of truth for initialization state and
+ * clear interfaces for the rest of the system to interact with initialization behavior.
+ */
+
+/**
+ * Manages initialization state and behavior
+ */
+declare class InitializationManager {
+    private state;
+    private ctx;
+    constructor(ctx: StateContext);
+    /**
+     * Set MVCP mode declaratively based on initialization phase
+     */
+    private setMvcpMode;
+    /**
+     * Enter initialization mode for a new timeline
+     */
+    enterInitialization(config: InitializationConfig): void;
+    /**
+     * Prepare initial scroll configuration when data arrives
+     * This replaces the logic previously in LegendList.tsx lines 407-430
+     *
+     * @param data - Current data array
+     * @param keyExtractor - Function to extract keys from items
+     * @returns true if initial scroll was prepared, false if anchor not found or data empty
+     */
+    prepareInitialScroll(data: readonly unknown[], keyExtractor: (item: unknown, index: number) => string): boolean;
+    /**
+     * Enter SCROLLING phase - called after initial scroll is prepared
+     * During this phase, the target item is being positioned and pagination/MVCP are blocked
+     */
+    enterScrollingPhase(): void;
+    /**
+     * Transition from SCROLLING to STABILIZING phase - called after initial scroll completes
+     * Skips FILLING phase since app provides sufficient data upfront (no pagination needed)
+     */
+    transitionToStabilizingPhase(): void;
+    /**
+     * Exit initialization mode
+     */
+    exitInitialization(): void;
+    /**
+     * Check if initialization is active
+     */
+    isInitializing(): boolean;
+    /**
+     * Get current initialization phase
+     */
+    getCurrentPhase(): InitializationPhase;
+    /**
+     * Check if initial scroll has completed
+     */
+    didCompleteInitialScroll(): boolean;
+    /**
+     * Get buffer multiplier for current phase
+     * Returns 4x during initialization, 1x otherwise
+     */
+    getBufferMultiplier(): number;
+    /**
+     * Check if MVCP should be locked to anchor
+     */
+    shouldLockMVCP(): boolean;
+    /**
+     * Get MVCP anchor override (if should lock)
+     * Returns undefined if MVCP should use normal behavior
+     */
+    getMVCPAnchorOverride(): string | undefined;
+    /**
+     * Get the initialization mode (chat, mid-timeline, chat-with-target, or idle)
+     */
+    getInitializationMode(): InitializationMode;
+    /**
+     * Get the target viewport position for the anchor
+     * Returns undefined if not initializing or no target position set
+     */
+    getTargetViewPosition(): number | undefined;
+    /**
+     * Check if re-centering should be performed
+     * Returns true only once after initial scroll completes and before first recenter
+     */
+    shouldRecenterAnchor(): boolean;
+    /**
+     * Mark that initial scroll to anchor has completed
+     */
+    markInitialScrollComplete(): void;
+    /**
+     * Mark that initial re-centering has been performed
+     */
+    markRecenterComplete(): void;
+    /**
+     * Increment stabilization frame counter
+     */
+    incrementStabilizationFrames(): void;
+    /**
+     * Reset stabilization frame counter
+     */
+    resetStabilizationFrames(): void;
+    /**
+     * Get current stabilization frame count
+     */
+    getStabilizationFrames(): number;
+    /**
+     * Handle MVCP adjustment during initialization
+     * Resets stabilization frame counter when scroll position is adjusted significantly.
+     *
+     * Note: Called from requestAdjust() only for adjustments > 1px to avoid infinite
+     * loops caused by sub-pixel position changes during data updates.
+     */
+    onMVCPAdjusted(): void;
+    /**
+     * After initial layout, items may resize or shift due to images loading, fonts rendering,
+     * url previews expanding, etc. This can cause the target message to move away from the
+     * intended viewport position. During STABILIZING phase, initializationMVCP is active to
+     * keep the target item at the correct viewport position.
+     *
+     * This method counts 3 consecutive stable frames (no MVCP adjustments needed) before
+     * declaring initialization complete. The counter is reset by onMVCPAdjusted() whenever
+     * scroll position needs adjustment due to item resizing.
+     *
+     * @returns true if stabilization is complete and initialization exited
+     */
+    checkStabilization(): boolean;
+}
 
 type AnimatedValue = number;
 
-type ListenerType = "activeStickyIndex" | "alignItemsPaddingTop" | "debugComputedScroll" | "debugRawScroll" | "extraData" | "footerSize" | "headerSize" | "lastItemKeys" | "lastPositionUpdate" | "maintainVisibleContentPosition" | "numColumns" | "numContainers" | "numContainersPooled" | "otherAxisSize" | "readyToRender" | "scrollAdjust" | "scrollAdjustPending" | "scrollAdjustUserOffset" | "scrollSize" | "snapToOffsets" | "stylePaddingTop" | "totalSize" | `containerColumn${number}` | `containerItemData${number}` | `containerItemKey${number}` | `containerPosition${number}` | `containerSticky${number}` | `containerStickyOffset${number}`;
+declare enum MvcpMode {
+    NONE = "none",
+    REGULAR = "regular",
+    INITIALIZATION = "initialization"
+}
+type ListenerType = "activeStickyIndex" | "alignItemsPaddingTop" | "debugComputedScroll" | "debugRawScroll" | "extraData" | "footerSize" | "headerSize" | "lastItemKeys" | "lastPositionUpdate" | "maintainVisibleContentPosition" | "mvcpMode" | "numColumns" | "numContainers" | "numContainersPooled" | "otherAxisSize" | "readyToRender" | "scrollAdjust" | "scrollAdjustPending" | "scrollAdjustUserOffset" | "scrollSize" | "snapToOffsets" | "stylePaddingTop" | "totalSize" | `containerColumn${number}` | `containerItemData${number}` | `containerItemKey${number}` | `containerPosition${number}` | `containerSticky${number}` | `containerStickyOffset${number}`;
 type LegendListListenerType = Extract<ListenerType, "activeStickyIndex" | "footerSize" | "headerSize" | "lastItemKeys" | "lastPositionUpdate" | "numContainers" | "numContainersPooled" | "otherAxisSize" | "readyToRender" | "snapToOffsets" | "totalSize">;
 type ListenerTypeValueMap = {
     activeStickyIndex: number;
@@ -19,6 +205,7 @@ type ListenerTypeValueMap = {
     lastItemKeys: string[];
     lastPositionUpdate: number;
     maintainVisibleContentPosition: MaintainVisibleContentPositionNormalized;
+    mvcpMode: MvcpMode;
     numColumns: number;
     numContainers: number;
     numContainersPooled: number;
@@ -51,6 +238,7 @@ interface StateContext {
     animatedScrollY: AnimatedValue;
     columnWrapperStyle: ColumnWrapperStyle | undefined;
     contextNum: number;
+    initializationManager: InitializationManager;
     listeners: Map<ListenerType, Set<(value: any) => void>>;
     mapViewabilityCallbacks: Map<string, ViewabilityCallback>;
     mapViewabilityValues: Map<string, ViewToken>;
@@ -120,6 +308,11 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      */
     alignItemsAtEnd?: boolean;
     /**
+     * Keeps selected items mounted even when they scroll out of view.
+     * @default undefined
+     */
+    alwaysRender?: AlwaysRenderConfig;
+    /**
      * Style applied to each column's wrapper view.
      */
     columnWrapperStyle?: ColumnWrapperStyle;
@@ -173,6 +366,7 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     initialScrollIndex?: number | {
         index: number;
         viewOffset?: number | undefined;
+        viewPosition?: number | undefined;
     };
     /**
      * When true, the list initializes scrolled to the last item.
@@ -253,15 +447,13 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      */
     stabilizationAnchorId?: string;
     /**
-     * Callback fired when viewport filling completes and the list becomes stable.
-     * Fired when both isEndReached and isStartReached transition from false to true,
-     * indicating that sufficient content has been loaded to fill the viewport.
+     * Callback fired when initialization completes.
      *
      * Use case: Clear stabilizationAnchorId when this callback fires to return to
      * normal MVCP behavior. The timelineId should remain unchanged so future data
      * updates don't re-trigger initialization mode.
      */
-    onStabilizationComplete?: () => void;
+    onInitializationComplete?: () => void;
     /**
      * Number of columns to render items in.
      * @default 1
@@ -289,6 +481,10 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
         itemData: ItemT;
     }) => void;
     /**
+     * Called when list layout metrics change.
+     */
+    onMetricsChange?: (metrics: LegendListMetrics) => void;
+    /**
      * Function to call when the user pulls to refresh.
      */
     onRefresh?: () => void;
@@ -304,6 +500,28 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      * @default 0.5
      */
     onStartReachedThreshold?: number | null | undefined;
+    /**
+     * Indicates whether more data is available in the start direction (towards index 0).
+     * When false during initialization, the start direction is considered complete
+     * even if the buffer is insufficient, allowing stabilization to proceed.
+     *
+     * Use case: Set to false when your pagination callback determines there are no
+     * more items to load in the backwards/older direction.
+     *
+     * @default true
+     */
+    hasMoreStart?: boolean;
+    /**
+     * Indicates whether more data is available in the end direction (towards last index).
+     * When false during initialization, the end direction is considered complete
+     * even if the buffer is insufficient, allowing stabilization to proceed.
+     *
+     * Use case: Set to false when your pagination callback determines there are no
+     * more items to load in the forwards/newer direction.
+     *
+     * @default true
+     */
+    hasMoreEnd?: boolean;
     /**
      * Called when the sticky header changes.
      */
@@ -407,6 +625,12 @@ interface StickyHeaderConfig {
      */
     backdropComponent?: React.ComponentType<any> | React.ReactElement | null | undefined;
 }
+interface AlwaysRenderConfig {
+    top?: number;
+    bottom?: number;
+    indices?: number[];
+    keys?: string[];
+}
 interface MaintainScrollAtEndOptions {
     onLayout?: boolean;
     onItemLayout?: boolean;
@@ -416,6 +640,11 @@ interface ColumnWrapperStyle {
     rowGap?: number;
     gap?: number;
     columnGap?: number;
+}
+interface LegendListMetrics {
+    alignItemsAtEndPadding: number;
+    headerSize: number;
+    footerSize: number;
 }
 type LegendListProps<ItemT = any> = LegendListPropsBase<ItemT, ComponentProps<typeof ScrollView>>;
 interface ThresholdSnapshot {
@@ -453,7 +682,7 @@ interface InternalState {
         avg: number;
     }>;
     columns: Map<string, number>;
-    containerItemKeys: Set<string>;
+    containerItemKeys: Map<string, number>;
     containerItemTypes: Map<number, string>;
     dataChangeNeedsScrollUpdate: boolean;
     didColumnsChange?: boolean;
@@ -482,17 +711,23 @@ interface InternalState {
     isEndReached: boolean | null;
     isFirst?: boolean;
     isInitializing: boolean;
+    isEndBufferSufficient: boolean;
+    isStartBufferSufficient: boolean;
     isStartReached: boolean | null;
     lastTimelineId: string | undefined;
+    lastStabilizationAnchorId: string | undefined;
     pendingEndRequest: boolean;
     pendingStartRequest: boolean;
     stabilizationStableFrames: number;
     lastBatchingAction: number;
     lastLayout: LayoutRectangle | undefined;
     lastScrollAdjustForHistory?: number;
+    lastScrollDelta: number;
     loadStartTime: number;
     maintainingScrollAtEnd?: boolean;
     minIndexSizeChanged: number | undefined;
+    contentInsetOverride?: Partial<Insets> | null;
+    nativeContentInset?: Insets;
     nativeMarginTop: number;
     needsOtherAxisSize?: boolean;
     otherAxisSize?: number;
@@ -542,6 +777,9 @@ interface InternalState {
     props: {
         alignItemsAtEnd: boolean;
         animatedProps: StylesAsSharedValue<ScrollViewProps>;
+        alwaysRender: AlwaysRenderConfig | undefined;
+        alwaysRenderIndicesArr: number[];
+        alwaysRenderIndicesSet: Set<number>;
         contentInset: Insets | undefined;
         data: readonly any[];
         dataVersion: Key | undefined;
@@ -564,7 +802,9 @@ interface InternalState {
         onScroll: LegendListProps["onScroll"];
         onStartReached: LegendListProps["onStartReached"];
         onStartReachedThreshold: number | null | undefined;
-        onStabilizationComplete: LegendListProps["onStabilizationComplete"];
+        onInitializationComplete: LegendListProps["onInitializationComplete"];
+        hasMoreStart: boolean;
+        hasMoreEnd: boolean;
         onStickyHeaderChange: LegendListProps["onStickyHeaderChange"];
         recycleItems: boolean;
         renderItem: LegendListProps["renderItem"];
@@ -609,6 +849,7 @@ type LegendListState = {
     positions: Map<string, number>;
     scroll: number;
     scrollLength: number;
+    scrollVelocity: number;
     sizeAtIndex: (index: number) => number;
     sizes: Map<string, number>;
     start: number;
@@ -726,6 +967,11 @@ type LegendListRef = {
      * @param enabled - If true, scroll processing is enabled.
      */
     setScrollProcessingEnabled(enabled: boolean): void;
+    /**
+     * Reports an externally measured content inset. Pass null/undefined to clear.
+     * Values are merged on top of props/animated/native insets.
+     */
+    reportContentInset(inset?: Partial<Insets> | null): void;
 };
 interface ViewToken<ItemT = any> {
     containerId: number;
@@ -831,4 +1077,4 @@ declare function useListScrollSize(): {
 };
 declare function useSyncLayout(): () => void;
 
-export { type ColumnWrapperStyle, type GetRenderedItem, type GetRenderedItemResult, type InitialScrollAnchor, type InternalState, LegendList, type LegendListProps, type LegendListPropsBase, type LegendListRecyclingState, type LegendListRef, type LegendListRenderItemProps, type LegendListState, type MaintainScrollAtEndOptions, type MaintainVisibleContentPositionConfig, type MaintainVisibleContentPositionNormalized, type OnViewableItemsChanged, type ScrollIndexWithOffset, type ScrollIndexWithOffsetAndContentOffset, type ScrollIndexWithOffsetPosition, type ScrollTarget, type StickyHeaderConfig, type ThresholdSnapshot, type TypedForwardRef, type TypedMemo, type ViewAmountToken, type ViewToken, type ViewabilityAmountCallback, type ViewabilityCallback, type ViewabilityConfig, type ViewabilityConfigCallbackPair, type ViewabilityConfigCallbackPairs, type ViewableRange, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };
+export { type AlwaysRenderConfig, type ColumnWrapperStyle, type GetRenderedItem, type GetRenderedItemResult, type InitialScrollAnchor, type InternalState, LegendList, type LegendListMetrics, type LegendListProps, type LegendListPropsBase, type LegendListRecyclingState, type LegendListRef, type LegendListRenderItemProps, type LegendListState, type MaintainScrollAtEndOptions, type MaintainVisibleContentPositionConfig, type MaintainVisibleContentPositionNormalized, type OnViewableItemsChanged, type ScrollIndexWithOffset, type ScrollIndexWithOffsetAndContentOffset, type ScrollIndexWithOffsetPosition, type ScrollTarget, type StickyHeaderConfig, type ThresholdSnapshot, type TypedForwardRef, type TypedMemo, type ViewAmountToken, type ViewToken, type ViewabilityAmountCallback, type ViewabilityCallback, type ViewabilityConfig, type ViewabilityConfigCallbackPair, type ViewabilityConfigCallbackPairs, type ViewableRange, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };
