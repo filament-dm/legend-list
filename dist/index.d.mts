@@ -50,6 +50,44 @@ interface InitializationConfig {
     mode?: InitializationMode;
     /** Target viewport position for anchor (0.5 = center, 1.0 = bottom) */
     targetViewPosition?: number;
+    /**
+     * Whether this is an imperative initialization (e.g., from jumpToLatest())
+     * rather than a prop-driven initialization (e.g., from timeline change).
+     * Imperative initializations don't update timeline tracking to avoid
+     * triggering cascading timeline change detection.
+     * @default false
+     */
+    isImperative?: boolean;
+}
+/**
+ * Type of initialization completion event
+ */
+declare enum InitializationCompletionType {
+    /** Timeline switch early exit (focused → live without anchor) */
+    TIMELINE_SWITCH_EARLY_EXIT = "timeline-switch-early-exit",
+    /** Successfully stabilized in mid-timeline mode */
+    STABILIZED_MID_TIMELINE = "stabilized-mid-timeline",
+    /** Successfully stabilized in chat mode */
+    STABILIZED_CHAT = "stabilized-chat",
+    /** Successfully stabilized in chat-with-target mode */
+    STABILIZED_CHAT_WITH_TARGET = "stabilized-chat-with-target",
+    /** Initialization failed or was aborted */
+    FAILED = "failed"
+}
+/**
+ * Information passed to onInitializationComplete callback
+ */
+interface InitializationCompletionInfo {
+    /** Type of completion event */
+    type: InitializationCompletionType;
+    /** The mode that was active during initialization */
+    mode: InitializationMode;
+    /** Optional reason for failure (only present when type is FAILED) */
+    reason?: string;
+    /** Timeline ID that was being initialized */
+    timelineId?: string;
+    /** Whether this was an imperative initialization (jumpToLatest, etc.) */
+    isImperative?: boolean;
 }
 
 /**
@@ -69,6 +107,7 @@ interface InitializationConfig {
 declare class InitializationManager {
     private state;
     private ctx;
+    private stabilizationCheckId;
     constructor(ctx: StateContext);
     /**
      * Set MVCP mode declaratively based on initialization phase
@@ -99,12 +138,31 @@ declare class InitializationManager {
     transitionToStabilizingPhase(): void;
     /**
      * Exit initialization mode
+     * @param completionInfo - Information about how/why initialization completed
      */
-    exitInitialization(): void;
+    exitInitialization(completionInfo?: InitializationCompletionInfo): void;
+    /**
+     * Start the stabilization checking loop
+     * Continuously checks for stable frames using requestAnimationFrame
+     */
+    private startStabilizationLoop;
+    /**
+     * Stop the stabilization checking loop
+     */
+    private stopStabilizationLoop;
     /**
      * Check if initialization is active
      */
     isInitializing(): boolean;
+    /**
+     * Get the current initialization mode
+     */
+    getMode(): InitializationMode;
+    /**
+     * Check if current initialization is imperative (e.g., from jumpToLatest())
+     * Returns false if not initializing
+     */
+    isImperativeInit(): boolean;
     /**
      * Get current initialization phase
      */
@@ -449,11 +507,24 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     /**
      * Callback fired when initialization completes.
      *
+     * @param info - Information about how/why initialization completed, including:
+     *   - type: The type of completion (stabilized, early exit, failed)
+     *   - mode: The initialization mode that was active
+     *   - reason: Optional failure reason (only for failed completions)
+     *   - timelineId: The timeline that was being initialized
+     *   - isImperative: Whether this was an imperative initialization (jumpToLatest, etc.)
+     *
      * Use case: Clear stabilizationAnchorId when this callback fires to return to
      * normal MVCP behavior. The timelineId should remain unchanged so future data
      * updates don't re-trigger initialization mode.
+     *
+     * You can use the completion info to distinguish between different types of completions:
+     * - timeline-switch-early-exit: Timeline switch without anchor (no action needed)
+     * - stabilized-chat: jumpToLatest completed (run pendingScrollAction)
+     * - stabilized-mid-timeline: Focused timeline completed (run pendingScrollAction)
+     * - failed: Initialization failed (handle error)
      */
-    onInitializationComplete?: () => void;
+    onInitializationComplete?: (info: InitializationCompletionInfo) => void;
     /**
      * Number of columns to render items in.
      * @default 1
@@ -662,6 +733,12 @@ interface ScrollTarget {
      * after data changes (insertions, deletions, reordering), preventing stale index bugs.
      */
     itemKey?: string;
+    /**
+     * If true, this scroll operation is a "scroll to end" operation.
+     * During scroll, the target will always resolve to the current last index (data.length - 1),
+     * not a specific item. MVCP adjustments are also disabled to prevent interference.
+     */
+    isScrollToEnd?: boolean;
     itemSize?: number;
     offset: number;
     /**
@@ -672,6 +749,11 @@ interface ScrollTarget {
     precomputedWithViewOffset?: boolean;
     viewOffset?: number;
     viewPosition?: number;
+    /**
+     * Number of retry attempts for scroll-to-end operations.
+     * Used to prevent infinite retry loops when data keeps changing.
+     */
+    retryCount?: number;
 }
 interface InternalState {
     activeStickyIndex: number | undefined;
@@ -913,6 +995,29 @@ type LegendListRef = {
         onSettled?: () => void;
     }): void;
     /**
+     * Jumps to the most recent item (bottom of list) with stabilization.
+     * Unlike scrollToEnd, this method enters initialization mode to keep the
+     * most recent item locked at the bottom of the viewport while items may resize
+     * (e.g., links unfurling, images loading, estimated sizes adjusting).
+     *
+     * Use case: "Jump to latest" button in chat interfaces when switching to live timeline.
+     * The method will:
+     * 1. Enter initialization mode (disables pagination)
+     * 2. Scroll to the last item
+     * 3. Lock it at the bottom while items stabilize
+     * 4. Exit automatically after 3 stable frames
+     *
+     * @param options - Options for jumping.
+     * @param options.animated - If true, animates the scroll. Default: true.
+     * @param options.viewOffset - Offset from the target position.
+     * @param options.onComplete - Optional callback invoked when scroll completes (before stabilization).
+     */
+    jumpToLatest(options?: {
+        animated?: boolean | undefined;
+        viewOffset?: number | undefined;
+        onComplete?: () => void;
+    }): void;
+    /**
      * Scrolls to a specific index in the list.
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
@@ -1077,4 +1182,4 @@ declare function useListScrollSize(): {
 };
 declare function useSyncLayout(): () => void;
 
-export { type AlwaysRenderConfig, type ColumnWrapperStyle, type GetRenderedItem, type GetRenderedItemResult, type InitialScrollAnchor, type InternalState, LegendList, type LegendListMetrics, type LegendListProps, type LegendListPropsBase, type LegendListRecyclingState, type LegendListRef, type LegendListRenderItemProps, type LegendListState, type MaintainScrollAtEndOptions, type MaintainVisibleContentPositionConfig, type MaintainVisibleContentPositionNormalized, type OnViewableItemsChanged, type ScrollIndexWithOffset, type ScrollIndexWithOffsetAndContentOffset, type ScrollIndexWithOffsetPosition, type ScrollTarget, type StickyHeaderConfig, type ThresholdSnapshot, type TypedForwardRef, type TypedMemo, type ViewAmountToken, type ViewToken, type ViewabilityAmountCallback, type ViewabilityCallback, type ViewabilityConfig, type ViewabilityConfigCallbackPair, type ViewabilityConfigCallbackPairs, type ViewableRange, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };
+export { type AlwaysRenderConfig, type ColumnWrapperStyle, type GetRenderedItem, type GetRenderedItemResult, type InitialScrollAnchor, type InitializationCompletionInfo, InitializationCompletionType, InitializationMode, InitializationPhase, type InternalState, LegendList, type LegendListMetrics, type LegendListProps, type LegendListPropsBase, type LegendListRecyclingState, type LegendListRef, type LegendListRenderItemProps, type LegendListState, type MaintainScrollAtEndOptions, type MaintainVisibleContentPositionConfig, type MaintainVisibleContentPositionNormalized, type OnViewableItemsChanged, type ScrollIndexWithOffset, type ScrollIndexWithOffsetAndContentOffset, type ScrollIndexWithOffsetPosition, type ScrollTarget, type StickyHeaderConfig, type ThresholdSnapshot, type TypedForwardRef, type TypedMemo, type ViewAmountToken, type ViewToken, type ViewabilityAmountCallback, type ViewabilityCallback, type ViewabilityConfig, type ViewabilityConfigCallbackPair, type ViewabilityConfigCallbackPairs, type ViewableRange, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };

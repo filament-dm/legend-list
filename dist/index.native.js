@@ -60,6 +60,29 @@ function getContentSize(ctx) {
   return headerSize + footerSize + totalSize + stylePaddingTop + stylePaddingBottom + (contentInsetBottom || 0);
 }
 
+// src/core/initialization/types.ts
+var InitializationPhase = /* @__PURE__ */ ((InitializationPhase2) => {
+  InitializationPhase2["IDLE"] = "IDLE";
+  InitializationPhase2["SCROLLING"] = "SCROLLING";
+  InitializationPhase2["STABILIZING"] = "STABILIZING";
+  return InitializationPhase2;
+})(InitializationPhase || {});
+var InitializationMode = /* @__PURE__ */ ((InitializationMode2) => {
+  InitializationMode2["CHAT"] = "chat";
+  InitializationMode2["MID_TIMELINE"] = "mid-timeline";
+  InitializationMode2["CHAT_WITH_TARGET"] = "chat-with-target";
+  InitializationMode2["IDLE"] = "idle";
+  return InitializationMode2;
+})(InitializationMode || {});
+var InitializationCompletionType = /* @__PURE__ */ ((InitializationCompletionType2) => {
+  InitializationCompletionType2["TIMELINE_SWITCH_EARLY_EXIT"] = "timeline-switch-early-exit";
+  InitializationCompletionType2["STABILIZED_MID_TIMELINE"] = "stabilized-mid-timeline";
+  InitializationCompletionType2["STABILIZED_CHAT"] = "stabilized-chat";
+  InitializationCompletionType2["STABILIZED_CHAT_WITH_TARGET"] = "stabilized-chat-with-target";
+  InitializationCompletionType2["FAILED"] = "failed";
+  return InitializationCompletionType2;
+})(InitializationCompletionType || {});
+
 // src/core/initialization/InitializationManager.ts
 var InitializationManager = class {
   constructor(ctx) {
@@ -69,6 +92,7 @@ var InitializationManager = class {
       anchorIndex: void 0,
       didCompleteInitialScroll: false,
       didInitialRecenter: false,
+      isImperative: false,
       mode: "idle" /* IDLE */,
       phase: "IDLE" /* IDLE */,
       stabilizationFrames: 0,
@@ -89,7 +113,7 @@ var InitializationManager = class {
    * Enter initialization mode for a new timeline
    */
   enterInitialization(config) {
-    var _a3;
+    var _a3, _b, _c, _d, _e;
     if (this.isInitializing()) {
       console.warn("[INIT-MANAGER] Already initializing, ignoring duplicate call");
       return;
@@ -97,22 +121,27 @@ var InitializationManager = class {
     let mode;
     if (config.mode && config.mode !== "idle" /* IDLE */) {
       mode = config.mode;
-    } else if (!this.ctx.state.props.maintainScrollAtEnd && config.anchorId) {
-      mode = "mid-timeline" /* MID_TIMELINE */;
-    } else if (this.ctx.state.props.maintainScrollAtEnd && !config.anchorId) {
-      mode = "chat" /* CHAT */;
-    } else if (this.ctx.state.props.maintainScrollAtEnd && config.anchorId) {
-      mode = "chat-with-target" /* CHAT_WITH_TARGET */;
     } else {
-      mode = "mid-timeline" /* MID_TIMELINE */;
+      const isLiveTimeline = this.ctx.state.props.maintainScrollAtEnd || ((_a3 = config.timelineId) == null ? void 0 : _a3.includes("live-timeline"));
+      if (!isLiveTimeline && config.anchorId) {
+        mode = "mid-timeline" /* MID_TIMELINE */;
+      } else if (isLiveTimeline && !config.anchorId) {
+        mode = "chat" /* CHAT */;
+      } else if (isLiveTimeline && config.anchorId) {
+        mode = "chat-with-target" /* CHAT_WITH_TARGET */;
+      } else {
+        mode = "mid-timeline" /* MID_TIMELINE */;
+      }
     }
-    const targetViewPosition = (_a3 = config.targetViewPosition) != null ? _a3 : mode === "chat" /* CHAT */ || mode === "chat-with-target" /* CHAT_WITH_TARGET */ ? 1 : 0.5;
+    const targetViewPosition = (_b = config.targetViewPosition) != null ? _b : mode === "chat" /* CHAT */ || mode === "chat-with-target" /* CHAT_WITH_TARGET */ ? 1 : 0.5;
     console.log("[INIT-MANAGER-1] Entering initialization mode:", {
       anchorId: config.anchorId,
       maintainScrollAtEnd: this.ctx.state.props.maintainScrollAtEnd,
+      timelineId: config.timelineId,
+      detectedAsLiveTimeline: (_c = config.timelineId) == null ? void 0 : _c.includes("live-timeline"),
       mode,
       targetViewPosition,
-      timelineId: config.timelineId
+      isImperative: (_d = config.isImperative) != null ? _d : false
     });
     this.state.phase = "SCROLLING" /* SCROLLING */;
     console.log("[INIT-PHASE] \u{1F504} Phase transition: IDLE \u2192 SCROLLING");
@@ -120,11 +149,14 @@ var InitializationManager = class {
     this.state.timelineId = config.timelineId;
     this.state.anchorId = config.anchorId;
     this.state.targetViewPosition = targetViewPosition;
+    this.state.isImperative = (_e = config.isImperative) != null ? _e : false;
     this.state.didCompleteInitialScroll = false;
     this.state.didInitialRecenter = false;
     this.state.stabilizationFrames = 0;
     this.ctx.state.isInitializing = true;
-    this.ctx.state.lastTimelineId = config.timelineId;
+    if (!config.isImperative) {
+      this.ctx.state.lastTimelineId = config.timelineId;
+    }
     this.ctx.state.stabilizationStableFrames = 0;
     this.setMvcpMode("none" /* NONE */);
   }
@@ -248,18 +280,25 @@ var InitializationManager = class {
     console.log("[INIT-PHASE-STABILIZING] MVCP set to INITIALIZATION mode for STABILIZING phase");
     console.log("[INIT-PHASE-STABILIZING] Triggering items in view calculation to apply initialization MVCP");
     (_b = (_a3 = this.ctx.state).triggerCalculateItemsInView) == null ? void 0 : _b.call(_a3, { doMVCP: true, forceFullItemPositions: true });
+    this.startStabilizationLoop();
   }
   /**
    * Exit initialization mode
+   * @param completionInfo - Information about how/why initialization completed
    */
-  exitInitialization() {
+  exitInitialization(completionInfo) {
     var _a3, _b;
     const currentPhase = this.state.phase;
+    const currentMode = this.state.mode;
+    const timelineId = this.state.timelineId;
+    const isImperative = this.state.isImperative;
     console.log("[INIT-PHASE] \u{1F504} Phase transition: \u2192 IDLE (EXIT)", {
       currentPhase,
+      completionInfo,
       note: "Simplified mode - exiting from any phase"
     });
     console.log("[INIT-MANAGER-2] \u{1F389} Exiting initialization mode - returning to normal operation");
+    this.stopStabilizationLoop();
     this.state.phase = "IDLE" /* IDLE */;
     this.state.mode = "idle" /* IDLE */;
     this.state.timelineId = void 0;
@@ -267,6 +306,7 @@ var InitializationManager = class {
     this.state.anchorIndex = void 0;
     this.state.targetScroll = void 0;
     this.state.targetViewPosition = void 0;
+    this.state.isImperative = false;
     this.state.didCompleteInitialScroll = false;
     this.state.didInitialRecenter = false;
     this.state.stabilizationFrames = 0;
@@ -274,7 +314,43 @@ var InitializationManager = class {
     this.ctx.state.stabilizationStableFrames = 0;
     this.ctx.state.initialAnchor = void 0;
     this.setMvcpMode("regular" /* REGULAR */);
-    (_b = (_a3 = this.ctx.state.props).onInitializationComplete) == null ? void 0 : _b.call(_a3);
+    const info = completionInfo || {
+      type: "failed" /* FAILED */,
+      mode: currentMode,
+      reason: "exitInitialization called without completion info",
+      timelineId,
+      isImperative
+    };
+    (_b = (_a3 = this.ctx.state.props).onInitializationComplete) == null ? void 0 : _b.call(_a3, info);
+  }
+  /**
+   * Start the stabilization checking loop
+   * Continuously checks for stable frames using requestAnimationFrame
+   */
+  startStabilizationLoop() {
+    this.stopStabilizationLoop();
+    console.log("[INIT-STABILIZATION-LOOP] Starting stabilization checking loop");
+    const checkFrame = () => {
+      var _a3, _b;
+      if (this.state.phase !== "STABILIZING" /* STABILIZING */) {
+        console.log("[INIT-STABILIZATION-LOOP] Stopping - no longer in STABILIZING phase");
+        this.stopStabilizationLoop();
+        return;
+      }
+      (_b = (_a3 = this.ctx.state).triggerCalculateItemsInView) == null ? void 0 : _b.call(_a3, { doMVCP: true });
+      this.stabilizationCheckId = requestAnimationFrame(checkFrame);
+    };
+    this.stabilizationCheckId = requestAnimationFrame(checkFrame);
+  }
+  /**
+   * Stop the stabilization checking loop
+   */
+  stopStabilizationLoop() {
+    if (this.stabilizationCheckId !== void 0) {
+      console.log("[INIT-STABILIZATION-LOOP] Stopping stabilization checking loop");
+      cancelAnimationFrame(this.stabilizationCheckId);
+      this.stabilizationCheckId = void 0;
+    }
   }
   // ===== State Queries =====
   /**
@@ -282,6 +358,19 @@ var InitializationManager = class {
    */
   isInitializing() {
     return this.state.phase !== "IDLE" /* IDLE */;
+  }
+  /**
+   * Get the current initialization mode
+   */
+  getMode() {
+    return this.state.mode;
+  }
+  /**
+   * Check if current initialization is imperative (e.g., from jumpToLatest())
+   * Returns false if not initializing
+   */
+  isImperativeInit() {
+    return this.isInitializing() && this.state.isImperative;
   }
   /**
    * Get current initialization phase
@@ -316,7 +405,13 @@ var InitializationManager = class {
     const hasPosition = this.ctx.state.positions.has(this.state.anchorId);
     if (anchorIndex === void 0) {
       console.warn("[INIT-MVCP] Anchor lost during initialization, exiting gracefully");
-      this.exitInitialization();
+      this.exitInitialization({
+        type: "failed" /* FAILED */,
+        mode: this.state.mode,
+        reason: "Anchor lost during initialization",
+        timelineId: this.state.timelineId,
+        isImperative: this.state.isImperative
+      });
       return false;
     }
     return anchorIndex !== void 0 && hasPosition;
@@ -421,7 +516,6 @@ var InitializationManager = class {
      * @returns true if stabilization is complete and initialization exited
      */
   checkStabilization() {
-    var _a3, _b;
     if (!this.isInitializing()) {
       return false;
     }
@@ -437,8 +531,27 @@ var InitializationManager = class {
     });
     if (this.state.stabilizationFrames >= 3) {
       console.log("[INIT-STABILIZATION] \u{1F389} Stabilization complete! Exiting initialization");
-      this.exitInitialization();
-      (_b = (_a3 = this.ctx.state.props).onInitializationComplete) == null ? void 0 : _b.call(_a3);
+      let completionType;
+      switch (this.state.mode) {
+        case "mid-timeline" /* MID_TIMELINE */:
+          completionType = "stabilized-mid-timeline" /* STABILIZED_MID_TIMELINE */;
+          break;
+        case "chat" /* CHAT */:
+          completionType = "stabilized-chat" /* STABILIZED_CHAT */;
+          break;
+        case "chat-with-target" /* CHAT_WITH_TARGET */:
+          completionType = "stabilized-chat-with-target" /* STABILIZED_CHAT_WITH_TARGET */;
+          break;
+        default:
+          completionType = "failed" /* FAILED */;
+          break;
+      }
+      this.exitInitialization({
+        type: completionType,
+        mode: this.state.mode,
+        timelineId: this.state.timelineId,
+        isImperative: this.state.isImperative
+      });
       return true;
     }
     return false;
@@ -1575,7 +1688,7 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b, _c, _d, _e, _f;
+  var _a3, _b, _c, _d, _e, _f, _g, _h;
   const state = ctx.state;
   console.log("[FINISH-SCROLL-TO] \u{1F3C1} Called:", {
     hasScrollingTo: !!(state == null ? void 0 : state.scrollingTo),
@@ -1591,6 +1704,63 @@ function finishScrollTo(ctx) {
       isInitialScroll: scrollingTo.isInitialScroll,
       hasCallback: !!callback
     });
+    if (scrollingTo.isScrollToEnd) {
+      const currentLastIndex = state.props.data.length - 1;
+      const isAtEnd = state.isAtEnd;
+      const retryCount = (_e = scrollingTo.retryCount) != null ? _e : 0;
+      const MAX_RETRIES = 3;
+      const dataChanged = scrollingTo.index !== currentLastIndex;
+      const notAtBottom = !isAtEnd;
+      console.log("[FINISH-SCROLL-TO] ScrollToEnd completion check:", {
+        targetWas: scrollingTo.index,
+        currentEnd: currentLastIndex,
+        isAtEnd,
+        retryCount,
+        dataChanged,
+        notAtBottom
+      });
+      const shouldRetry = (dataChanged || notAtBottom) && currentLastIndex >= 0 && retryCount < MAX_RETRIES;
+      if (shouldRetry) {
+        console.log("[FINISH-SCROLL-TO] ScrollToEnd incomplete - retrying:", {
+          targetWas: scrollingTo.index,
+          currentEnd: currentLastIndex,
+          reason: dataChanged ? "data changed" : "not at bottom",
+          attempt: retryCount + 1,
+          maxRetries: MAX_RETRIES
+        });
+        state.scrollHistory.length = 0;
+        state.scrollingTo = void 0;
+        const targetId = getId(state, currentLastIndex);
+        const itemSize = getItemSize(ctx, targetId, currentLastIndex, state.props.data[currentLastIndex]);
+        const currentOffset = calculateOffsetForIndex(ctx, currentLastIndex);
+        scrollTo(ctx, {
+          animated: false,
+          // Don't animate the correction
+          index: currentLastIndex,
+          isScrollToEnd: true,
+          itemKey: targetId,
+          itemSize,
+          offset: currentOffset,
+          onSettled: callback,
+          // Preserve original callback
+          viewOffset: scrollingTo.viewOffset,
+          viewPosition: (_f = scrollingTo.viewPosition) != null ? _f : 1,
+          forceScroll: true,
+          retryCount: retryCount + 1
+          // Track retry attempts
+        });
+        return;
+      }
+      if (retryCount >= MAX_RETRIES && (dataChanged || notAtBottom)) {
+        console.warn("[FINISH-SCROLL-TO] ScrollToEnd reached max retries, giving up:", {
+          retryCount,
+          targetWas: scrollingTo.index,
+          currentEnd: currentLastIndex,
+          isAtEnd,
+          dataChanged
+        });
+      }
+    }
     state.scrollHistory.length = 0;
     state.initialScroll = void 0;
     state.initialAnchor = void 0;
@@ -1598,8 +1768,8 @@ function finishScrollTo(ctx) {
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
-    if ((_e = state.props) == null ? void 0 : _e.data) {
-      (_f = state.triggerCalculateItemsInView) == null ? void 0 : _f.call(state, { doMVCP: true, forceFullItemPositions: true });
+    if ((_g = state.props) == null ? void 0 : _g.data) {
+      (_h = state.triggerCalculateItemsInView) == null ? void 0 : _h.call(state, { doMVCP: true, forceFullItemPositions: true });
     }
     if (PlatformAdjustBreaksScroll) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
@@ -2189,6 +2359,9 @@ function prepareMVCP(ctx, dataChanged) {
   const scrollingToViewPosition = scrollingTo == null ? void 0 : scrollingTo.viewPosition;
   const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
   const indexByKey = state.indexByKey;
+  if (scrollingTo == null ? void 0 : scrollingTo.isScrollToEnd) {
+    return void 0;
+  }
   if (shouldMVCP) {
     if (scrollTarget !== void 0) {
       if (!IsNewArchitecture && (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll)) {
@@ -2843,7 +3016,7 @@ function comparatorByDistance(a, b) {
 }
 
 // src/core/scrollToIndex.ts
-function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition, onSettled }) {
+function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition, onSettled, isScrollToEnd }) {
   const state = ctx.state;
   const { data } = state.props;
   console.log("[SCROLL-1] scrollToIndex called:", {
@@ -2890,6 +3063,7 @@ function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPositi
     animated,
     index,
     isInitialScroll: state.initialScroll !== void 0 && state.initialScroll.index === index,
+    isScrollToEnd,
     itemKey: targetId,
     itemSize,
     offset: firstIndexOffset,
@@ -3719,7 +3893,16 @@ var ScrollAdjustHandler = class {
         let targetScroll;
         if ((scrollTarget == null ? void 0 : scrollTarget.index) !== void 0) {
           let targetIndex = scrollTarget.index;
-          if (scrollTarget.itemKey !== void 0) {
+          if (scrollTarget.isScrollToEnd) {
+            const currentLastIndex = state.props.data.length - 1;
+            if (currentLastIndex >= 0 && currentLastIndex !== targetIndex) {
+              console.log("[COMMIT-ADJUST-2] ScrollToEnd - updating to current last index:", {
+                oldIndex: targetIndex,
+                newIndex: currentLastIndex
+              });
+              targetIndex = currentLastIndex;
+            }
+          } else if (scrollTarget.itemKey !== void 0) {
             const currentIndex = state.indexByKey.get(scrollTarget.itemKey);
             if (currentIndex !== void 0) {
               console.log("[COMMIT-ADJUST-2] Updated index from itemKey:", {
@@ -4033,9 +4216,68 @@ function createImperativeHandle(ctx) {
           ...options,
           index,
           viewOffset: -paddingBottom - footerSize + ((options == null ? void 0 : options.viewOffset) || 0),
-          viewPosition: 1
+          viewPosition: 1,
+          isScrollToEnd: true
         });
       }
+    },
+    jumpToLatest: (options) => {
+      var _a3, _b, _c;
+      const data = state.props.data;
+      const keyExtractor = state.props.keyExtractor;
+      if (!data || data.length === 0) {
+        console.warn("[jumpToLatest] No data available, cannot jump to latest");
+        (_a3 = options == null ? void 0 : options.onComplete) == null ? void 0 : _a3.call(options);
+        return;
+      }
+      if (ctx.initializationManager.isInitializing()) {
+        console.log("[jumpToLatest] Exiting current initialization before starting jump");
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "Interrupted by jumpToLatest call",
+          timelineId: state.props.timelineId,
+          isImperative: ctx.initializationManager.isImperativeInit()
+        });
+      }
+      ctx.initializationManager.enterInitialization({
+        timelineId: state.props.timelineId || "live-timeline",
+        isImperative: true,
+        // Mark as imperative to avoid timeline tracking update
+        mode: "chat",
+        // CHAT mode: anchors to bottom, viewPosition 1.0
+        targetViewPosition: 1
+      });
+      const scrollPrepared = ctx.initializationManager.prepareInitialScroll(data, keyExtractor);
+      if (!scrollPrepared) {
+        console.warn("[jumpToLatest] Failed to prepare scroll, exiting initialization");
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "Failed to prepare scroll in jumpToLatest",
+          timelineId: state.props.timelineId,
+          isImperative: true
+        });
+        (_b = options == null ? void 0 : options.onComplete) == null ? void 0 : _b.call(options);
+        return;
+      }
+      const lastIndex = data.length - 1;
+      const stylePaddingBottom = state.props.stylePaddingBottom || 0;
+      const footerSize = peek$(ctx, "footerSize") || 0;
+      scrollToIndex(ctx, {
+        index: lastIndex,
+        viewPosition: 1,
+        viewOffset: -stylePaddingBottom - footerSize + ((options == null ? void 0 : options.viewOffset) || 0),
+        animated: (_c = options == null ? void 0 : options.animated) != null ? _c : true,
+        isScrollToEnd: true,
+        // Enable retry logic if data changes during scroll
+        onSettled: () => {
+          var _a4;
+          console.log("[jumpToLatest] Scroll settled, transitioning to STABILIZING phase");
+          ctx.initializationManager.transitionToStabilizingPhase();
+          (_a4 = options == null ? void 0 : options.onComplete) == null ? void 0 : _a4.call(options);
+        }
+      });
     },
     scrollToIndex: (params) => scrollToIndex(ctx, params),
     scrollToItem: ({ item, ...props }) => {
@@ -4231,7 +4473,7 @@ var LegendList = typedMemo(
   })
 );
 var LegendListInner = typedForwardRef(function LegendListInner2(props, forwardedRef) {
-  var _a3, _b, _c, _d;
+  var _a3, _b, _c, _d, _e;
   const {
     alignItemsAtEnd = false,
     alwaysRender,
@@ -4482,38 +4724,72 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   state.refScroller = refScroller;
   const timelineChanged = timelineId !== state.lastTimelineId;
   const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
-  const shouldInitialize = stabilizationAnchorId && anchorChanged;
-  if (timelineChanged) {
-    state.lastTimelineId = timelineId;
-  }
   if (anchorChanged) {
-    console.log("[INIT-1] Anchor changed:", {
+    console.log("[INIT-1] Anchor changed (tracking only, no initialization):", {
+      oldAnchor: state.lastStabilizationAnchorId,
+      newAnchor: stabilizationAnchorId
+    });
+    state.lastStabilizationAnchorId = stabilizationAnchorId;
+  }
+  if (timelineChanged) {
+    if (ctx.initializationManager.isImperativeInit()) {
+      console.log("[INIT-1] Skipping timeline change detection during imperative initialization");
+      return;
+    }
+    const isSwitchingFromFocused = (_d = state.lastTimelineId) == null ? void 0 : _d.includes("focused-timeline");
+    const isSwitchingToLive = timelineId == null ? void 0 : timelineId.includes("live-timeline");
+    const shouldSkipScrolling = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+    console.log("[INIT-1] Timeline changed - entering initialization:", {
       dataLength: dataProp.length,
       hasInitialScrollProp: !!initialScrollProp,
       maintainScrollAtEnd,
-      timelineId,
-      oldAnchor: state.lastStabilizationAnchorId,
-      newAnchor: stabilizationAnchorId,
-      shouldInitialize
+      oldTimeline: state.lastTimelineId,
+      newTimeline: timelineId,
+      anchorId: stabilizationAnchorId,
+      isSwitchingFromFocused,
+      isSwitchingToLive,
+      shouldSkipScrolling
     });
-    state.lastStabilizationAnchorId = stabilizationAnchorId;
-    if (shouldInitialize) {
-      console.log("[INIT-1] ENTERING INITIALIZATION MODE for new anchor");
-      ctx.initializationManager.enterInitialization({
-        anchorId: stabilizationAnchorId,
+    state.lastTimelineId = timelineId;
+    console.log("[INIT-1] ENTERING INITIALIZATION MODE for timeline change");
+    ctx.initializationManager.enterInitialization({
+      anchorId: stabilizationAnchorId,
+      timelineId: timelineId || ""
+    });
+    if (shouldSkipScrolling) {
+      console.log("[INIT-1] Focused \u2192 Live without anchor - exiting immediately (app will handle scroll)");
+      ctx.initializationManager.exitInitialization({
+        type: "timeline-switch-early-exit" /* TIMELINE_SWITCH_EARLY_EXIT */,
+        mode: ctx.initializationManager.getMode(),
         timelineId: timelineId || ""
       });
+    } else {
       if (!initialScrollProp && dataProp && dataProp.length > 0) {
         const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
           dataProp,
           keyExtractor
         );
         if (scrollPrepared) {
+          console.log("[INIT-1] Scroll prepared - entering SCROLLING phase");
           ctx.initializationManager.enterScrollingPhase();
+        } else {
+          console.log("[INIT-1] Scroll preparation failed - exiting initialization");
+          ctx.initializationManager.exitInitialization({
+            type: "failed" /* FAILED */,
+            mode: ctx.initializationManager.getMode(),
+            reason: "Scroll preparation failed - anchor not found in data",
+            timelineId: timelineId || ""
+          });
         }
+      } else {
+        console.log("[INIT-1] No data or has initialScroll prop - exiting initialization immediately");
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "No data or has initialScroll prop",
+          timelineId: timelineId || ""
+        });
       }
-    } else if (!stabilizationAnchorId && state.lastStabilizationAnchorId) {
-      console.log("[INIT-1] Anchor cleared (timeout or scroll to live), skipping initialization");
     }
   }
   const memoizedLastItemKeys = React2.useMemo(() => {
@@ -4770,7 +5046,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         }
       ),
       refScrollView: combinedRef,
-      scrollAdjustHandler: (_d = refState.current) == null ? void 0 : _d.scrollAdjustHandler,
+      scrollAdjustHandler: (_e = refState.current) == null ? void 0 : _e.scrollAdjustHandler,
       scrollEventThrottle: 0,
       snapToIndices,
       stickyHeaderConfig,
@@ -4782,6 +5058,9 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   ), IS_DEV && ENABLE_DEBUG_VIEW && /* @__PURE__ */ React2__namespace.createElement(DebugView, { state: refState.current }));
 });
 
+exports.InitializationCompletionType = InitializationCompletionType;
+exports.InitializationMode = InitializationMode;
+exports.InitializationPhase = InitializationPhase;
 exports.LegendList = LegendList;
 exports.typedForwardRef = typedForwardRef;
 exports.typedMemo = typedMemo;
