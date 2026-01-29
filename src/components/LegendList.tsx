@@ -24,6 +24,7 @@ import { checkResetContainers } from "@/core/checkResetContainers";
 import { clampScrollOffset } from "@/core/clampScrollOffset";
 import { doInitialAllocateContainers } from "@/core/doInitialAllocateContainers";
 import { handleLayout } from "@/core/handleLayout";
+import { InitializationCompletionType } from "@/core/initialization/types";
 import { onScroll } from "@/core/onScroll";
 import { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
 import { scrollTo } from "@/core/scrollTo";
@@ -391,56 +392,108 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
 
     state.refScroller = refScroller;
 
-    // Detect timeline or anchor changes to determine if we need to enter initialization mode
+    // Detect timeline or anchor changes
     const timelineChanged = timelineId !== state.lastTimelineId;
     const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
 
-    // Only initialize if we have a NEW anchor to scroll to (anchor is defined and different)
-    const shouldInitialize = stabilizationAnchorId && anchorChanged;
-
-    // Always track timeline changes for other purposes
-    if (timelineChanged) {
-        state.lastTimelineId = timelineId;
+    // Track anchor changes separately (for logging/debugging, but doesn't trigger initialization)
+    if (anchorChanged) {
+        console.log("[INIT-1] Anchor changed (tracking only, no initialization):", {
+            oldAnchor: state.lastStabilizationAnchorId,
+            newAnchor: stabilizationAnchorId,
+        });
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
     }
 
-    // Handle anchor changes
-    if (anchorChanged) {
-        console.log("[INIT-1] Anchor changed:", {
+    // ONLY timeline changes trigger initialization
+    // Anchor-only changes are UI hints (scroll targets) that shouldn't block pagination or reset state
+    if (timelineChanged) {
+        // Skip timeline change detection during imperative initialization
+        // (e.g., when jumpToLatest() is running)
+        if (ctx.initializationManager.isImperativeInit()) {
+            console.log("[INIT-1] Skipping timeline change detection during imperative initialization");
+            return;
+        }
+
+        // Detect if this is a focused → live timeline switch without anchor
+        // In this case, skip scrolling/stabilizing and let app handle scroll
+        const isSwitchingFromFocused = state.lastTimelineId?.includes('focused-timeline');
+        const isSwitchingToLive = timelineId?.includes('live-timeline');
+        const shouldSkipScrolling = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+
+        console.log("[INIT-1] Timeline changed - entering initialization:", {
             dataLength: dataProp.length,
             hasInitialScrollProp: !!initialScrollProp,
             maintainScrollAtEnd,
-            timelineId,
-            oldAnchor: state.lastStabilizationAnchorId,
-            newAnchor: stabilizationAnchorId,
-            shouldInitialize,
+            oldTimeline: state.lastTimelineId,
+            newTimeline: timelineId,
+            anchorId: stabilizationAnchorId,
+            isSwitchingFromFocused,
+            isSwitchingToLive,
+            shouldSkipScrolling,
         });
 
-        state.lastStabilizationAnchorId = stabilizationAnchorId;
+        // Update timeline tracking
+        state.lastTimelineId = timelineId;
 
-        // Only enter initialization if anchor is defined (we have a target to scroll to)
-        if (shouldInitialize) {
-            console.log("[INIT-1] ENTERING INITIALIZATION MODE for new anchor");
+        // ALWAYS enter initialization for timeline changes to ensure predictable state transitions
+        // This handles:
+        // - First load (live or focused timeline)
+        // - Switching between live and focused timelines
+        // - Timeline transitions with or without anchor
+        console.log("[INIT-1] ENTERING INITIALIZATION MODE for timeline change");
 
-            // Enter initialization via the InitializationManager
-            ctx.initializationManager.enterInitialization({
-                anchorId: stabilizationAnchorId,
+        // Enter initialization via the InitializationManager
+        // This sets the correct mode (CHAT vs MID_TIMELINE vs CHAT_WITH_TARGET) and resets MVCP state
+        ctx.initializationManager.enterInitialization({
+            anchorId: stabilizationAnchorId,
+            timelineId: timelineId || "",
+        });
+
+        // Special case: Switching from focused → live without anchor
+        // Skip scrolling/stabilizing and let app handle scroll positioning
+        if (shouldSkipScrolling) {
+            console.log("[INIT-1] Focused → Live without anchor - exiting immediately (app will handle scroll)");
+            ctx.initializationManager.exitInitialization({
+                type: InitializationCompletionType.TIMELINE_SWITCH_EARLY_EXIT,
+                mode: ctx.initializationManager.getMode(),
                 timelineId: timelineId || "",
             });
-
-            // Prepare initial scroll if we have data and no explicit initialScroll prop
+        } else {
+            // Normal initialization flow: prepare scroll if we have data
+            // prepareInitialScroll handles both chat mode (no anchor) and targeted mode (with anchor)
             if (!initialScrollProp && dataProp && dataProp.length > 0) {
                 const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
                     dataProp as readonly unknown[],
                     keyExtractor as (item: unknown, index: number) => string,
                 );
 
-                // If initial scroll was prepared, enter SCROLLING phase
+                // If initial scroll was prepared, enter SCROLLING phase to perform the scroll
                 if (scrollPrepared) {
+                    console.log("[INIT-1] Scroll prepared - entering SCROLLING phase");
                     ctx.initializationManager.enterScrollingPhase();
+                } else {
+                    // Scroll couldn't be prepared (e.g., anchor not in data) - exit initialization
+                    console.log("[INIT-1] Scroll preparation failed - exiting initialization");
+                    ctx.initializationManager.exitInitialization({
+                        type: InitializationCompletionType.FAILED,
+                        mode: ctx.initializationManager.getMode(),
+                        reason: "Scroll preparation failed - anchor not found in data",
+                        timelineId: timelineId || "",
+                    });
                 }
+            } else {
+                // No data yet, or has explicit initialScroll prop - exit initialization immediately
+                // This handles cases like switching to live timeline without needing scroll positioning
+                // The onInitializationComplete callback will fire, signaling the transition is complete
+                console.log("[INIT-1] No data or has initialScroll prop - exiting initialization immediately");
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "No data or has initialScroll prop",
+                    timelineId: timelineId || "",
+                });
             }
-        } else if (!stabilizationAnchorId && state.lastStabilizationAnchorId) {
-            console.log("[INIT-1] Anchor cleared (timeout or scroll to live), skipping initialization");
         }
     }
 

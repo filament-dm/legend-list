@@ -11,7 +11,9 @@
 
 import { MvcpMode, type StateContext, set$ } from "@/state/state";
 import {
+    type InitializationCompletionInfo,
     type InitializationConfig,
+    InitializationCompletionType,
     InitializationMode,
     InitializationPhase,
     type InitializationState,
@@ -23,6 +25,7 @@ import {
 export class InitializationManager {
     private state: InitializationState;
     private ctx: StateContext;
+    private stabilizationCheckId: number | undefined;
 
     constructor(ctx: StateContext) {
         this.ctx = ctx;
@@ -31,6 +34,7 @@ export class InitializationManager {
             anchorIndex: undefined,
             didCompleteInitialScroll: false,
             didInitialRecenter: false,
+            isImperative: false,
             mode: InitializationMode.IDLE,
             phase: InitializationPhase.IDLE,
             stabilizationFrames: 0,
@@ -66,18 +70,26 @@ export class InitializationManager {
         if (config.mode && config.mode !== InitializationMode.IDLE) {
             // Explicit mode provided in config
             mode = config.mode;
-        } else if (!this.ctx.state.props.maintainScrollAtEnd && config.anchorId) {
-            // Case 1: Focused timeline - center target, paginate both directions
-            mode = InitializationMode.MID_TIMELINE;
-        } else if (this.ctx.state.props.maintainScrollAtEnd && !config.anchorId) {
-            // Case 2: Live timeline, no target - bottom position, paginate backward only
-            mode = InitializationMode.CHAT;
-        } else if (this.ctx.state.props.maintainScrollAtEnd && config.anchorId) {
-            // Case 3: Live timeline with target - attempt positioning, paginate backward only
-            mode = InitializationMode.CHAT_WITH_TARGET;
         } else {
-            // Fallback default
-            mode = InitializationMode.MID_TIMELINE;
+            // Derive live timeline mode from both prop and timelineId to avoid timing issues
+            // Props may lag behind timelineId changes, so check both sources
+            const isLiveTimeline =
+                this.ctx.state.props.maintainScrollAtEnd ||
+                config.timelineId?.includes('live-timeline');
+
+            if (!isLiveTimeline && config.anchorId) {
+                // Case 1: Focused timeline - center target, paginate both directions
+                mode = InitializationMode.MID_TIMELINE;
+            } else if (isLiveTimeline && !config.anchorId) {
+                // Case 2: Live timeline, no target - bottom position, paginate backward only
+                mode = InitializationMode.CHAT;
+            } else if (isLiveTimeline && config.anchorId) {
+                // Case 3: Live timeline with target - attempt positioning, paginate backward only
+                mode = InitializationMode.CHAT_WITH_TARGET;
+            } else {
+                // Fallback default (focused timeline without anchor)
+                mode = InitializationMode.MID_TIMELINE;
+            }
         }
 
         // Set targetViewPosition based on mode
@@ -90,9 +102,11 @@ export class InitializationManager {
         console.log("[INIT-MANAGER-1] Entering initialization mode:", {
             anchorId: config.anchorId,
             maintainScrollAtEnd: this.ctx.state.props.maintainScrollAtEnd,
+            timelineId: config.timelineId,
+            detectedAsLiveTimeline: config.timelineId?.includes('live-timeline'),
             mode,
             targetViewPosition,
-            timelineId: config.timelineId,
+            isImperative: config.isImperative ?? false,
         });
 
         this.state.phase = InitializationPhase.SCROLLING;
@@ -101,13 +115,21 @@ export class InitializationManager {
         this.state.timelineId = config.timelineId;
         this.state.anchorId = config.anchorId;
         this.state.targetViewPosition = targetViewPosition;
+        this.state.isImperative = config.isImperative ?? false;
         this.state.didCompleteInitialScroll = false;
         this.state.didInitialRecenter = false;
         this.state.stabilizationFrames = 0;
 
         // Sync to InternalState
         this.ctx.state.isInitializing = true;
-        this.ctx.state.lastTimelineId = config.timelineId;
+
+        // Only update lastTimelineId for prop-driven initialization
+        // Imperative initialization (e.g., jumpToLatest) uses the current timeline
+        // and doesn't trigger timeline change detection
+        if (!config.isImperative) {
+            this.ctx.state.lastTimelineId = config.timelineId;
+        }
+
         this.ctx.state.stabilizationStableFrames = 0;
 
         // Set MVCP mode: disable during SCROLLING phase
@@ -261,20 +283,32 @@ export class InitializationManager {
 		console.log("[INIT-PHASE-STABILIZING] MVCP set to INITIALIZATION mode for STABILIZING phase");
 		console.log("[INIT-PHASE-STABILIZING] Triggering items in view calculation to apply initialization MVCP");
 		this.ctx.state.triggerCalculateItemsInView?.({ doMVCP: true, forceFullItemPositions: true });
+
+		// Start continuous stabilization checking loop
+		this.startStabilizationLoop();
     }
 
 
     /**
      * Exit initialization mode
+     * @param completionInfo - Information about how/why initialization completed
      */
-    exitInitialization(): void {
+    exitInitialization(completionInfo?: InitializationCompletionInfo): void {
         const currentPhase = this.state.phase;
+        const currentMode = this.state.mode;
+        const timelineId = this.state.timelineId;
+        const isImperative = this.state.isImperative;
+
         console.log("[INIT-PHASE] 🔄 Phase transition: → IDLE (EXIT)", {
             currentPhase,
+            completionInfo,
             note: "Simplified mode - exiting from any phase",
         });
 
         console.log("[INIT-MANAGER-2] 🎉 Exiting initialization mode - returning to normal operation");
+
+        // Stop stabilization loop if running
+        this.stopStabilizationLoop();
 
         this.state.phase = InitializationPhase.IDLE;
         this.state.mode = InitializationMode.IDLE;
@@ -283,6 +317,7 @@ export class InitializationManager {
         this.state.anchorIndex = undefined;
         this.state.targetScroll = undefined;
         this.state.targetViewPosition = undefined;
+        this.state.isImperative = false;
         this.state.didCompleteInitialScroll = false;
         this.state.didInitialRecenter = false;
         this.state.stabilizationFrames = 0;
@@ -295,7 +330,56 @@ export class InitializationManager {
         // Set MVCP mode: restore regular MVCP after initialization
         this.setMvcpMode(MvcpMode.REGULAR);
 
-        this.ctx.state.props.onInitializationComplete?.();
+        // Build completion info with defaults if not provided
+        const info: InitializationCompletionInfo = completionInfo || {
+            type: InitializationCompletionType.FAILED,
+            mode: currentMode,
+            reason: "exitInitialization called without completion info",
+            timelineId,
+            isImperative,
+        };
+
+        this.ctx.state.props.onInitializationComplete?.(info);
+    }
+
+    /**
+     * Start the stabilization checking loop
+     * Continuously checks for stable frames using requestAnimationFrame
+     */
+    private startStabilizationLoop(): void {
+        // Cancel any existing loop
+        this.stopStabilizationLoop();
+
+        console.log("[INIT-STABILIZATION-LOOP] Starting stabilization checking loop");
+
+        const checkFrame = () => {
+            // Stop if no longer in STABILIZING phase
+            if (this.state.phase !== InitializationPhase.STABILIZING) {
+                console.log("[INIT-STABILIZATION-LOOP] Stopping - no longer in STABILIZING phase");
+                this.stopStabilizationLoop();
+                return;
+            }
+
+            // Trigger calculateItemsInView which will call checkStabilization
+            this.ctx.state.triggerCalculateItemsInView?.({ doMVCP: true });
+
+            // Schedule next check
+            this.stabilizationCheckId = requestAnimationFrame(checkFrame);
+        };
+
+        // Start the loop
+        this.stabilizationCheckId = requestAnimationFrame(checkFrame);
+    }
+
+    /**
+     * Stop the stabilization checking loop
+     */
+    private stopStabilizationLoop(): void {
+        if (this.stabilizationCheckId !== undefined) {
+            console.log("[INIT-STABILIZATION-LOOP] Stopping stabilization checking loop");
+            cancelAnimationFrame(this.stabilizationCheckId);
+            this.stabilizationCheckId = undefined;
+        }
     }
 
     // ===== State Queries =====
@@ -305,6 +389,21 @@ export class InitializationManager {
      */
     isInitializing(): boolean {
         return this.state.phase !== InitializationPhase.IDLE;
+    }
+
+    /**
+     * Get the current initialization mode
+     */
+    getMode(): InitializationMode {
+        return this.state.mode;
+    }
+
+    /**
+     * Check if current initialization is imperative (e.g., from jumpToLatest())
+     * Returns false if not initializing
+     */
+    isImperativeInit(): boolean {
+        return this.isInitializing() && this.state.isImperative;
     }
 
     /**
@@ -349,7 +448,13 @@ export class InitializationManager {
         // Detect anchor loss - exit initialization gracefully if anchor was removed
         if (anchorIndex === undefined) {
             console.warn("[INIT-MVCP] Anchor lost during initialization, exiting gracefully");
-            this.exitInitialization();
+            this.exitInitialization({
+                type: InitializationCompletionType.FAILED,
+                mode: this.state.mode,
+                reason: "Anchor lost during initialization",
+                timelineId: this.state.timelineId,
+                isImperative: this.state.isImperative,
+            });
             return false;
         }
 
@@ -502,11 +607,30 @@ export class InitializationManager {
         if (this.state.stabilizationFrames >= 3) {
             console.log("[INIT-STABILIZATION] 🎉 Stabilization complete! Exiting initialization");
 
-            // Exit initialization mode
-            this.exitInitialization();
+            // Determine completion type based on mode
+            let completionType: InitializationCompletionType;
+            switch (this.state.mode) {
+                case InitializationMode.MID_TIMELINE:
+                    completionType = InitializationCompletionType.STABILIZED_MID_TIMELINE;
+                    break;
+                case InitializationMode.CHAT:
+                    completionType = InitializationCompletionType.STABILIZED_CHAT;
+                    break;
+                case InitializationMode.CHAT_WITH_TARGET:
+                    completionType = InitializationCompletionType.STABILIZED_CHAT_WITH_TARGET;
+                    break;
+                default:
+                    completionType = InitializationCompletionType.FAILED;
+                    break;
+            }
 
-            // Fire completion callback
-            this.ctx.state.props.onInitializationComplete?.();
+            // Exit initialization mode (this will also fire onInitializationComplete callback)
+            this.exitInitialization({
+                type: completionType,
+                mode: this.state.mode,
+                timelineId: this.state.timelineId,
+                isImperative: this.state.isImperative,
+            });
 
             return true;
         }

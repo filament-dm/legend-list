@@ -1,6 +1,7 @@
 import { scrollTo } from "@/core/scrollTo";
 import { scrollToIndex } from "@/core/scrollToIndex";
 import { updateScroll } from "@/core/updateScroll";
+import { InitializationCompletionType } from "@/core/initialization/types";
 import { getContentSize } from "@/state/getContentSize";
 import {
     type LegendListListenerType,
@@ -98,8 +99,83 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
                     index,
                     viewOffset: -paddingBottom - footerSize + (options?.viewOffset || 0),
                     viewPosition: 1,
+                    isScrollToEnd: true,
                 });
             }
+        },
+        jumpToLatest: (options) => {
+            const data = state.props.data;
+            const keyExtractor = state.props.keyExtractor;
+
+            // Guard: Check that data exists and has items
+            if (!data || data.length === 0) {
+                console.warn("[jumpToLatest] No data available, cannot jump to latest");
+                options?.onComplete?.();
+                return;
+            }
+
+            // Exit any current initialization before starting new one
+            if (ctx.initializationManager.isInitializing()) {
+                console.log("[jumpToLatest] Exiting current initialization before starting jump");
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "Interrupted by jumpToLatest call",
+                    timelineId: state.props.timelineId,
+                    isImperative: ctx.initializationManager.isImperativeInit(),
+                });
+            }
+
+            // Step 1: Enter initialization in CHAT mode
+            // Use actual timelineId from props + isImperative flag to avoid
+            // triggering timeline change detection
+            ctx.initializationManager.enterInitialization({
+                timelineId: state.props.timelineId || "live-timeline",
+                isImperative: true, // Mark as imperative to avoid timeline tracking update
+                mode: "chat" as any, // CHAT mode: anchors to bottom, viewPosition 1.0
+                targetViewPosition: 1.0,
+            });
+
+            // Step 2 & 3: Identify most recent message and prepare scroll
+            const scrollPrepared = ctx.initializationManager.prepareInitialScroll(data, keyExtractor!);
+
+            if (!scrollPrepared) {
+                console.warn("[jumpToLatest] Failed to prepare scroll, exiting initialization");
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "Failed to prepare scroll in jumpToLatest",
+                    timelineId: state.props.timelineId,
+                    isImperative: true,
+                });
+                options?.onComplete?.();
+                return;
+            }
+
+            // Step 4: Perform scroll to last item
+            const lastIndex = data.length - 1;
+            const stylePaddingBottom = state.props.stylePaddingBottom || 0;
+            const footerSize = peek$(ctx, "footerSize") || 0;
+
+            scrollToIndex(ctx, {
+                index: lastIndex,
+                viewPosition: 1.0,
+                viewOffset: -stylePaddingBottom - footerSize + (options?.viewOffset || 0),
+                animated: options?.animated ?? true,
+                isScrollToEnd: true, // Enable retry logic if data changes during scroll
+                onSettled: () => {
+                    // Step 5: Transition to STABILIZING phase after scroll completes
+                    // This enables initialization MVCP to lock the item at the bottom
+                    console.log("[jumpToLatest] Scroll settled, transitioning to STABILIZING phase");
+                    ctx.initializationManager.transitionToStabilizingPhase();
+
+                    // Call user's onComplete callback if provided
+                    options?.onComplete?.();
+                },
+            });
+
+            // Step 6: Exit happens automatically via checkStabilization after 3 stable frames
+            // The initialization manager will call onInitializationComplete when done
         },
         scrollToIndex: (params) => scrollToIndex(ctx, params),
         scrollToItem: ({ item, ...props }) => {

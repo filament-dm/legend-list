@@ -16,6 +16,7 @@ import type {
 import type Reanimated from "react-native-reanimated";
 
 import type { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
+import type { InitializationCompletionInfo } from "@/core/initialization/types";
 import type { LegendListListenerType, ListenerTypeValueMap } from "@/state/state";
 import type { StylesAsSharedValue } from "@/typesInternal";
 
@@ -236,11 +237,24 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     /**
      * Callback fired when initialization completes.
      *
+     * @param info - Information about how/why initialization completed, including:
+     *   - type: The type of completion (stabilized, early exit, failed)
+     *   - mode: The initialization mode that was active
+     *   - reason: Optional failure reason (only for failed completions)
+     *   - timelineId: The timeline that was being initialized
+     *   - isImperative: Whether this was an imperative initialization (jumpToLatest, etc.)
+     *
      * Use case: Clear stabilizationAnchorId when this callback fires to return to
      * normal MVCP behavior. The timelineId should remain unchanged so future data
      * updates don't re-trigger initialization mode.
+     *
+     * You can use the completion info to distinguish between different types of completions:
+     * - timeline-switch-early-exit: Timeline switch without anchor (no action needed)
+     * - stabilized-chat: jumpToLatest completed (run pendingScrollAction)
+     * - stabilized-mid-timeline: Focused timeline completed (run pendingScrollAction)
+     * - failed: Initialization failed (handle error)
      */
-    onInitializationComplete?: () => void;
+    onInitializationComplete?: (info: InitializationCompletionInfo) => void;
 
     /**
      * Number of columns to render items in.
@@ -492,6 +506,12 @@ export interface ScrollTarget {
      * after data changes (insertions, deletions, reordering), preventing stale index bugs.
      */
     itemKey?: string;
+    /**
+     * If true, this scroll operation is a "scroll to end" operation.
+     * During scroll, the target will always resolve to the current last index (data.length - 1),
+     * not a specific item. MVCP adjustments are also disabled to prevent interference.
+     */
+    isScrollToEnd?: boolean;
     itemSize?: number;
     offset: number;
     /**
@@ -502,6 +522,11 @@ export interface ScrollTarget {
     precomputedWithViewOffset?: boolean;
     viewOffset?: number;
     viewPosition?: number;
+    /**
+     * Number of retry attempts for scroll-to-end operations.
+     * Used to prevent infinite retry loops when data keeps changing.
+     */
+    retryCount?: number;
 }
 
 export interface InternalState {
@@ -739,6 +764,30 @@ export type LegendListRef = {
         animated?: boolean | undefined;
         viewOffset?: number | undefined;
         onSettled?: () => void;
+    }): void;
+
+    /**
+     * Jumps to the most recent item (bottom of list) with stabilization.
+     * Unlike scrollToEnd, this method enters initialization mode to keep the
+     * most recent item locked at the bottom of the viewport while items may resize
+     * (e.g., links unfurling, images loading, estimated sizes adjusting).
+     *
+     * Use case: "Jump to latest" button in chat interfaces when switching to live timeline.
+     * The method will:
+     * 1. Enter initialization mode (disables pagination)
+     * 2. Scroll to the last item
+     * 3. Lock it at the bottom while items stabilize
+     * 4. Exit automatically after 3 stable frames
+     *
+     * @param options - Options for jumping.
+     * @param options.animated - If true, animates the scroll. Default: true.
+     * @param options.viewOffset - Offset from the target position.
+     * @param options.onComplete - Optional callback invoked when scroll completes (before stabilization).
+     */
+    jumpToLatest(options?: {
+        animated?: boolean | undefined;
+        viewOffset?: number | undefined;
+        onComplete?: () => void;
     }): void;
 
     /**

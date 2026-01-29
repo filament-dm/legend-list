@@ -5,11 +5,13 @@ import type { LegendListRef } from "@/types";
 import { getId } from "@/utils/getId";
 import { getItemSize } from "@/utils/getItemSize";
 
-export type ScrollToIndexParams = Parameters<LegendListRef["scrollToIndex"]>[0];
+export type ScrollToIndexParams = Parameters<LegendListRef["scrollToIndex"]>[0] & {
+    isScrollToEnd?: boolean;
+};
 
 export function scrollToIndex(
     ctx: StateContext,
-    { index, viewOffset = 0, animated = true, viewPosition, onSettled }: ScrollToIndexParams,
+    { index, viewOffset = 0, animated = true, viewPosition, onSettled, isScrollToEnd }: ScrollToIndexParams,
 ) {
     const state = ctx.state;
     const { data } = state.props;
@@ -69,6 +71,7 @@ export function scrollToIndex(
         animated,
         index,
         isInitialScroll: state.initialScroll !== undefined && state.initialScroll.index === index,
+        isScrollToEnd,
         itemKey: targetId,
         itemSize,
         offset: firstIndexOffset,

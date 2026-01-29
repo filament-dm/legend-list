@@ -58,9 +58,20 @@ export class ScrollAdjustHandler {
                 if (scrollTarget?.index !== undefined) {
                     let targetIndex = scrollTarget.index;
 
+                    // Special handling for scrollToEnd: always resolve to current last index
+                    if (scrollTarget.isScrollToEnd) {
+                        const currentLastIndex = state.props.data.length - 1;
+                        if (currentLastIndex >= 0 && currentLastIndex !== targetIndex) {
+                            console.log("[COMMIT-ADJUST-2] ScrollToEnd - updating to current last index:", {
+                                oldIndex: targetIndex,
+                                newIndex: currentLastIndex,
+                            });
+                            targetIndex = currentLastIndex;
+                        }
+                    }
                     // If we have itemKey, look up the current index (handles data changes like prepending)
                     // This prevents the stale index bug where the index points to a different item after data changes
-                    if (scrollTarget.itemKey !== undefined) {
+                    else if (scrollTarget.itemKey !== undefined) {
                         const currentIndex = state.indexByKey.get(scrollTarget.itemKey);
                         if (currentIndex !== undefined) {
                             console.log("[COMMIT-ADJUST-2] Updated index from itemKey:", {

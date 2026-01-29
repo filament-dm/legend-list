@@ -51,6 +51,15 @@ export interface InitializationConfig {
 
     /** Target viewport position for anchor (0.5 = center, 1.0 = bottom) */
     targetViewPosition?: number;
+
+    /**
+     * Whether this is an imperative initialization (e.g., from jumpToLatest())
+     * rather than a prop-driven initialization (e.g., from timeline change).
+     * Imperative initializations don't update timeline tracking to avoid
+     * triggering cascading timeline change detection.
+     * @default false
+     */
+    isImperative?: boolean;
 }
 
 /**
@@ -86,6 +95,13 @@ export interface InitializationState {
 
     /** Number of consecutive stable frames observed */
     stabilizationFrames: number;
+
+    /**
+     * Whether this is an imperative initialization (from jumpToLatest(), etc.)
+     * rather than prop-driven (from timeline change). Imperative initializations
+     * don't interfere with timeline tracking.
+     */
+    isImperative: boolean;
 }
 
 /**
@@ -168,4 +184,44 @@ export interface DataArrivalInfo {
 
     /** Total number of items in new data */
     newCount: number;
+}
+
+/**
+ * Type of initialization completion event
+ */
+export enum InitializationCompletionType {
+    /** Timeline switch early exit (focused → live without anchor) */
+    TIMELINE_SWITCH_EARLY_EXIT = "timeline-switch-early-exit",
+
+    /** Successfully stabilized in mid-timeline mode */
+    STABILIZED_MID_TIMELINE = "stabilized-mid-timeline",
+
+    /** Successfully stabilized in chat mode */
+    STABILIZED_CHAT = "stabilized-chat",
+
+    /** Successfully stabilized in chat-with-target mode */
+    STABILIZED_CHAT_WITH_TARGET = "stabilized-chat-with-target",
+
+    /** Initialization failed or was aborted */
+    FAILED = "failed",
+}
+
+/**
+ * Information passed to onInitializationComplete callback
+ */
+export interface InitializationCompletionInfo {
+    /** Type of completion event */
+    type: InitializationCompletionType;
+
+    /** The mode that was active during initialization */
+    mode: InitializationMode;
+
+    /** Optional reason for failure (only present when type is FAILED) */
+    reason?: string;
+
+    /** Timeline ID that was being initialized */
+    timelineId?: string;
+
+    /** Whether this was an imperative initialization (jumpToLatest, etc.) */
+    isImperative?: boolean;
 }

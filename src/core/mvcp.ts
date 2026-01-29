@@ -22,6 +22,12 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const shouldMVCP = dataChanged ? mvcpData : mvcpScroll;
     const indexByKey = state.indexByKey;
 
+    // Skip MVCP during scrollToEnd operations - we want to scroll to the absolute end,
+    // not maintain the position of any particular item
+    if (scrollingTo?.isScrollToEnd) {
+        return undefined;
+    }
+
     if (shouldMVCP) {
         // Priority 1: Active scroll target
         if (scrollTarget !== undefined) {
