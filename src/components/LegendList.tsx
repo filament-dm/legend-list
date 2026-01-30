@@ -24,6 +24,7 @@ import { checkResetContainers } from "@/core/checkResetContainers";
 import { clampScrollOffset } from "@/core/clampScrollOffset";
 import { doInitialAllocateContainers } from "@/core/doInitialAllocateContainers";
 import { handleLayout } from "@/core/handleLayout";
+import { InitializationCompletionType } from "@/core/initialization/types";
 import { onScroll } from "@/core/onScroll";
 import { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
 import { scrollTo } from "@/core/scrollTo";
@@ -139,6 +140,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         overrideItemLayout,
         onEndReached,
         onEndReachedThreshold = 0.5,
+        onInitializationComplete,
         onItemSizeChanged,
         onMetricsChange,
         onLayout: onLayoutProp,
@@ -158,10 +160,12 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         renderItem,
         scrollEventThrottle,
         snapToIndices,
+        stabilizationAnchorId,
         stickyHeaderIndices: stickyHeaderIndicesProp,
         stickyIndices: stickyIndicesDeprecated, // TODOV3: Remove from v3 release
         style: styleProp,
         suggestEstimatedItemSize,
+        timelineId,
         viewabilityConfig,
         viewabilityConfigCallbackPairs,
         waitForInitialLayout = true,
@@ -286,16 +290,23 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 initialScroll: initialScrollProp,
                 isAtEnd: false,
                 isAtStart: false,
+                isEndBufferSufficient: false,
                 isEndReached: null,
                 isFirst: true,
+                isInitializing: false,
+                isStartBufferSufficient: false,
                 isStartReached: null,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
                 lastScrollDelta: 0,
+                lastTimelineId: undefined,
+                lastStabilizationAnchorId: undefined,
                 loadStartTime: Date.now(),
                 minIndexSizeChanged: 0,
                 nativeContentInset: undefined,
                 nativeMarginTop: 0,
+                pendingEndRequest: false,
+                pendingStartRequest: false,
                 positions: new Map(),
                 props: {} as any,
                 queuedCalculateItemsInView: 0,
@@ -312,6 +323,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 scrollTime: 0,
                 sizes: new Map(),
                 sizesKnown: new Map(),
+                stabilizationStableFrames: 0,
                 startBuffered: -1,
                 startNoBuffer: -1,
                 startReachedSnapshot: undefined,
@@ -371,6 +383,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         numColumns: numColumnsProp,
         onEndReached,
         onEndReachedThreshold,
+        onInitializationComplete,
         onItemSizeChanged,
         onLoad,
         onScroll: throttleScrollFn,
@@ -382,14 +395,91 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         renderItem: renderItem!,
         scrollBuffer,
         snapToIndices,
+        stabilizationAnchorId,
         stickyIndicesArr: stickyHeaderIndices ?? [],
         stickyIndicesSet: useMemo(() => new Set(stickyHeaderIndices ?? []), [stickyHeaderIndices?.join(",")]),
         stylePaddingBottom: stylePaddingBottomState,
         stylePaddingTop: stylePaddingTopState,
         suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+        timelineId,
     };
 
     state.refScroller = refScroller;
+
+    // Detect timeline or anchor changes
+    const timelineChanged = timelineId !== state.lastTimelineId;
+    const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+
+    // Track anchor changes separately (for logging/debugging, but doesn't trigger initialization)
+    if (anchorChanged) {
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
+    }
+
+    // ONLY timeline changes trigger initialization
+    // Anchor-only changes are UI hints (scroll targets) that shouldn't block pagination or reset state
+    if (timelineChanged) {
+        // Skip timeline change detection during imperative initialization
+        // (e.g., when jumpToLatest() is running)
+        if (ctx.initializationManager.isImperativeInit()) {
+            return;
+        }
+
+        // Detect if this is a focused → live timeline switch without anchor
+        // In this case, skip scrolling/stabilizing altogether and exit early
+        const isSwitchingFromFocused = state.lastTimelineId?.includes('focused-timeline');
+        const isSwitchingToLive = timelineId?.includes('live-timeline');
+        const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+        // Update timeline tracking
+        state.lastTimelineId = timelineId;
+
+        // Enter initialization via the InitializationManager
+        // This sets the correct mode (CHAT vs MID_TIMELINE vs CHAT_WITH_TARGET) and resets MVCP state
+        ctx.initializationManager.enterInitialization({
+            anchorId: stabilizationAnchorId,
+            timelineId: timelineId || "",
+        });
+
+        if (shouldExitEarly) {
+            // Exit early if conditions are met to skip scrolling/stabilizing
+            ctx.initializationManager.exitInitialization({
+                type: InitializationCompletionType.EARLY_EXIT,
+                mode: ctx.initializationManager.getMode(),
+                timelineId: timelineId || "",
+            });
+        } else {
+            // Normal initialization flow: prepare scroll if we have data
+            // prepareInitialScroll handles both chat mode (no anchor) and targeted mode (with anchor)
+            if (!initialScrollProp && dataProp && dataProp.length > 0) {
+                const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+                    dataProp as readonly unknown[],
+                    keyExtractor as (item: unknown, index: number) => string,
+                );
+
+                // If initial scroll was prepared, enter SCROLLING phase to perform the scroll
+                if (scrollPrepared) {
+                    ctx.initializationManager.enterScrollingPhase();
+                } else {
+                    // Scroll couldn't be prepared (e.g., anchor not in data) - exit initialization
+                    ctx.initializationManager.exitInitialization({
+                        type: InitializationCompletionType.FAILED,
+                        mode: ctx.initializationManager.getMode(),
+                        reason: "Scroll preparation failed - anchor not found in data",
+                        timelineId: timelineId || "",
+                    });
+                }
+            } else {
+                // No data yet, or has explicit initialScroll prop - exit initialization immediately
+                // This handles cases like switching to live timeline without needing scroll positioning
+                // The onInitializationComplete callback will fire, signaling the transition is complete
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "No data or has initialScroll prop",
+                    timelineId: timelineId || "",
+                });
+            }
+        }
+    }
 
     const memoizedLastItemKeys = useMemo(() => {
         if (!dataProp.length) return [];
@@ -510,8 +600,22 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     }, []);
 
     const doInitialScroll = useCallback(() => {
-        const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
-        if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+        const {
+            initialScroll,
+            didFinishInitialScroll,
+            queuedInitialLayout,
+            scrollingTo,
+            didContainersLayout,
+            scrollLength,
+        } = state;
+        if (
+            initialScroll &&
+            !queuedInitialLayout &&
+            !didFinishInitialScroll &&
+            !scrollingTo &&
+            didContainersLayout &&
+            scrollLength > 0
+        ) {
             scrollTo(ctx, {
                 animated: false,
                 index: initialScroll?.index,
@@ -549,7 +653,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
             props: { data },
         } = state;
         const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
-        if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
+        if (!didAllocateContainers && (isFirst || didDataChange || didColumnsChange)) {
             checkResetContainers(ctx, data);
         }
         // Now that it's done, reset the flags

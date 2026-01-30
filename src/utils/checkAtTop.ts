@@ -24,7 +24,14 @@ export function checkAtTop(state: InternalState) {
             dataLength: state.props.data?.length,
             scrollPosition: scroll,
         },
-        (distance) => state.props.onStartReached?.({ distanceFromStart: distance }),
+        (distance) => {
+            // Block all pagination during initialization
+            // App provides sufficient data upfront
+            if (state.isInitializing) {
+                return;
+            }
+            state.props.onStartReached?.({ distanceFromStart: distance });
+        },
         (snapshot) => {
             state.startReachedSnapshot = snapshot;
         },

@@ -204,11 +204,13 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
     }, [onLayout]);
 
     const scrollViewStyle: CSSProperties = {
+        height: horizontal ? undefined : "100%",
         overflow: "auto",
         overflowX: horizontal ? "auto" : showsHorizontalScrollIndicator ? "auto" : "hidden",
         overflowY: horizontal ? (showsVerticalScrollIndicator ? "auto" : "hidden") : "auto",
         position: "relative", // Ensure proper positioning context
         WebkitOverflowScrolling: "touch", // iOS momentum scrolling
+        width: horizontal ? "100%" : undefined,
         ...StyleSheet.flatten(style),
     };
 

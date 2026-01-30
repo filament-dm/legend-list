@@ -3,13 +3,15 @@ import { IsNewArchitecture } from "@/constants-platform";
 import { calculateOffsetForIndex } from "@/core/calculateOffsetForIndex";
 import { calculateOffsetWithOffsetPosition } from "@/core/calculateOffsetWithOffsetPosition";
 import { ensureInitialAnchor } from "@/core/ensureInitialAnchor";
+import { prepareInitializationMVCP } from "@/core/initialization/mvcpInitialization";
+import { InitializationPhase } from "@/core/initialization/types";
 import { prepareMVCP } from "@/core/mvcp";
 import { updateItemPositions } from "@/core/updateItemPositions";
 import { updateViewableItems } from "@/core/viewability";
 import { batchedUpdates } from "@/platform/batchedUpdates";
 import { Platform } from "@/platform/Platform";
 import { getContentSize } from "@/state/getContentSize";
-import { peek$, type StateContext, set$ } from "@/state/state";
+import { MvcpMode, peek$, type StateContext, set$ } from "@/state/state";
 import type { InternalState } from "@/types";
 import { checkAllSizesKnown } from "@/utils/checkAllSizesKnown";
 import { findAvailableContainers } from "@/utils/findAvailableContainers";
@@ -127,6 +129,23 @@ function handleStickyRecycling(
         if (shouldRecycle) {
             pendingRemoval.push(containerIndex);
         }
+    }
+}
+
+/**
+ * Get MVCP handler based on current mode
+ * Declarative approach - mode is set by InitializationManager during phase transitions
+ */
+function getMvcpHandler(ctx: StateContext, mode: MvcpMode, dataChanged?: boolean): (() => void) | undefined {
+    switch (mode) {
+        case MvcpMode.NONE:
+            return undefined;
+        case MvcpMode.REGULAR:
+            return prepareMVCP(ctx, dataChanged);
+        case MvcpMode.INITIALIZATION:
+            return prepareInitializationMVCP(ctx);
+        default:
+            return undefined;
     }
 }
 
@@ -257,8 +276,13 @@ export function calculateItemsInView(
         }
 
         ////// Update item positions and do MVCP
-        // Handle maintainVisibleContentPosition adjustment early
-        const checkMVCP = doMVCP ? prepareMVCP(ctx, dataChanged) : undefined;
+        // Handle maintainVisibleContentPosition adjustment
+        // MVCP mode is set declaratively by InitializationManager during phase transitions:
+        // - SCROLLING phase: NONE (no MVCP)
+        // - STABILIZING phase: INITIALIZATION (anchor-locked MVCP)
+        // - IDLE phase: REGULAR (normal MVCP)
+        const mvcpMode = peek$(ctx, "mvcpMode");
+        const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : undefined;
 
         if (dataChanged) {
             indexByKey.clear();
@@ -292,7 +316,12 @@ export function calculateItemsInView(
         let endNoBuffer: number | null = null;
         let endBuffered: number | null = null;
 
-        let loopStart: number = !dataChanged && startBufferedIdOrig ? indexByKey.get(startBufferedIdOrig) || 0 : 0;
+        // When forceFullItemPositions is true, we need to recalculate the buffered range from scratch
+        // This is critical when alignItemsPaddingTop changes after stabilization, as all item positions shift
+        let loopStart: number =
+            !dataChanged && !forceFullItemPositions && startBufferedIdOrig
+                ? indexByKey.get(startBufferedIdOrig) || 0
+                : 0;
 
         // Go backwards from the last start position to find the first item that is in view
         // This is an optimization to avoid looping through all items, which could slow down
@@ -598,7 +627,11 @@ export function calculateItemsInView(
                         // so we need to set it to out of view
                         set$(ctx, `containerPosition${i}`, POSITION_OUT_OF_VIEW);
                     } else {
-                        const position = (positionValue || 0) - scrollAdjustPending;
+                        // During initialization with initialScroll, don't apply scrollAdjustPending
+                        // because scrollState is already overridden with the target position
+                        // Applying it here would cause a coordinate mismatch (double-adjustment)
+                        const shouldApplyAdjust = queuedInitialLayout || !initialScroll;
+                        const position = (positionValue || 0) - (shouldApplyAdjust ? scrollAdjustPending : 0);
                         const column = columns.get(id) || 1;
                         const span = columnSpans.get(id) || 1;
 
@@ -607,7 +640,9 @@ export function calculateItemsInView(
                         const prevSpan = peek$(ctx, `containerSpan${i}`);
                         const prevData = peek$(ctx, `containerItemData${i}`);
 
-                        if (position > POSITION_OUT_OF_VIEW && position !== prevPos) {
+                        // Update position if it changed, regardless of whether it's at POSITION_OUT_OF_VIEW
+                        // This fixes an issue where items with boundary positions weren't being updated
+                        if (position !== prevPos) {
                             set$(ctx, `containerPosition${i}`, position);
                             didChangePositions = true;
                         }
@@ -660,5 +695,9 @@ export function calculateItemsInView(
 
     if (!IsNewArchitecture && state.initialAnchor) {
         ensureInitialAnchor(ctx);
+    }
+
+    if (state.isInitializing && ctx.initializationManager.getCurrentPhase() === InitializationPhase.STABILIZING) {
+        ctx.initializationManager?.checkStabilization();
     }
 }

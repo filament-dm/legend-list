@@ -9,14 +9,17 @@ export function checkAtBottom(ctx: StateContext) {
         return;
     }
     const {
-        queuedInitialLayout,
         scrollLength,
         scroll,
         maintainingScrollAtEnd,
         props: { maintainScrollAtEndThreshold, onEndReachedThreshold },
     } = state;
     const contentSize = getContentSize(ctx);
-    if (contentSize > 0 && queuedInitialLayout && !maintainingScrollAtEnd) {
+
+    // Always check threshold, even with zero content or during animations
+    // The threshold state machine needs to progress (null → false → true)
+    // Skip only if actively animating scroll to end to avoid interference
+    if (!maintainingScrollAtEnd) {
         // Check if at end
         const insetEnd = getContentInsetEnd(state);
         const distanceFromEnd = contentSize - scroll - scrollLength - insetEnd;
@@ -34,7 +37,14 @@ export function checkAtBottom(ctx: StateContext) {
                 dataLength: state.props.data?.length,
                 scrollPosition: scroll,
             },
-            (distance) => state.props.onEndReached?.({ distanceFromEnd: distance }),
+            (distance) => {
+                // Block pagination during initialization
+                // App provides sufficient data upfront
+                if (state.isInitializing) {
+                    return;
+                }
+                state.props.onEndReached?.({ distanceFromEnd: distance });
+            },
             (snapshot) => {
                 state.endReachedSnapshot = snapshot;
             },

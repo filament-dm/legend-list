@@ -20,18 +20,16 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
     const shouldMaintainScrollAtEnd =
         maintainScrollAtEnd === true || (maintainScrollAtEnd as MaintainScrollAtEndOptions).onDataChange;
 
-    const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
-
-    // Reset the endReached flag if new data has been added and we didn't
-    // just maintain the scroll at end
-    if (!didMaintainScrollAtEnd && previousData && dataProp.length > previousData.length) {
-        state.isEndReached = false;
+    if (shouldMaintainScrollAtEnd) {
+        doMaintainScrollAtEnd(ctx, false);
     }
 
-    if (!didMaintainScrollAtEnd) {
-        checkAtTop(state);
-        checkAtBottom(ctx);
-    }
+    // Always check thresholds after data changes
+    checkAtTop(state);
+    checkAtBottom(ctx);
+
+    // Check if stabilization completed and fire callback
+    ctx.initializationManager.checkStabilization();
 
     delete state.previousData;
 }

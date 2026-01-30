@@ -16,6 +16,7 @@ import type {
 import type Reanimated from "react-native-reanimated";
 
 import type { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
+import type { InitializationCompletionInfo } from "@/core/initialization/types";
 import type { LegendListListenerType, ListenerTypeValueMap } from "@/state/state";
 import type { StylesAsSharedValue } from "@/typesInternal";
 
@@ -219,6 +220,49 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      * - true enables both behaviors; false disables both.
      */
     maintainVisibleContentPosition?: boolean | MaintainVisibleContentPositionConfig<ItemT>;
+
+    /**
+     * Timeline identifier that signals when the list is in initialization mode.
+     * When this value changes, the list enters initialization mode and will
+     * absolutely lock MVCP to the stabilizationAnchorId (if provided) until
+     * stabilization completes.
+     *
+     * Use case: Set to a unique identifier when navigating to a new timeline
+     * or jumping to a specific message. The changing value triggers initialization
+     * mode, preventing scroll jumps during pagination.
+     *
+     * Example: "conversation-123:message-456"
+     */
+    timelineId?: string;
+
+    /**
+     * Optional anchor ID to maintain on screen during initialization.
+     * When timelineId changes (entering initialization mode), MVCP will
+     * absolutely prioritize keeping this item stable while pagination fills
+     * the viewport, ignoring all other anchors.
+     *
+     * Use case: When loading a focused timeline or navigating to a specific message,
+     * set this to the target message ID along with a new timelineId.
+     */
+    stabilizationAnchorId?: string;
+
+    /**
+     * Callback fired when initialization completes.
+     *
+     * @param info - Information about how/why initialization completed, including:
+     *   - type: The type of completion (stabilized, early exit, failed)
+     *   - mode: The initialization mode that was active
+     *   - reason: Optional failure reason (only for failed completions)
+     *   - timelineId: The timeline that was being initialized
+     *   - isImperative: Whether this was an imperative initialization (jumpToLatest, etc.)
+     *
+     * You can use the completion info to distinguish between different types of completions:
+     * - timeline-switch-early-exit: Timeline switch without anchor (no action needed)
+     * - stabilized-chat: jumpToLatest completed (run pendingScrollAction)
+     * - stabilized-mid-timeline: Focused timeline completed (run pendingScrollAction)
+     * - failed: Initialization failed (handle error)
+     */
+    onInitializationComplete?: (info: InitializationCompletionInfo) => void;
 
     /**
      * Number of columns to render items in.
@@ -440,11 +484,32 @@ export interface ScrollTarget {
     animated?: boolean;
     index?: number;
     isInitialScroll?: boolean;
+    /**
+     * The item key (ID) for the target item. This allows looking up the current index
+     * after data changes (insertions, deletions, reordering), preventing stale index bugs.
+     */
+    itemKey?: string;
+    /**
+     * If true, this scroll operation is a "scroll to end" operation.
+     * During scroll, the target will always resolve to the current last index (data.length - 1),
+     * not a specific item. MVCP adjustments are also disabled to prevent interference.
+     */
+    isScrollToEnd?: boolean;
     itemSize?: number;
     offset: number;
+    /**
+     * Optional callback invoked when the scroll operation completes.
+     * This fires after scroll animations complete, or after layout settles (via double RAF) when no scroll is needed.
+     */
+    onSettled?: () => void;
     precomputedWithViewOffset?: boolean;
     viewOffset?: number;
     viewPosition?: number;
+    /**
+     * Number of retry attempts for scroll-to-end operations.
+     * Used to prevent infinite retry loops when data keeps changing.
+     */
+    retryCount?: number;
 }
 
 export interface InternalState {
@@ -479,7 +544,15 @@ export interface InternalState {
     isAtStart: boolean;
     isEndReached: boolean | null;
     isFirst?: boolean;
+    isInitializing: boolean;
+    isEndBufferSufficient: boolean;
+    isStartBufferSufficient: boolean;
     isStartReached: boolean | null;
+    lastTimelineId: string | undefined;
+    lastStabilizationAnchorId: string | undefined;
+    pendingEndRequest: boolean;
+    pendingStartRequest: boolean;
+    stabilizationStableFrames: number;
     lastBatchingAction: number;
     lastLayout: LayoutRectangle | undefined;
     lastScrollAdjustForHistory?: number;
@@ -557,17 +630,20 @@ export interface InternalState {
         onScroll: LegendListProps["onScroll"];
         onStartReached: LegendListProps["onStartReached"];
         onStartReachedThreshold: number | null | undefined;
+        onInitializationComplete: LegendListProps["onInitializationComplete"];
         onStickyHeaderChange: LegendListProps["onStickyHeaderChange"];
         overrideItemLayout: LegendListProps["overrideItemLayout"];
         recycleItems: boolean;
         renderItem: LegendListProps["renderItem"];
         scrollBuffer: number;
         snapToIndices: number[] | undefined;
+        stabilizationAnchorId: LegendListProps["stabilizationAnchorId"];
         stickyIndicesArr: number[];
         stickyIndicesSet: Set<number>;
         stylePaddingBottom: number | undefined;
         stylePaddingTop: number | undefined;
         suggestEstimatedItemSize: boolean;
+        timelineId: LegendListProps["timelineId"];
     };
 }
 
@@ -599,6 +675,7 @@ export type LegendListState = {
     endBuffered: number;
     isAtEnd: boolean;
     isAtStart: boolean;
+    isInitializing: boolean;
     listen: <T extends LegendListListenerType>(
         listenerType: T,
         callback: (value: ListenerTypeValueMap[T]) => void,
@@ -646,24 +723,57 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.index - The index to scroll to.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollIndexIntoView(params: { animated?: boolean | undefined; index: number }): void;
+    scrollIndexIntoView(params: { animated?: boolean | undefined; index: number; onSettled?: () => void }): void;
 
     /**
-     * Scrolls a specific index into view.
+     * Scrolls a specific item into view.
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.item - The item to scroll to.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollItemIntoView(params: { animated?: boolean | undefined; item: any }): void;
+    scrollItemIntoView(params: { animated?: boolean | undefined; item: any; onSettled?: () => void }): void;
 
     /**
      * Scrolls to the end of the list.
      * @param options - Options for scrolling.
      * @param options.animated - If true, animates the scroll. Default: true.
      * @param options.viewOffset - Offset from the target position.
+     * @param options.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollToEnd(options?: { animated?: boolean | undefined; viewOffset?: number | undefined }): void;
+    scrollToEnd(options?: {
+        animated?: boolean | undefined;
+        viewOffset?: number | undefined;
+        onSettled?: () => void;
+    }): void;
+
+    /**
+     * Jumps to the most recent item (bottom of list) with stabilization.
+     * Unlike scrollToEnd, this method enters initialization mode to keep the
+     * most recent item locked at the bottom of the viewport while items may resize
+     * (e.g., links unfurling, images loading, estimated sizes adjusting).
+     *
+     * Use case: "Jump to latest" button in chat interfaces when switching to live timeline.
+     * The method will:
+     * 1. Enter initialization mode (disables pagination)
+     * 2. Scroll to the last item
+     * 3. Lock it at the bottom while items stabilize
+     * 4. Exit automatically after 3 stable frames
+     *
+     * This is unlike other scrollTo methods in that it explicitly enters initialization.
+     * Intended for user-initiated jumps to the live timeline.
+     * Instead of an onSettled callback, use the onInitializationComplete prop and set it
+     * to respond to "stabilized-chat" completions.
+     * @param options - Options for jumping.
+     * @param options.animated - If true, animates the scroll. Default: true.
+     * @param options.viewOffset - Offset from the target position.
+     */ 
+    jumpToLatest(options?: {
+        animated?: boolean | undefined;
+        viewOffset?: number | undefined;
+    }): void;
 
     /**
      * Scrolls to a specific index in the list.
@@ -672,12 +782,14 @@ export type LegendListRef = {
      * @param params.index - The index to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
     scrollToIndex(params: {
         animated?: boolean | undefined;
         index: number;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
+        onSettled?: () => void;
     }): void;
 
     /**
@@ -687,12 +799,14 @@ export type LegendListRef = {
      * @param params.item - The item to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
     scrollToItem(params: {
         animated?: boolean | undefined;
         item: any;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
+        onSettled?: () => void;
     }): void;
 
     /**
@@ -700,8 +814,9 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.offset - The pixel offset to scroll to.
      * @param params.animated - If true, animates the scroll. Default: true.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes (after animation or layout settles via double RAF if no scroll needed).
      */
-    scrollToOffset(params: { offset: number; animated?: boolean | undefined }): void;
+    scrollToOffset(params: { offset: number; animated?: boolean | undefined; onSettled?: () => void }): void;
 
     /**
      * Sets or adds to the offset of the visible content anchor.

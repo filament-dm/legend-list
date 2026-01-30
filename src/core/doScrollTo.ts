@@ -1,5 +1,7 @@
 import { finishScrollTo } from "@/core/finishScrollTo";
+import { Platform } from "@/platform/Platform";
 import type { StateContext } from "@/state/state";
+import { checkFinishedScrollFallback } from "./checkFinishedScroll";
 
 export interface DoScrollToParams {
     animated?: boolean;
@@ -27,6 +29,12 @@ export function doScrollTo(ctx: StateContext, params: DoScrollToParams) {
 
         if (animated) {
             listenForScrollEnd(ctx, node);
+            // Only use fallback timeout on native platforms where scrollend events aren't reliable.
+            // On web, listenForScrollEnd provides proper event-based handling (scrollend event + idle timeout + max timeout).
+            // checkFinishedScrollFallback would race with listenForScrollEnd and call finishScrollTo prematurely.
+            if (Platform.OS !== "web") {
+                checkFinishedScrollFallback(ctx);
+            }
         } else {
             state.scroll = offset;
             setTimeout(() => {
@@ -52,6 +60,11 @@ function listenForScrollEnd(ctx: StateContext, node: HTMLElement): () => void {
         // If another scrollTo wasn't triggered since this started, finish the scrollTo
         if (targetToken === ctx.state.scrollingTo) {
             finishScrollTo(ctx);
+        } else {
+            // Don't lose callbacks on token mismatch
+            if (targetToken?.onSettled) {
+                targetToken.onSettled();
+            }
         }
     };
 
@@ -79,6 +92,8 @@ function listenForScrollEnd(ctx: StateContext, node: HTMLElement): () => void {
 
     if (supportsScrollEnd) {
         node.addEventListener("scrollend", finish, { once: true });
+        // Add max timeout even for scrollend to prevent callback loss
+        maxTimeout = setTimeout(finish, SCROLL_END_MAX_MS);
     } else {
         (node as HTMLElement).addEventListener("scroll", onScroll);
         idleTimeout = setTimeout(finish, SMOOTH_SCROLL_DURATION_MS);
