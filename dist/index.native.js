@@ -1644,6 +1644,10 @@ function finishScrollTo(ctx) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
     }
     setInitialRenderState(ctx, { didInitialScroll: true });
+    if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+      ctx.initializationManager.markInitialScrollComplete();
+      ctx.initializationManager.transitionToStabilizingPhase();
+    }
     if (callback) {
       callback();
     }
@@ -1742,6 +1746,7 @@ function scrollTo(ctx, params) {
     doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
   } else {
     state.scroll = offset;
+    setTimeout(() => finishScrollTo(ctx), 100);
   }
 }
 
@@ -3017,6 +3022,10 @@ function calculateItemsInView(ctx, params = {}) {
     } else {
       scrollBufferTop = scrollBuffer * 1.5;
       scrollBufferBottom = scrollBuffer * 0.5;
+    }
+    if (state.isInitializing) {
+      scrollBufferTop *= 4;
+      scrollBufferBottom *= 4;
     }
     const scrollTopBuffered = scroll - scrollBufferTop;
     const scrollBottom = scroll + scrollLength + (scroll < 0 ? -scroll : 0);
@@ -4511,6 +4520,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         );
         if (scrollPrepared) {
           ctx.initializationManager.enterScrollingPhase();
+          setRenderNum((v) => v + 1);
         } else {
           ctx.initializationManager.exitInitialization({
             type: "failed" /* FAILED */,
