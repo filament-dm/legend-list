@@ -458,6 +458,9 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 // If initial scroll was prepared, enter SCROLLING phase to perform the scroll
                 if (scrollPrepared) {
                     ctx.initializationManager.enterScrollingPhase();
+                    // Force re-render to trigger initialContentOffset memo recalculation
+                    // This ensures the memo uses the newly set state.initialScroll
+                    setRenderNum((v) => v + 1);
                 } else {
                     // Scroll couldn't be prepared (e.g., anchor not in data) - exit initialization
                     ctx.initializationManager.exitInitialization({

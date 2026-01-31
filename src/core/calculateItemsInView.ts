@@ -255,6 +255,13 @@ export function calculateItemsInView(
             scrollBufferBottom = scrollBuffer * 0.5;
         }
 
+        // During initialization, multiply buffers by 4x to handle scroll position uncertainty
+        // This ensures sufficient items render for accurate MVCP measurements and positioning
+        if (state.isInitializing) {
+            scrollBufferTop *= 4;
+            scrollBufferBottom *= 4;
+        }
+
         const scrollTopBuffered = scroll - scrollBufferTop;
         const scrollBottom = scroll + scrollLength + (scroll < 0 ? -scroll : 0);
         const scrollBottomBuffered = scrollBottom + scrollBufferBottom;

@@ -47,6 +47,12 @@ export function scrollTo(ctx: StateContext, params: ScrollTarget & { noScrolling
     if (forceScroll || !isInitialScroll || Platform.OS === "android") {
         doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
     } else {
+        // For initial scroll on web (not android), we set scroll directly without animation
+        // to avoid janky initial positioning. However, we still need to call finishScrollTo
+        // to trigger phase transitions and callbacks.
         state.scroll = offset;
+        // Use setTimeout to ensure scroll state is updated before finishing
+        // This matches the pattern in doScrollTo.ts for non-animated scrolls
+        setTimeout(() => finishScrollTo(ctx), 100);
     }
 }

@@ -90,6 +90,12 @@ export function finishScrollTo(ctx: StateContext) {
 
         setInitialRenderState(ctx, { didInitialScroll: true });
 
+        // Notify initialization manager that initial scroll completed
+        if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+            ctx.initializationManager.markInitialScrollComplete();
+            ctx.initializationManager.transitionToStabilizingPhase();
+        }
+
         // Invoke callback after all state cleanup and updates are complete
         if (callback) {
             callback();
