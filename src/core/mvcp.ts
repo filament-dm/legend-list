@@ -10,6 +10,7 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const { idsInView, positions, props } = state;
     const {
         maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition },
+        alignItemsAtEnd,
     } = props;
     const scrollingTo = state.scrollingTo;
 
@@ -35,17 +36,42 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             targetId = getId(state, scrollTarget);
         } else if (idsInView.length > 0 && state.didContainersLayout) {
             if (dataChanged) {
-                // Do MVCP for the first item fully in view
-                for (let i = 0; i < idsInView.length; i++) {
-                    const id = idsInView[i];
-                    const index = indexByKey.get(id);
-                    if (index !== undefined) {
-                        idsInViewWithPositions.push({ id, position: positions.get(id)! });
+                // Do MVCP for the first (or last if alignItemsAtEnd) item fully in view
+                if (alignItemsAtEnd) {
+                    // For chat UIs, anchor to bottom-most visible item
+                    for (let i = idsInView.length - 1; i >= 0; i--) {
+                        const id = idsInView[i];
+                        const index = indexByKey.get(id);
+                        if (index !== undefined) {
+                            idsInViewWithPositions.push({ id, position: positions.get(id)! });
+                        }
+                    }
+                } else {
+                    // For normal lists, anchor to top-most visible item
+                    for (let i = 0; i < idsInView.length; i++) {
+                        const id = idsInView[i];
+                        const index = indexByKey.get(id);
+                        if (index !== undefined) {
+                            idsInViewWithPositions.push({ id, position: positions.get(id)! });
+                        }
                     }
                 }
             } else {
-                // Do MVCP for the first item fully in view
-                targetId = idsInView.find((id) => indexByKey.get(id) !== undefined);
+                // Do MVCP for the first (or last if alignItemsAtEnd) item fully in view
+                if (alignItemsAtEnd) {
+                    // For chat UIs, anchor to bottom-most visible item
+                    for (let i = idsInView.length - 1; i >= 0; i--) {
+                        const id = idsInView[i];
+                        const index = indexByKey.get(id);
+                        if (index !== undefined) {
+                            targetId = id;
+                            break;
+                        }
+                    }
+                } else {
+                    // For normal lists, anchor to top-most visible item
+                    targetId = idsInView.find((id) => indexByKey.get(id) !== undefined);
+                }
             }
         }
 
