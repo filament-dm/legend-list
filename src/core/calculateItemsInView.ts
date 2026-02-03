@@ -134,7 +134,7 @@ function handleStickyRecycling(
 
 /**
  * Get MVCP handler based on current mode
- * Declarative approach - mode is set by InitializationManager during phase transitions
+ * Mode is set by managers during phase transitions
  */
 function getMvcpHandler(ctx: StateContext, mode: MvcpMode, dataChanged?: boolean): (() => void) | undefined {
     switch (mode) {

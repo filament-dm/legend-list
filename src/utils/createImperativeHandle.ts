@@ -160,6 +160,7 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
                 onSettled: () => {
                     // Step 5: Transition to STABILIZING phase after scroll completes
                     // This enables initialization MVCP to lock the item at the bottom
+                    // Note: transitionToStabilizingPhase has a guard to prevent re-entry
                     ctx.initializationManager.transitionToStabilizingPhase();
                 },
             });

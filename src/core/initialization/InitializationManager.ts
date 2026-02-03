@@ -216,6 +216,12 @@ export class InitializationManager {
         if (!this.isInitializing()) {
             return;
         }
+
+        // Guard against re-entry - prevent double-transition
+        if (this.state.phase === InitializationPhase.STABILIZING) {
+            return;
+        }
+
         this.state.phase = InitializationPhase.STABILIZING;
 
         // Set MVCP mode: enable initialization MVCP during STABILIZING phase
@@ -232,8 +238,6 @@ export class InitializationManager {
      * @param completionInfo - Information about how/why initialization completed
      */
     exitInitialization(completionInfo?: InitializationCompletionInfo): void {
-        const currentPhase = this.state.phase;
-        const currentMode = this.state.mode;
         const timelineId = this.state.timelineId;
         const isImperative = this.state.isImperative;
 
@@ -263,7 +267,7 @@ export class InitializationManager {
         // Build completion info with defaults if not provided
         const info: InitializationCompletionInfo = completionInfo || {
             type: InitializationCompletionType.FAILED,
-            mode: currentMode,
+            mode: this.state.mode,
             reason: "exitInitialization called without completion info",
             timelineId,
             isImperative,
