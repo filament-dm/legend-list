@@ -105,6 +105,13 @@ var InitializationManager = class {
       timelineId: void 0
     };
   }
+  // ===== Debug Helper =====
+  /**
+   * Check if debug logging is enabled for initialization
+   */
+  shouldLog() {
+    return this.ctx.state.props.debugInitialization;
+  }
   // ===== Phase Management =====
   /**
    * Set MVCP mode declaratively based on initialization phase
@@ -117,7 +124,18 @@ var InitializationManager = class {
    */
   enterInitialization(config) {
     var _a3, _b, _c;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] enterInitialization called", {
+        config,
+        currentPhase: this.state.phase,
+        currentMode: this.state.mode,
+        isAlreadyInitializing: this.isInitializing()
+      });
+    }
     if (this.isInitializing()) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Already initializing, ignoring re-entry");
+      }
       return;
     }
     let mode;
@@ -145,12 +163,25 @@ var InitializationManager = class {
     this.state.didCompleteInitialScroll = false;
     this.state.didInitialRecenter = false;
     this.state.stabilizationFrames = 0;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Initialization state set", {
+        phase: this.state.phase,
+        mode: this.state.mode,
+        timelineId: this.state.timelineId,
+        anchorId: this.state.anchorId,
+        targetViewPosition: this.state.targetViewPosition,
+        isImperative: this.state.isImperative
+      });
+    }
     this.ctx.state.isInitializing = true;
     if (!config.isImperative) {
       this.ctx.state.lastTimelineId = config.timelineId;
     }
     this.ctx.state.stabilizationStableFrames = 0;
     this.setMvcpMode("none" /* NONE */);
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] MVCP mode set to NONE for SCROLLING phase");
+    }
   }
   /**
    * Prepare initial scroll configuration when data arrives
@@ -161,28 +192,60 @@ var InitializationManager = class {
    * @returns true if initial scroll was prepared, false if anchor not found or data empty
    */
   prepareInitialScroll(data, keyExtractor) {
-    var _a3, _b;
+    var _a3, _b, _c, _d, _e;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] prepareInitialScroll called", {
+        isInitializing: this.isInitializing(),
+        dataLength: (_a3 = data == null ? void 0 : data.length) != null ? _a3 : 0,
+        anchorId: this.state.anchorId,
+        phase: this.state.phase
+      });
+    }
     if (!this.isInitializing()) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Not initializing, skipping prepareInitialScroll");
+      }
       return false;
     }
     if (!data || data.length === 0) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] No data available, skipping prepareInitialScroll");
+      }
       return false;
     }
     if (!this.state.anchorId) {
       const lastIndex = Math.max(0, data.length - 1);
       this.ctx.state.initialScroll = {
         index: lastIndex,
-        viewPosition: (_a3 = this.state.targetViewPosition) != null ? _a3 : 1
+        viewPosition: (_b = this.state.targetViewPosition) != null ? _b : 1
       };
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Chat mode - scrolling to bottom", {
+          lastIndex,
+          viewPosition: (_c = this.state.targetViewPosition) != null ? _c : 1
+        });
+      }
       return true;
     }
     const anchorIndex = data.findIndex((item, index) => keyExtractor(item, index) === this.state.anchorId);
     if (anchorIndex >= 0) {
       this.ctx.state.initialScroll = {
         index: anchorIndex,
-        viewPosition: (_b = this.state.targetViewPosition) != null ? _b : 0.5
+        viewPosition: (_d = this.state.targetViewPosition) != null ? _d : 0.5
       };
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Anchor found - setting initial scroll", {
+          anchorIndex,
+          viewPosition: (_e = this.state.targetViewPosition) != null ? _e : 0.5
+        });
+      }
       return true;
+    }
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Anchor not found, applying fallback", {
+        mode: this.state.mode,
+        anchorId: this.state.anchorId
+      });
     }
     if (this.state.mode === "chat-with-target") {
       this.state.mode = "chat" /* CHAT */;
@@ -193,6 +256,9 @@ var InitializationManager = class {
         index: lastIndex,
         viewPosition: 1
       };
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Fallback to CHAT mode - scrolling to bottom", { lastIndex });
+      }
       return true;
     }
     if (this.state.mode === "mid-timeline" /* MID_TIMELINE */) {
@@ -202,7 +268,13 @@ var InitializationManager = class {
         index: middleIndex,
         viewPosition: 0.5
       };
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Fallback to middle item", { middleIndex, anchorId: this.state.anchorId });
+      }
       return true;
+    }
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] WARNING: No fallback matched, returning false");
     }
     this.ctx.state.initialScroll = {
       index: 0,
@@ -226,13 +298,41 @@ var InitializationManager = class {
    */
   transitionToStabilizingPhase() {
     var _a3, _b;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] transitionToStabilizingPhase called", {
+        isInitializing: this.isInitializing(),
+        currentPhase: this.state.phase,
+        mode: this.state.mode
+      });
+    }
     if (!this.isInitializing()) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Not initializing, ignoring transition");
+      }
+      return;
+    }
+    if (this.state.phase === "STABILIZING" /* STABILIZING */) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Already in STABILIZING phase, ignoring transition");
+      }
       return;
     }
     this.state.phase = "STABILIZING" /* STABILIZING */;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Transitioned to STABILIZING phase");
+    }
     this.setMvcpMode("initialization" /* INITIALIZATION */);
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] MVCP mode set to INITIALIZATION");
+    }
     (_b = (_a3 = this.ctx.state).triggerCalculateItemsInView) == null ? void 0 : _b.call(_a3, { doMVCP: true, forceFullItemPositions: true });
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Triggered calculateItemsInView with MVCP");
+    }
     this.startStabilizationLoop();
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Started stabilization loop");
+    }
   }
   /**
    * Exit initialization mode
@@ -240,11 +340,20 @@ var InitializationManager = class {
    */
   exitInitialization(completionInfo) {
     var _a3, _b;
-    this.state.phase;
-    const currentMode = this.state.mode;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] exitInitialization called", {
+        currentPhase: this.state.phase,
+        currentMode: this.state.mode,
+        completionType: completionInfo == null ? void 0 : completionInfo.type,
+        stabilizationFrames: this.state.stabilizationFrames
+      });
+    }
     const timelineId = this.state.timelineId;
     const isImperative = this.state.isImperative;
     this.stopStabilizationLoop();
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Stopped stabilization loop");
+    }
     this.state.phase = "IDLE" /* IDLE */;
     this.state.mode = "idle" /* IDLE */;
     this.state.timelineId = void 0;
@@ -260,14 +369,23 @@ var InitializationManager = class {
     this.ctx.state.stabilizationStableFrames = 0;
     this.ctx.state.initialAnchor = void 0;
     this.setMvcpMode("regular" /* REGULAR */);
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] MVCP mode restored to REGULAR");
+    }
     const info = completionInfo || {
       type: "failed" /* FAILED */,
-      mode: currentMode,
+      mode: this.state.mode,
       reason: "exitInitialization called without completion info",
       timelineId,
       isImperative
     };
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Calling onInitializationComplete", { info });
+    }
     (_b = (_a3 = this.ctx.state.props).onInitializationComplete) == null ? void 0 : _b.call(_a3, info);
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Initialization complete");
+    }
   }
   /**
    * Start the stabilization checking loop
@@ -430,6 +548,12 @@ var InitializationManager = class {
    */
   onMVCPAdjusted() {
     if (!this.isInitializing()) return;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] MVCP adjusted - resetting stabilization counter", {
+        previousFrames: this.state.stabilizationFrames,
+        phase: this.state.phase
+      });
+    }
     this.state.stabilizationFrames = 0;
     this.ctx.state.stabilizationStableFrames = 0;
   }
@@ -447,15 +571,37 @@ var InitializationManager = class {
      * @returns true if stabilization is complete and initialization exited
      */
   checkStabilization() {
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] checkStabilization called", {
+        isInitializing: this.isInitializing(),
+        phase: this.state.phase,
+        stabilizationFrames: this.state.stabilizationFrames
+      });
+    }
     if (!this.isInitializing()) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Not initializing, skipping stabilization check");
+      }
       return false;
     }
     if (this.state.phase !== "STABILIZING" /* STABILIZING */) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] Not in STABILIZING phase, skipping check");
+      }
       return false;
     }
     this.state.stabilizationFrames++;
     this.ctx.state.stabilizationStableFrames = this.state.stabilizationFrames;
+    if (this.shouldLog()) {
+      console.log("[InitializationManager] Incremented stable frames", {
+        stabilizationFrames: this.state.stabilizationFrames,
+        needsMore: this.state.stabilizationFrames < 3
+      });
+    }
     if (this.state.stabilizationFrames >= 3) {
+      if (this.shouldLog()) {
+        console.log("[InitializationManager] 3 stable frames reached, completing initialization");
+      }
       let completionType;
       switch (this.state.mode) {
         case "mid-timeline" /* MID_TIMELINE */:
@@ -2318,7 +2464,8 @@ function prepareMVCP(ctx, dataChanged) {
   const state = ctx.state;
   const { idsInView, positions, props } = state;
   const {
-    maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition }
+    maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition },
+    alignItemsAtEnd
   } = props;
   const scrollingTo = state.scrollingTo;
   let prevPosition;
@@ -2333,15 +2480,36 @@ function prepareMVCP(ctx, dataChanged) {
       targetId = getId(state, scrollTarget);
     } else if (idsInView.length > 0 && state.didContainersLayout) {
       if (dataChanged) {
-        for (let i = 0; i < idsInView.length; i++) {
-          const id = idsInView[i];
-          const index = indexByKey.get(id);
-          if (index !== void 0) {
-            idsInViewWithPositions.push({ id, position: positions.get(id) });
+        if (alignItemsAtEnd) {
+          for (let i = idsInView.length - 1; i >= 0; i--) {
+            const id = idsInView[i];
+            const index = indexByKey.get(id);
+            if (index !== void 0) {
+              idsInViewWithPositions.push({ id, position: positions.get(id) });
+            }
+          }
+        } else {
+          for (let i = 0; i < idsInView.length; i++) {
+            const id = idsInView[i];
+            const index = indexByKey.get(id);
+            if (index !== void 0) {
+              idsInViewWithPositions.push({ id, position: positions.get(id) });
+            }
           }
         }
       } else {
-        targetId = idsInView.find((id) => indexByKey.get(id) !== void 0);
+        if (alignItemsAtEnd) {
+          for (let i = idsInView.length - 1; i >= 0; i--) {
+            const id = idsInView[i];
+            const index = indexByKey.get(id);
+            if (index !== void 0) {
+              targetId = id;
+              break;
+            }
+          }
+        } else {
+          targetId = idsInView.find((id) => indexByKey.get(id) !== void 0);
+        }
       }
     }
     if (targetId !== void 0) {
@@ -4484,6 +4652,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     // TODOV3: Remove from v3 release
     style: styleProp,
     suggestEstimatedItemSize,
+    debugInitialization,
     timelineId,
     viewabilityConfig,
     viewabilityConfigCallbackPairs,
@@ -4682,6 +4851,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     stylePaddingBottom: stylePaddingBottomState,
     stylePaddingTop: stylePaddingTopState,
     suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+    debugInitialization: !!debugInitialization,
     timelineId
   };
   state.refScroller = refScroller;

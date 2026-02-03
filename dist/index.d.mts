@@ -114,6 +114,10 @@ declare class InitializationManager {
     private stabilizationCheckId;
     constructor(ctx: StateContext);
     /**
+     * Check if debug logging is enabled for initialization
+     */
+    private shouldLog;
+    /**
      * Set MVCP mode declaratively based on initialization phase
      */
     private setMvcpMode;
@@ -615,6 +619,11 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      */
     suggestEstimatedItemSize?: boolean;
     /**
+     * Enable debug console logging for initialization manager.
+     * @default false
+     */
+    debugInitialization?: boolean;
+    /**
      * Configuration for determining item viewability.
      */
     viewabilityConfig?: ViewabilityConfig;
@@ -876,6 +885,7 @@ interface InternalState {
         stylePaddingBottom: number | undefined;
         stylePaddingTop: number | undefined;
         suggestEstimatedItemSize: boolean;
+        debugInitialization: boolean;
         timelineId: LegendListProps["timelineId"];
     };
 }
