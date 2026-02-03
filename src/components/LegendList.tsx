@@ -165,6 +165,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         stickyIndices: stickyIndicesDeprecated, // TODOV3: Remove from v3 release
         style: styleProp,
         suggestEstimatedItemSize,
+        debugInitialization,
         timelineId,
         viewabilityConfig,
         viewabilityConfigCallbackPairs,
@@ -401,6 +402,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         stylePaddingBottom: stylePaddingBottomState,
         stylePaddingTop: stylePaddingTopState,
         suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+        debugInitialization: !!debugInitialization,
         timelineId,
     };
 

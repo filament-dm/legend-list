@@ -44,6 +44,15 @@ export class InitializationManager {
         };
     }
 
+    // ===== Debug Helper =====
+
+    /**
+     * Check if debug logging is enabled for initialization
+     */
+    private shouldLog(): boolean {
+        return this.ctx.state.props.debugInitialization;
+    }
+
     // ===== Phase Management =====
 
     /**
@@ -57,8 +66,20 @@ export class InitializationManager {
      * Enter initialization mode for a new timeline
      */
     enterInitialization(config: InitializationConfig): void {
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] enterInitialization called', {
+                config,
+                currentPhase: this.state.phase,
+                currentMode: this.state.mode,
+                isAlreadyInitializing: this.isInitializing(),
+            });
+        }
+
         // Guard against re-entry while already initializing
         if (this.isInitializing()) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Already initializing, ignoring re-entry');
+            }
             return;
         }
 
@@ -107,6 +128,17 @@ export class InitializationManager {
         this.state.didInitialRecenter = false;
         this.state.stabilizationFrames = 0;
 
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Initialization state set', {
+                phase: this.state.phase,
+                mode: this.state.mode,
+                timelineId: this.state.timelineId,
+                anchorId: this.state.anchorId,
+                targetViewPosition: this.state.targetViewPosition,
+                isImperative: this.state.isImperative,
+            });
+        }
+
         // Sync to InternalState
         this.ctx.state.isInitializing = true;
 
@@ -121,6 +153,10 @@ export class InitializationManager {
 
         // Set MVCP mode: disable during SCROLLING phase
         this.setMvcpMode(MvcpMode.NONE);
+
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] MVCP mode set to NONE for SCROLLING phase');
+        }
     }
 
     /**
@@ -132,12 +168,27 @@ export class InitializationManager {
      * @returns true if initial scroll was prepared, false if anchor not found or data empty
      */
     prepareInitialScroll(data: readonly unknown[], keyExtractor: (item: unknown, index: number) => string): boolean {
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] prepareInitialScroll called', {
+                isInitializing: this.isInitializing(),
+                dataLength: data?.length ?? 0,
+                anchorId: this.state.anchorId,
+                phase: this.state.phase,
+            });
+        }
+
         if (!this.isInitializing()) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Not initializing, skipping prepareInitialScroll');
+            }
             return false;
         }
 
         // Wait for initial data to arrive
         if (!data || data.length === 0) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] No data available, skipping prepareInitialScroll');
+            }
             return false;
         }
 
@@ -148,6 +199,12 @@ export class InitializationManager {
                 index: lastIndex,
                 viewPosition: this.state.targetViewPosition ?? 1.0,
             };
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Chat mode - scrolling to bottom', {
+                    lastIndex,
+                    viewPosition: this.state.targetViewPosition ?? 1.0,
+                });
+            }
             return true;
         }
 
@@ -160,7 +217,20 @@ export class InitializationManager {
                 index: anchorIndex,
                 viewPosition: this.state.targetViewPosition ?? 0.5,
             };
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Anchor found - setting initial scroll', {
+                    anchorIndex,
+                    viewPosition: this.state.targetViewPosition ?? 0.5,
+                });
+            }
             return true;
+        }
+
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Anchor not found, applying fallback', {
+                mode: this.state.mode,
+                anchorId: this.state.anchorId,
+            });
         }
 
         if (this.state.mode === "chat-with-target") {
@@ -174,6 +244,9 @@ export class InitializationManager {
                 index: lastIndex,
                 viewPosition: 1.0,
             };
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Fallback to CHAT mode - scrolling to bottom', { lastIndex });
+            }
             return true;
         }
 
@@ -186,9 +259,15 @@ export class InitializationManager {
                 index: middleIndex,
                 viewPosition: 0.5,
             };
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Fallback to middle item', { middleIndex, anchorId: this.state.anchorId });
+            }
             return true;
         }
 
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] WARNING: No fallback matched, returning false');
+        }
         // Should not reach here, but provide safe fallback
         this.ctx.state.initialScroll = {
             index: 0,
@@ -213,23 +292,51 @@ export class InitializationManager {
      * Skips FILLING phase since app provides sufficient data upfront (no pagination needed)
      */
     transitionToStabilizingPhase(): void {
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] transitionToStabilizingPhase called', {
+                isInitializing: this.isInitializing(),
+                currentPhase: this.state.phase,
+                mode: this.state.mode,
+            });
+        }
+
         if (!this.isInitializing()) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Not initializing, ignoring transition');
+            }
             return;
         }
 
         // Guard against re-entry - prevent double-transition
         if (this.state.phase === InitializationPhase.STABILIZING) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Already in STABILIZING phase, ignoring transition');
+            }
             return;
         }
 
         this.state.phase = InitializationPhase.STABILIZING;
 
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Transitioned to STABILIZING phase');
+        }
+
         // Set MVCP mode: enable initialization MVCP during STABILIZING phase
         this.setMvcpMode(MvcpMode.INITIALIZATION);
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] MVCP mode set to INITIALIZATION');
+        }
+
 		this.ctx.state.triggerCalculateItemsInView?.({ doMVCP: true, forceFullItemPositions: true });
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Triggered calculateItemsInView with MVCP');
+        }
 
 		// Start continuous stabilization checking loop
 		this.startStabilizationLoop();
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Started stabilization loop');
+        }
     }
 
 
@@ -238,11 +345,23 @@ export class InitializationManager {
      * @param completionInfo - Information about how/why initialization completed
      */
     exitInitialization(completionInfo?: InitializationCompletionInfo): void {
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] exitInitialization called', {
+                currentPhase: this.state.phase,
+                currentMode: this.state.mode,
+                completionType: completionInfo?.type,
+                stabilizationFrames: this.state.stabilizationFrames,
+            });
+        }
+
         const timelineId = this.state.timelineId;
         const isImperative = this.state.isImperative;
 
         // Stop stabilization loop if running
         this.stopStabilizationLoop();
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Stopped stabilization loop');
+        }
 
         this.state.phase = InitializationPhase.IDLE;
         this.state.mode = InitializationMode.IDLE;
@@ -263,6 +382,9 @@ export class InitializationManager {
 
         // Set MVCP mode: restore regular MVCP after initialization
         this.setMvcpMode(MvcpMode.REGULAR);
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] MVCP mode restored to REGULAR');
+        }
 
         // Build completion info with defaults if not provided
         const info: InitializationCompletionInfo = completionInfo || {
@@ -273,7 +395,13 @@ export class InitializationManager {
             isImperative,
         };
 
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Calling onInitializationComplete', { info });
+        }
         this.ctx.state.props.onInitializationComplete?.(info);
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Initialization complete');
+        }
     }
 
     /**
@@ -478,6 +606,13 @@ export class InitializationManager {
     onMVCPAdjusted(): void {
         if (!this.isInitializing()) return;
 
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] MVCP adjusted - resetting stabilization counter', {
+                previousFrames: this.state.stabilizationFrames,
+                phase: this.state.phase,
+            });
+        }
+
         this.state.stabilizationFrames = 0;
         this.ctx.state.stabilizationStableFrames = 0;
     }
@@ -497,12 +632,26 @@ export class InitializationManager {
      * @returns true if stabilization is complete and initialization exited
      */
     checkStabilization(): boolean {
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] checkStabilization called', {
+                isInitializing: this.isInitializing(),
+                phase: this.state.phase,
+                stabilizationFrames: this.state.stabilizationFrames,
+            });
+        }
+
         if (!this.isInitializing()) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Not initializing, skipping stabilization check');
+            }
             return false;
         }
 
         // Only stabilize during STABILIZING phase
         if (this.state.phase !== InitializationPhase.STABILIZING) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] Not in STABILIZING phase, skipping check');
+            }
             return false;
         }
 
@@ -510,8 +659,19 @@ export class InitializationManager {
         // This gets reset by onMVCPAdjusted() if scroll position needs adjustment
         this.state.stabilizationFrames++;
         this.ctx.state.stabilizationStableFrames = this.state.stabilizationFrames;
+
+        if (this.shouldLog()) {
+            console.log('[InitializationManager] Incremented stable frames', {
+                stabilizationFrames: this.state.stabilizationFrames,
+                needsMore: this.state.stabilizationFrames < 3,
+            });
+        }
+
         // Check if we've reached 3 consecutive stable frames
         if (this.state.stabilizationFrames >= 3) {
+            if (this.shouldLog()) {
+                console.log('[InitializationManager] 3 stable frames reached, completing initialization');
+            }
             // Determine completion type based on mode
             let completionType: InitializationCompletionType;
             switch (this.state.mode) {

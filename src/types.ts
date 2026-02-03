@@ -363,6 +363,12 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     suggestEstimatedItemSize?: boolean;
 
     /**
+     * Enable debug console logging for initialization manager.
+     * @default false
+     */
+    debugInitialization?: boolean;
+
+    /**
      * Configuration for determining item viewability.
      */
     viewabilityConfig?: ViewabilityConfig;
@@ -643,6 +649,7 @@ export interface InternalState {
         stylePaddingBottom: number | undefined;
         stylePaddingTop: number | undefined;
         suggestEstimatedItemSize: boolean;
+        debugInitialization: boolean;
         timelineId: LegendListProps["timelineId"];
     };
 }
