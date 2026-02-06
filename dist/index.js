@@ -3766,25 +3766,26 @@ function doMaintainScrollAtEnd(ctx, animated) {
     refScroller,
     props: { maintainScrollAtEnd }
   } = state;
+  if (state.maintainingScrollAtEnd) {
+    return false;
+  }
   if (isAtEnd && maintainScrollAtEnd && didContainersLayout) {
+    state.maintainingScrollAtEnd = true;
     const contentSize = getContentSize(ctx);
     if (contentSize < state.scrollLength) {
       state.scroll = 0;
     }
     requestAnimationFrame(() => {
       var _a3;
-      if (state.isAtEnd) {
-        state.maintainingScrollAtEnd = true;
-        (_a3 = refScroller.current) == null ? void 0 : _a3.scrollToEnd({
-          animated
-        });
-        setTimeout(
-          () => {
-            state.maintainingScrollAtEnd = false;
-          },
-          0
-        );
-      }
+      (_a3 = refScroller.current) == null ? void 0 : _a3.scrollToEnd({
+        animated
+      });
+      setTimeout(
+        () => {
+          state.maintainingScrollAtEnd = false;
+        },
+        0
+      );
     });
     return true;
   }
@@ -3859,7 +3860,7 @@ function checkResetContainers(ctx, dataProp) {
   checkAtTop(state);
   checkAtBottom(ctx);
   ctx.initializationManager.checkStabilization();
-  delete state.previousData;
+  state.previousData = dataProp;
 }
 
 // src/core/doInitialAllocateContainers.ts
@@ -4072,6 +4073,7 @@ var ScrollAdjustHandler = class {
 };
 
 // src/core/updateItemSize.ts
+var pendingMaintainScrollAtEndFrame = null;
 function updateItemSize(ctx, itemKey, sizeObj) {
   var _a3;
   const state = ctx.state;
@@ -4159,7 +4161,12 @@ function updateItemSize(ctx, itemKey, sizeObj) {
     }
     if (shouldMaintainScrollAtEnd) {
       if (maintainScrollAtEnd === true || maintainScrollAtEnd.onItemLayout) {
-        doMaintainScrollAtEnd(ctx, false);
+        if (pendingMaintainScrollAtEndFrame === null) {
+          pendingMaintainScrollAtEndFrame = requestAnimationFrame(() => {
+            pendingMaintainScrollAtEndFrame = null;
+            doMaintainScrollAtEnd(ctx, false);
+          });
+        }
       }
     }
   }
