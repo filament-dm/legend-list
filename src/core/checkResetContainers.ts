@@ -31,5 +31,7 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
     // Check if stabilization completed and fire callback
     ctx.initializationManager.checkStabilization();
 
-    delete state.previousData;
+    // Store current data as previousData for next change detection
+    // Don't delete it - that causes every render to be treated as a data change
+    state.previousData = dataProp as readonly unknown[];
 }

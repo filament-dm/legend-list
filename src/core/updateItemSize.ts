@@ -9,6 +9,9 @@ import { IS_DEV } from "@/utils/devEnvironment";
 import { getItemSize } from "@/utils/getItemSize";
 import { roundSize } from "@/utils/helpers";
 
+// Batch multiple item size changes into single scroll operation per frame
+let pendingMaintainScrollAtEndFrame: number | null = null;
+
 export function updateItemSize(ctx: StateContext, itemKey: string, sizeObj: { width: number; height: number }) {
     const state = ctx.state;
     const {
@@ -119,7 +122,13 @@ export function updateItemSize(ctx: StateContext, itemKey: string, sizeObj: { wi
         }
         if (shouldMaintainScrollAtEnd) {
             if (maintainScrollAtEnd === true || (maintainScrollAtEnd as MaintainScrollAtEndOptions).onItemLayout) {
-                doMaintainScrollAtEnd(ctx, false);
+                // Batch multiple item size changes into single scroll operation per frame
+                if (pendingMaintainScrollAtEndFrame === null) {
+                    pendingMaintainScrollAtEndFrame = requestAnimationFrame(() => {
+                        pendingMaintainScrollAtEndFrame = null;
+                        doMaintainScrollAtEnd(ctx, false);
+                    });
+                }
             }
         }
     }
