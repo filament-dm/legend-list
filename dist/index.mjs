@@ -1,5 +1,5 @@
 import * as React3 from 'react';
-import React3__default, { forwardRef, useReducer, useEffect, createContext, useRef, useState, useMemo, useCallback, useImperativeHandle, useLayoutEffect, memo, useContext } from 'react';
+import React3__default, { forwardRef, useReducer, useEffect, createContext, useRef, useState, useMemo, useCallback, useLayoutEffect, useImperativeHandle, memo, useContext } from 'react';
 import { useSyncExternalStore } from 'use-sync-external-store/shim';
 import { unstable_batchedUpdates, flushSync } from 'react-dom';
 
@@ -1543,6 +1543,19 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
 }, ref) {
   const scrollRef = useRef(null);
   const contentRef = useRef(null);
+  useLayoutEffect(() => {
+    const styleId = "legendlist-hide-scrollbar";
+    if (!document.getElementById(styleId)) {
+      const style2 = document.createElement("style");
+      style2.id = styleId;
+      style2.textContent = `
+            .legendlist-hide-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+        `;
+      document.head.appendChild(style2);
+    }
+  }, []);
   useImperativeHandle(ref, () => {
     const api = {
       getBoundingClientRect: () => {
@@ -1652,6 +1665,7 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
   }, [onLayout]);
+  const hideScrollbar = showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
   const scrollViewStyle = {
     height: horizontal ? void 0 : "100%",
     overflow: "auto",
@@ -1662,6 +1676,11 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
     WebkitOverflowScrolling: "touch",
     // iOS momentum scrolling
     width: horizontal ? "100%" : void 0,
+    // Add Firefox/IE scrollbar hiding (inline styles)
+    ...hideScrollbar && {
+      scrollbarWidth: "none",
+      msOverflowStyle: "none"
+    },
     ...StyleSheet.flatten(style)
   };
   const contentStyle = {
@@ -1672,7 +1691,17 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
     ...StyleSheet.flatten(contentContainerStyle)
   };
   const { contentInset, scrollEventThrottle, ScrollComponent, ...webProps } = props;
-  return /* @__PURE__ */ React3.createElement("div", { ref: scrollRef, ...webProps, style: scrollViewStyle }, refreshControl, /* @__PURE__ */ React3.createElement("div", { ref: contentRef, style: contentStyle }, children));
+  return /* @__PURE__ */ React3.createElement(
+    "div",
+    {
+      ref: scrollRef,
+      className: hideScrollbar ? "legendlist-hide-scrollbar" : void 0,
+      ...webProps,
+      style: scrollViewStyle
+    },
+    refreshControl,
+    /* @__PURE__ */ React3.createElement("div", { ref: contentRef, style: contentStyle }, children)
+  );
 });
 function useValueListener$(key, callback) {
   const ctx = useStateContext();

@@ -1564,6 +1564,19 @@ var ListComponentScrollView = React3.forwardRef(function ListComponentScrollView
 }, ref) {
   const scrollRef = React3.useRef(null);
   const contentRef = React3.useRef(null);
+  React3.useLayoutEffect(() => {
+    const styleId = "legendlist-hide-scrollbar";
+    if (!document.getElementById(styleId)) {
+      const style2 = document.createElement("style");
+      style2.id = styleId;
+      style2.textContent = `
+            .legendlist-hide-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+        `;
+      document.head.appendChild(style2);
+    }
+  }, []);
   React3.useImperativeHandle(ref, () => {
     const api = {
       getBoundingClientRect: () => {
@@ -1673,6 +1686,7 @@ var ListComponentScrollView = React3.forwardRef(function ListComponentScrollView
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
   }, [onLayout]);
+  const hideScrollbar = showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
   const scrollViewStyle = {
     height: horizontal ? void 0 : "100%",
     overflow: "auto",
@@ -1683,6 +1697,11 @@ var ListComponentScrollView = React3.forwardRef(function ListComponentScrollView
     WebkitOverflowScrolling: "touch",
     // iOS momentum scrolling
     width: horizontal ? "100%" : void 0,
+    // Add Firefox/IE scrollbar hiding (inline styles)
+    ...hideScrollbar && {
+      scrollbarWidth: "none",
+      msOverflowStyle: "none"
+    },
     ...StyleSheet.flatten(style)
   };
   const contentStyle = {
@@ -1693,7 +1712,17 @@ var ListComponentScrollView = React3.forwardRef(function ListComponentScrollView
     ...StyleSheet.flatten(contentContainerStyle)
   };
   const { contentInset, scrollEventThrottle, ScrollComponent, ...webProps } = props;
-  return /* @__PURE__ */ React3__namespace.createElement("div", { ref: scrollRef, ...webProps, style: scrollViewStyle }, refreshControl, /* @__PURE__ */ React3__namespace.createElement("div", { ref: contentRef, style: contentStyle }, children));
+  return /* @__PURE__ */ React3__namespace.createElement(
+    "div",
+    {
+      ref: scrollRef,
+      className: hideScrollbar ? "legendlist-hide-scrollbar" : void 0,
+      ...webProps,
+      style: scrollViewStyle
+    },
+    refreshControl,
+    /* @__PURE__ */ React3__namespace.createElement("div", { ref: contentRef, style: contentStyle }, children)
+  );
 });
 function useValueListener$(key, callback) {
   const ctx = useStateContext();
