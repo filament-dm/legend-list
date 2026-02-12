@@ -386,7 +386,10 @@ export function calculateItemsInView(
         }
 
         const idsInView: string[] = [];
-        for (let i = firstFullyOnScreenIndex!; i <= endNoBuffer!; i++) {
+        // Use startNoBuffer (first partially visible item) instead of firstFullyOnScreenIndex
+        // This ensures MVCP has an anchor even when scrolled to middle of tall items
+        const firstVisibleIndex = startNoBuffer ?? firstFullyOnScreenIndex;
+        for (let i = firstVisibleIndex!; i <= endNoBuffer!; i++) {
             const id = idCache[i] ?? getId(state, i);
             idsInView.push(id);
         }
