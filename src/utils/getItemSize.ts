@@ -32,7 +32,6 @@ export function getItemSize(
             return sizeKnown;
         }
         // Data reference changed - fall through to re-estimate
-        console.log(`[LL-DEBUG getItemSize] key=${key} index=${index} dataRefChanged, sizeKnown=${sizeKnown}, will re-estimate`);
     }
 
     let size: number | undefined;
@@ -41,11 +40,6 @@ export function getItemSize(
         // Get estimated size since we don't have a valid measured size for this data version
         const itemType = getItemType ? (getItemType(data, index) ?? "") : "";
         size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize!;
-    }
-
-    const prevSizeInMap = sizes.get(key);
-    if (prevSizeInMap !== size) {
-        console.log(`[LL-DEBUG getItemSize] key=${key} index=${index} estimated=${size} prevInSizes=${prevSizeInMap} sizesKnown=${sizeKnown} (OVERWRITING sizes map)`);
     }
 
     setSize(ctx, key, size);

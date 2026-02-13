@@ -26,7 +26,6 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     // console.log("prepareMVCP", ctx.contextNum, shouldMVCP, dataChanged, mvcpdataChanged, mvcpScroll);
 
     if (shouldMVCP) {
-        console.log(`[LL-DEBUG prepareMVCP] dataChanged=${dataChanged} idsInView=[${idsInView.slice(0, 5).join(',')}${idsInView.length > 5 ? '...' : ''}] (${idsInView.length} total) alignItemsAtEnd=${alignItemsAtEnd} scroll=${state.scroll}`);
         if (scrollTarget !== undefined) {
             if (!IsNewArchitecture && scrollingTo?.isInitialScroll) {
                 // In old architecture, we don't want to do MVCP for the initial scroll
@@ -80,8 +79,6 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             prevPosition = positions.get(targetId)!;
         }
 
-        console.log(`[LL-DEBUG prepareMVCP] anchors: targetId=${targetId} prevPosition=${prevPosition} idsInViewWithPositions=${JSON.stringify(idsInViewWithPositions.slice(0, 3))}`);
-
         // Return a function to do MVCP based on the prepared values
         return () => {
             let positionDiff = 0;
@@ -114,14 +111,19 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                 if (newPosition !== undefined) {
                     const totalSize = getContentSize(ctx);
                     let diff = newPosition - prevPosition;
-                    if (diff !== 0 && state.scroll + state.scrollLength > totalSize) {
-                        // If we're scrolling to the end of the list, then there's two potential issues we workaround:
-                        // 1. List items above the scroll target may be in view so we don't want to take too much adjusting
-                        // 2. Adjusting too much could cause the list to scroll back up
+
+                    // Only apply the end-of-list guard when all items have been measured,
+                    // so totalSize is accurate. When unmeasured items exist (e.g. after
+                    // pagination prepends estimated items), totalSize is unreliable and
+                    // the guard would incorrectly zero legitimate diffs, causing drift.
+                    const allMeasured = state.sizesKnown.size >= (state.props.data?.length ?? 0);
+                    if (allMeasured && diff !== 0 && state.scroll + state.scrollLength > totalSize) {
                         if (diff > 0) {
                             diff = Math.max(0, totalSize - state.scroll - state.scrollLength);
                         } else {
-                            diff = 0;
+                            // Negative diffs (anchor moved up / content shrunk) pass through
+                            // even at the end of the list — we need to scroll up to follow
+                            // the anchor and prevent visual drift (Bug 3 fix).
                         }
                     }
 
@@ -141,9 +143,7 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                 }
             }
 
-            console.log(`[LL-DEBUG MVCP closure] targetId=${targetId} prevPosition=${prevPosition} newPosition=${targetId ? positions.get(targetId) : 'N/A'} positionDiff=${positionDiff} scroll=${state.scroll} dataChanged=${dataChanged}`);
             if (Math.abs(positionDiff) > 0.1) {
-                console.log(`[LL-DEBUG MVCP] ADJUSTING by ${positionDiff}`);
                 requestAdjust(ctx, positionDiff, dataChanged && mvcpData);
             }
         };

@@ -3,9 +3,6 @@ let globalResizeObserver: ResizeObserver | null = null;
 function getGlobalResizeObserver(): ResizeObserver {
     if (!globalResizeObserver) {
         globalResizeObserver = new ResizeObserver((entries) => {
-            if (entries.length > 1) {
-                console.log(`[LL-DEBUG ResizeObserver] BATCH of ${entries.length} entries in single callback`);
-            }
             for (const entry of entries) {
                 const callbacks = callbackMap.get(entry.target);
                 if (callbacks) {
