@@ -13,10 +13,11 @@ export function checkAtTop(state: InternalState) {
     const distanceFromTop = scroll;
     state.isAtStart = distanceFromTop <= 0;
 
+    const threshold = onStartReachedThreshold! * scrollLength;
     state.isStartReached = checkThreshold(
         distanceFromTop,
         false,
-        onStartReachedThreshold! * scrollLength,
+        threshold,
         state.isStartReached,
         state.startReachedSnapshot,
         {
@@ -35,6 +36,6 @@ export function checkAtTop(state: InternalState) {
         (snapshot) => {
             state.startReachedSnapshot = snapshot;
         },
-        false,
+        true,
     );
 }
