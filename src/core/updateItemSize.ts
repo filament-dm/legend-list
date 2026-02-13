@@ -82,6 +82,7 @@ export function updateItemSize(ctx: StateContext, itemKey: string, sizeObj: { wi
     const size = roundSize(horizontal ? sizeObj.width : sizeObj.height);
 
     if (diff !== 0) {
+        console.log(`[LL-DEBUG updateItemSize] key=${itemKey} index=${index} prevSizeKnown=${prevSizeKnown} newSize=${size} diff=${diff} needsRecalc=${needsRecalculate} inView=[${state.startBuffered},${state.endBuffered}]`);
         minIndexSizeChanged = minIndexSizeChanged !== undefined ? Math.min(minIndexSizeChanged, index) : index;
 
         // Check if item is in view
@@ -163,12 +164,19 @@ export function updateOneItemSize(ctx: StateContext, itemKey: string, sizeObj: {
 
     const index = indexByKey.get(itemKey)!;
 
+    const prevSizeKnownBefore = sizesKnown.get(itemKey);
+    const prevSizeCached = state.sizes.get(itemKey);
     const prevSize = getItemSize(ctx, itemKey, index, data[index]);
+    console.log(`[LL-DEBUG updateOneItemSize] key=${itemKey} index=${index} sizesKnown=${prevSizeKnownBefore} sizesCached=${prevSizeCached} getItemSize=${prevSize}`);
     const rawSize = horizontal ? sizeObj.width : sizeObj.height;
     // On web, prefer whole-pixel sizes to avoid cumulative subpixel gaps/overlaps with transforms
     const size = Platform.OS === "web" ? Math.round(rawSize) : roundSize(rawSize);
     const prevSizeKnown = sizesKnown.get(itemKey);
     sizesKnown.set(itemKey, size);
+    // Store the data reference at measurement time so getItemSize can detect content changes
+    if (data[index] !== undefined) {
+        state.dataRefWhenMeasured.set(itemKey, data[index]);
+    }
 
     // Update averages per item type
     // If user has provided getEstimatedItemSize that has precedence over averages

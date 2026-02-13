@@ -164,6 +164,8 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             prevPosition = positions.get(targetId)!;
         }
 
+        console.log(`[LL-DEBUG prepareMVCP] anchors: targetId=${targetId} prevPosition=${prevPosition} idsInViewWithPositions=${JSON.stringify(idsInViewWithPositions.slice(0, 3))}`);
+
         // Return a function to do MVCP based on the prepared values
         return () => {
             let positionDiff = 0;

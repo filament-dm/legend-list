@@ -317,6 +317,8 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 scrollTime: 0,
                 sizes: new Map(),
                 sizesKnown: new Map(),
+                dataRefWhenMeasured: new Map(),
+                stabilizationStableFrames: 0,
                 startBuffered: -1,
                 startNoBuffer: -1,
                 startReachedSnapshot: undefined,
