@@ -591,6 +591,7 @@ export interface InternalState {
     scrollTime: number;
     sizes: Map<string, number>;
     sizesKnown: Map<string, number>;
+    dataRefWhenMeasured: Map<string, any>;
     startBuffered: number;
     startBufferedId?: string;
     startNoBuffer: number;

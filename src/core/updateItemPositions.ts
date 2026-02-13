@@ -56,6 +56,8 @@ export function updateItemPositions(
 
     const maxVisibleArea = scrollBottomBuffered + 1000;
 
+    console.log(`[LL-DEBUG updateItemPositions] startIndex=${startIndex} dataChanged=${dataChanged} forceFullUpdate=${forceFullUpdate} shouldOptimize=${shouldOptimize} velocity=${velocity} lastScrollDelta=${lastScrollDelta} scrollLength=${state.scrollLength}`);
+
     // Only use average size if user did not provide a getEstimatedItemSize function.
     // Note that with estimatedItemSize, we use it for the first render and then
     // we can use average size after that.
@@ -99,6 +101,10 @@ export function updateItemPositions(
     const needsIndexByKey = dataChanged || indexByKey.size === 0;
 
     let didBreakEarly = false;
+
+    if (shouldOptimize) {
+        console.log(`[LL-DEBUG updateItemPositions] WILL OPTIMIZE (early break possible) maxVisibleArea=${maxVisibleArea}`);
+    }
 
     let breakAt: number | undefined;
     // Note that this loop is micro-optimized because it's a hot path

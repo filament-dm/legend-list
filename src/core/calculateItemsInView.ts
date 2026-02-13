@@ -291,6 +291,8 @@ export function calculateItemsInView(
         const mvcpMode = peek$(ctx, "mvcpMode");
         const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : undefined;
 
+        console.log(`[LL-DEBUG calcItemsInView] dataChanged=${dataChanged} doMVCP=${doMVCP} mvcpMode=${mvcpMode} scroll=${scrollState} scrollAdjustPending=${scrollAdjustPending} forceFullItemPositions=${forceFullItemPositions} minIndexSizeChanged=${minIndexSizeChanged} startIndex=${forceFullItemPositions || dataChanged ? 0 : (minIndexSizeChanged ?? state.startBuffered ?? 0)}`);
+
         if (dataChanged) {
             indexByKey.clear();
             idCache.length = 0;

@@ -26,6 +26,7 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     // console.log("prepareMVCP", ctx.contextNum, shouldMVCP, dataChanged, mvcpdataChanged, mvcpScroll);
 
     if (shouldMVCP) {
+        console.log(`[LL-DEBUG prepareMVCP] dataChanged=${dataChanged} idsInView=[${idsInView.slice(0, 5).join(',')}${idsInView.length > 5 ? '...' : ''}] (${idsInView.length} total) alignItemsAtEnd=${alignItemsAtEnd} scroll=${state.scroll}`);
         if (scrollTarget !== undefined) {
             if (!IsNewArchitecture && scrollingTo?.isInitialScroll) {
                 // In old architecture, we don't want to do MVCP for the initial scroll
@@ -78,6 +79,8 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
         if (targetId !== undefined) {
             prevPosition = positions.get(targetId)!;
         }
+
+        console.log(`[LL-DEBUG prepareMVCP] anchors: targetId=${targetId} prevPosition=${prevPosition} idsInViewWithPositions=${JSON.stringify(idsInViewWithPositions.slice(0, 3))}`);
 
         // Return a function to do MVCP based on the prepared values
         return () => {
@@ -138,7 +141,9 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                 }
             }
 
+            console.log(`[LL-DEBUG MVCP closure] targetId=${targetId} prevPosition=${prevPosition} newPosition=${targetId ? positions.get(targetId) : 'N/A'} positionDiff=${positionDiff} scroll=${state.scroll} dataChanged=${dataChanged}`);
             if (Math.abs(positionDiff) > 0.1) {
+                console.log(`[LL-DEBUG MVCP] ADJUSTING by ${positionDiff}`);
                 requestAdjust(ctx, positionDiff, dataChanged && mvcpData);
             }
         };
