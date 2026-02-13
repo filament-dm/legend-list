@@ -291,8 +291,6 @@ export function calculateItemsInView(
         const mvcpMode = peek$(ctx, "mvcpMode");
         const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : undefined;
 
-        console.log(`[LL-DEBUG calcItemsInView] dataChanged=${dataChanged} doMVCP=${doMVCP} mvcpMode=${mvcpMode} scroll=${scrollState} scrollAdjustPending=${scrollAdjustPending} forceFullItemPositions=${forceFullItemPositions} minIndexSizeChanged=${minIndexSizeChanged} startIndex=${forceFullItemPositions || dataChanged ? 0 : (minIndexSizeChanged ?? state.startBuffered ?? 0)}`);
-
         if (dataChanged) {
             indexByKey.clear();
             idCache.length = 0;
@@ -310,6 +308,17 @@ export function calculateItemsInView(
             scrollBottomBuffered,
             startIndex,
         });
+
+        // Sweep stale entries from dataRefWhenMeasured so we don't pin
+        // removed data objects in memory and prevent GC.
+        if (dataChanged) {
+            const { dataRefWhenMeasured } = state;
+            for (const key of dataRefWhenMeasured.keys()) {
+                if (!indexByKey.has(key)) {
+                    dataRefWhenMeasured.delete(key);
+                }
+            }
+        }
 
         if (minIndexSizeChanged !== undefined) {
             // Clear minIndexSizeChanged after using it for position updates

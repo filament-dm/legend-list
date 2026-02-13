@@ -21,7 +21,6 @@ export function ScrollAdjust() {
             if (scrollDelta !== 0) {
                 const el = scrollView.getScrollableNode();
                 const prevScroll = el.scrollTop;
-                console.log(`[LL-DEBUG ScrollAdjust] scrollDelta=${scrollDelta} domScrollTopBefore=${prevScroll} scrollOffset=${scrollOffset} lastOffset=${lastScrollOffsetRef.current} scrollHeight=${el.scrollHeight} clientHeight=${el.clientHeight}`);
                 const nextScroll = prevScroll + scrollDelta;
                 const totalSize = el.scrollHeight;
                 if (
@@ -54,10 +53,8 @@ export function ScrollAdjust() {
                 const expectedScroll = prevScroll + scrollDelta;
                 const drift = actualScroll - expectedScroll;
                 if (Math.abs(drift) > 1) {
-                    console.log(`[LL-DEBUG ScrollAdjust] DRIFT CORRECTION: drift=${drift} correcting state.scroll from ${ctx.state.scroll} to ${ctx.state.scroll + drift}`);
                     ctx.state.scroll += drift;
                 }
-                console.log(`[LL-DEBUG ScrollAdjust] domScrollTopAfter=${actualScroll} expectedScrollTop=${expectedScroll} drift=${drift}`);
             }
 
             lastScrollOffsetRef.current = scrollOffset;
