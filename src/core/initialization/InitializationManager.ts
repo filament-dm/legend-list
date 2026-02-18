@@ -406,28 +406,20 @@ export class InitializationManager {
 
     /**
      * Start the stabilization checking loop
-     * Continuously checks for stable frames using requestAnimationFrame
+     * Uses setTimeout with 100ms interval
      */
     private startStabilizationLoop(): void {
-        // Cancel any existing loop
-        this.stopStabilizationLoop();
+        const checkLoop = () => {
+            const completed = this.checkStabilization();
 
-        const checkFrame = () => {
-            // Stop if no longer in STABILIZING phase
-            if (this.state.phase !== InitializationPhase.STABILIZING) {
-                this.stopStabilizationLoop();
-                return;
+            // Continue loop if not completed and still in stabilizing phase
+            if (!completed && this.state.phase === InitializationPhase.STABILIZING) {
+                this.stabilizationCheckId = setTimeout(checkLoop, 100) as unknown as number;
             }
-
-            // Trigger calculateItemsInView which will call checkStabilization
-            this.ctx.state.triggerCalculateItemsInView?.({ doMVCP: true });
-
-            // Schedule next check
-            this.stabilizationCheckId = requestAnimationFrame(checkFrame);
         };
 
         // Start the loop
-        this.stabilizationCheckId = requestAnimationFrame(checkFrame);
+        this.stabilizationCheckId = setTimeout(checkLoop, 100) as unknown as number;
     }
 
     /**
@@ -435,7 +427,7 @@ export class InitializationManager {
      */
     private stopStabilizationLoop(): void {
         if (this.stabilizationCheckId !== undefined) {
-            cancelAnimationFrame(this.stabilizationCheckId);
+            clearTimeout(this.stabilizationCheckId);
             this.stabilizationCheckId = undefined;
         }
     }
