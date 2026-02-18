@@ -452,7 +452,12 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         } else {
             // Normal initialization flow: prepare scroll if we have data
             // prepareInitialScroll handles both chat mode (no anchor) and targeted mode (with anchor)
-            if (!initialScrollProp && dataProp && dataProp.length > 0) {
+
+            // Only bypass initialization if user provided explicit scroll index/offset
+            // initialScrollAtEnd-generated props should still go through initialization
+            const hasExplicitUserScrollProp = initialScrollIndexProp !== undefined || initialScrollOffsetProp !== undefined;
+
+            if (!hasExplicitUserScrollProp && dataProp && dataProp.length > 0) {
                 const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
                     dataProp as readonly unknown[],
                     keyExtractor as (item: unknown, index: number) => string,
