@@ -2518,8 +2518,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   const shouldOptimize = !forceFullUpdate && !dataChanged && (Math.abs(velocity) > 0 || Platform2.OS === "web" && state.scrollLength > 0 && lastScrollDelta > state.scrollLength);
   const maxVisibleArea = scrollBottomBuffered + 1e3;
   !doMVCP || dataChanged || state.scrollAdjustHandler.getAdjust() !== 0 || ((_b = peek$(ctx, "scrollAdjustPending")) != null ? _b : 0) !== 0;
-  const alignItemsPaddingTop = peek$(ctx, "alignItemsPaddingTop") || 0;
-  let currentRowTop = alignItemsPaddingTop;
+  let currentRowTop = 0;
   let column = 1;
   let maxSizeInRow = 0;
   if (dataChanged) {
@@ -3188,19 +3187,45 @@ function calculateItemsInView(ctx, params = {}) {
       }
     }
     const mvcpMode = peek$(ctx, "mvcpMode");
-    const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : void 0;
-    if (dataChanged) {
+    if (dataChanged && doMVCP) {
+      const newIndexByKey = /* @__PURE__ */ new Map();
+      for (let i = 0; i < data.length; i++) {
+        const id = getId(state, i);
+        newIndexByKey.set(id, i);
+      }
+      const oldIndexByKey = indexByKey;
+      state.indexByKey = newIndexByKey;
+      const checkMVCP = getMvcpHandler(ctx, mvcpMode, dataChanged);
+      state.indexByKey = oldIndexByKey;
       indexByKey.clear();
       idCache.length = 0;
       positions.clear();
+      for (const [id, index] of newIndexByKey) {
+        indexByKey.set(id, index);
+      }
+      updateItemPositions(ctx, dataChanged, {
+        doMVCP,
+        forceFullUpdate: !!forceFullItemPositions,
+        scrollBottomBuffered,
+        startIndex: 0
+      });
+      checkMVCP == null ? void 0 : checkMVCP();
+    } else {
+      const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : void 0;
+      if (dataChanged) {
+        indexByKey.clear();
+        idCache.length = 0;
+        positions.clear();
+      }
+      const startIndex = forceFullItemPositions || dataChanged ? 0 : (_b = minIndexSizeChanged != null ? minIndexSizeChanged : state.startBuffered) != null ? _b : 0;
+      updateItemPositions(ctx, dataChanged, {
+        doMVCP,
+        forceFullUpdate: !!forceFullItemPositions,
+        scrollBottomBuffered,
+        startIndex
+      });
+      checkMVCP == null ? void 0 : checkMVCP();
     }
-    const startIndex = forceFullItemPositions || dataChanged ? 0 : (_b = minIndexSizeChanged != null ? minIndexSizeChanged : state.startBuffered) != null ? _b : 0;
-    updateItemPositions(ctx, dataChanged, {
-      doMVCP,
-      forceFullUpdate: !!forceFullItemPositions,
-      scrollBottomBuffered,
-      startIndex
-    });
     if (dataChanged) {
       const { dataRefWhenMeasured } = state;
       for (const key of dataRefWhenMeasured.keys()) {
@@ -3212,7 +3237,6 @@ function calculateItemsInView(ctx, params = {}) {
     if (minIndexSizeChanged !== void 0) {
       state.minIndexSizeChanged = void 0;
     }
-    checkMVCP == null ? void 0 : checkMVCP();
     let startNoBuffer = null;
     let startBuffered = null;
     let startBufferedId = null;
@@ -4681,7 +4705,8 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         timelineId: timelineId || ""
       });
     } else {
-      if (!initialScrollProp && dataProp && dataProp.length > 0) {
+      const hasExplicitUserScrollProp = initialScrollIndexProp !== void 0 || initialScrollOffsetProp !== void 0;
+      if (!hasExplicitUserScrollProp && dataProp && dataProp.length > 0) {
         const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
           dataProp,
           keyExtractor
