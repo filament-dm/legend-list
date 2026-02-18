@@ -289,25 +289,72 @@ export function calculateItemsInView(
         // - STABILIZING phase: INITIALIZATION (anchor-locked MVCP)
         // - IDLE phase: REGULAR (normal MVCP)
         const mvcpMode = peek$(ctx, "mvcpMode");
-        const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : undefined;
 
-        if (dataChanged) {
+        // BUGFIX: Build new indexByKey BEFORE clearing old one to prevent anchor loss
+        // When data changes (e.g., URL previews unfurl, pagination), we need to ensure
+        // prepareMVCP can validate anchors against the NEW data's ID mappings
+        // Without this, indexByKey is cleared before prepareMVCP runs, causing lookups to fail
+        if (dataChanged && doMVCP) {
+            // Build new indexByKey from current data
+            const newIndexByKey = new Map<string, number>();
+            for (let i = 0; i < data.length; i++) {
+                const id = getId(state, i);
+                newIndexByKey.set(id, i);
+            }
+
+            // Temporarily replace indexByKey so prepareMVCP can validate anchors
+            const oldIndexByKey = indexByKey;
+            state.indexByKey = newIndexByKey;
+
+            // Prepare MVCP with valid indexByKey
+            const checkMVCP = getMvcpHandler(ctx, mvcpMode, dataChanged);
+
+            // Restore original map reference (will be cleared next)
+            state.indexByKey = oldIndexByKey;
+
+            // Now clear old state
             indexByKey.clear();
             idCache.length = 0;
             positions.clear();
+
+            // Copy new mappings into the cleared map
+            for (const [id, index] of newIndexByKey) {
+                indexByKey.set(id, index);
+            }
+
+            // Update positions and apply MVCP
+            updateItemPositions(ctx, dataChanged, {
+                doMVCP,
+                forceFullUpdate: !!forceFullItemPositions,
+                scrollBottomBuffered,
+                startIndex: 0,
+            });
+
+            checkMVCP?.();
+        } else {
+            // Normal path when no data change or no MVCP needed
+            const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : undefined;
+
+            if (dataChanged) {
+                indexByKey.clear();
+                idCache.length = 0;
+                positions.clear();
+            }
+
+            // Update all positions upfront so we can assume they're correct
+            // Use minIndexSizeChanged to avoid recalculating from index 0 when only later items changed
+            const startIndex =
+                forceFullItemPositions || dataChanged ? 0 : (minIndexSizeChanged ?? state.startBuffered ?? 0);
+
+            updateItemPositions(ctx, dataChanged, {
+                doMVCP,
+                forceFullUpdate: !!forceFullItemPositions,
+                scrollBottomBuffered,
+                startIndex,
+            });
+
+            checkMVCP?.();
         }
-
-        // Update all positions upfront so we can assume they're correct
-        // Use minIndexSizeChanged to avoid recalculating from index 0 when only later items changed
-        const startIndex =
-            forceFullItemPositions || dataChanged ? 0 : (minIndexSizeChanged ?? state.startBuffered ?? 0);
-
-        updateItemPositions(ctx, dataChanged, {
-            doMVCP,
-            forceFullUpdate: !!forceFullItemPositions,
-            scrollBottomBuffered,
-            startIndex,
-        });
 
         // Sweep stale entries from dataRefWhenMeasured so we don't pin
         // removed data objects in memory and prevent GC.
@@ -325,8 +372,6 @@ export function calculateItemsInView(
             state.minIndexSizeChanged = undefined;
         }
 
-        checkMVCP?.();
-
         ////// Prepare for loop
         let startNoBuffer: number | null = null;
         let startBuffered: number | null = null;
@@ -335,7 +380,7 @@ export function calculateItemsInView(
         let endBuffered: number | null = null;
 
         // When forceFullItemPositions is true, we need to recalculate the buffered range from scratch
-        // This is critical when alignItemsPaddingTop changes after stabilization, as all item positions shift
+        // This is critical when item positions shift after stabilization
         let loopStart: number =
             !dataChanged && !forceFullItemPositions && startBufferedIdOrig
                 ? indexByKey.get(startBufferedIdOrig) || 0
