@@ -151,7 +151,7 @@ declare class InitializationManager {
     exitInitialization(completionInfo?: InitializationCompletionInfo): void;
     /**
      * Start the stabilization checking loop
-     * Continuously checks for stable frames using requestAnimationFrame
+     * Uses setTimeout with 100ms interval
      */
     private startStabilizationLoop;
     /**
@@ -827,6 +827,7 @@ interface InternalState {
     scrollTime: number;
     sizes: Map<string, number>;
     sizesKnown: Map<string, number>;
+    dataRefWhenMeasured: Map<string, any>;
     startBuffered: number;
     startBufferedId?: string;
     startNoBuffer: number;
