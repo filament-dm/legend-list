@@ -302,25 +302,15 @@ export function calculateItemsInView(
                 newIndexByKey.set(id, i);
             }
 
-            // Temporarily replace indexByKey so prepareMVCP can validate anchors
-            const oldIndexByKey = indexByKey;
+            // Replace indexByKey so prepareMVCP can validate anchors
             state.indexByKey = newIndexByKey;
 
             // Prepare MVCP with valid indexByKey
             const checkMVCP = getMvcpHandler(ctx, mvcpMode, dataChanged);
 
-            // Restore original map reference (will be cleared next)
-            state.indexByKey = oldIndexByKey;
-
-            // Now clear old state
-            indexByKey.clear();
+            // Clear old caches (indexByKey is already updated, updateItemPositions will rebuild it)
             idCache.length = 0;
             positions.clear();
-
-            // Copy new mappings into the cleared map
-            for (const [id, index] of newIndexByKey) {
-                indexByKey.set(id, index);
-            }
 
             // Update positions and apply MVCP
             updateItemPositions(ctx, dataChanged, {
