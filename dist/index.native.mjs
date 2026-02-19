@@ -364,23 +364,27 @@ var InitializationManager = class {
   }
   /**
    * Start the stabilization checking loop
-   * Uses setTimeout with 100ms interval
+   * Continuously checks for stable frames using requestAnimationFrame
    */
   startStabilizationLoop() {
-    const checkLoop = () => {
-      const completed = this.checkStabilization();
-      if (!completed && this.state.phase === "STABILIZING" /* STABILIZING */) {
-        this.stabilizationCheckId = setTimeout(checkLoop, 100);
+    this.stopStabilizationLoop();
+    const checkFrame = () => {
+      var _a3, _b;
+      if (this.state.phase !== "STABILIZING" /* STABILIZING */) {
+        this.stopStabilizationLoop();
+        return;
       }
+      (_b = (_a3 = this.ctx.state).triggerCalculateItemsInView) == null ? void 0 : _b.call(_a3, { doMVCP: true });
+      this.stabilizationCheckId = requestAnimationFrame(checkFrame);
     };
-    this.stabilizationCheckId = setTimeout(checkLoop, 100);
+    this.stabilizationCheckId = requestAnimationFrame(checkFrame);
   }
   /**
    * Stop the stabilization checking loop
    */
   stopStabilizationLoop() {
     if (this.stabilizationCheckId !== void 0) {
-      clearTimeout(this.stabilizationCheckId);
+      cancelAnimationFrame(this.stabilizationCheckId);
       this.stabilizationCheckId = void 0;
     }
   }
@@ -3193,16 +3197,10 @@ function calculateItemsInView(ctx, params = {}) {
         const id = getId(state, i);
         newIndexByKey.set(id, i);
       }
-      const oldIndexByKey = indexByKey;
       state.indexByKey = newIndexByKey;
       const checkMVCP = getMvcpHandler(ctx, mvcpMode, dataChanged);
-      state.indexByKey = oldIndexByKey;
-      indexByKey.clear();
       idCache.length = 0;
       positions.clear();
-      for (const [id, index] of newIndexByKey) {
-        indexByKey.set(id, index);
-      }
       updateItemPositions(ctx, dataChanged, {
         doMVCP,
         forceFullUpdate: !!forceFullItemPositions,

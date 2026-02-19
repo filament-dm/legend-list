@@ -151,7 +151,7 @@ declare class InitializationManager {
     exitInitialization(completionInfo?: InitializationCompletionInfo): void;
     /**
      * Start the stabilization checking loop
-     * Uses setTimeout with 100ms interval
+     * Continuously checks for stable frames using requestAnimationFrame
      */
     private startStabilizationLoop;
     /**
