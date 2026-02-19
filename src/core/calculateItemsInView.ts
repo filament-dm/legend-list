@@ -309,6 +309,17 @@ export function calculateItemsInView(
             startIndex,
         });
 
+        // Sweep stale entries from dataRefWhenMeasured so we don't pin
+        // removed data objects in memory and prevent GC.
+        if (dataChanged) {
+            const { dataRefWhenMeasured } = state;
+            for (const key of dataRefWhenMeasured.keys()) {
+                if (!indexByKey.has(key)) {
+                    dataRefWhenMeasured.delete(key);
+                }
+            }
+        }
+
         if (minIndexSizeChanged !== undefined) {
             // Clear minIndexSizeChanged after using it for position updates
             state.minIndexSizeChanged = undefined;

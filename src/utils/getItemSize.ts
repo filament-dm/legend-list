@@ -14,63 +14,31 @@ export function getItemSize(
     const {
         sizesKnown,
         sizes,
-        averageSizes,
-        props: { estimatedItemSize, getEstimatedItemSize, getFixedItemSize, getItemType },
-        scrollingTo,
+        dataRefWhenMeasured,
+        props: { estimatedItemSize, getEstimatedItemSize, getItemType },
     } = state;
-    
+
     /**
      * NOTE (FILAMENT FORK):
-     * Caching causes lots of when item sizes change dynamically after initial measurement.
-     * Disabling for now. If this optimization is needed later, we can consider a more nuanced
-     * caching strategy.
+     * Use sizesKnown (measured size) when the item's data reference hasn't changed.
+     * If the data reference changed (e.g. link preview loaded), re-estimate since
+     * the content has changed and the measured size is stale.
      */
-
-    // const sizeKnown = sizesKnown.get(key)!;
-    // if (sizeKnown !== undefined) {
-    //     console.log(`[getItemSize] ${key}: returning sizeKnown=${sizeKnown}`);
-    //     return sizeKnown;
-    // }
+    const sizeKnown = sizesKnown.get(key);
+    if (sizeKnown !== undefined) {
+        const measuredDataRef = dataRefWhenMeasured.get(key);
+        if (measuredDataRef === data) {
+            // Data reference unchanged - measured size is still valid
+            return sizeKnown;
+        }
+        // Data reference changed - fall through to re-estimate
+    }
 
     let size: number | undefined;
 
-    const itemType = getItemType ? (getItemType(data, index) ?? "") : "";
-
-    // if (preferCachedSize) {
-    //     const cachedSize = sizes.get(key);
-    //     if (cachedSize !== undefined) {
-    //         console.log(`[getItemSize] ${key}: returning cached size=${cachedSize}`);
-    //         return cachedSize;
-    //     }
-    // }
-
-    // if (getFixedItemSize) {
-    //     size = getFixedItemSize(data, index, itemType);
-    //     if (size !== undefined) {
-    //         sizesKnown.set(key, size);
-    //     }
-    // }
-
-    // // useAverageSize will be false if getEstimatedItemSize is defined
-    // if (size === undefined && useAverageSize && !scrollingTo) {
-    //     // Use item type specific average if available
-    //     const averageSizeForType = averageSizes[itemType]?.avg;
-    //     if (averageSizeForType !== undefined) {
-    //         size = roundSize(averageSizeForType);
-    //     }
-    // }
-
-    // if (size === undefined && preferCachedSize !== false) {
-    //     size = sizes.get(key)!;
-
-    //     if (size !== undefined) {
-    //         console.log(`[getItemSize] ${key}: returning fallback cached size=${size}`);
-    //         return size;
-    //     }
-    // }
-
     if (size === undefined) {
-        // Get estimated size if we don't have an average or already cached size
+        // Get estimated size since we don't have a valid measured size for this data version
+        const itemType = getItemType ? (getItemType(data, index) ?? "") : "";
         size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize!;
     }
 
