@@ -5,6 +5,15 @@ import type { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
 import type { LegendListListenerType, ListenerTypeValueMap } from "@/state/state";
 import type { StylesAsSharedValue } from "@/typesInternal";
 
+// Export initialization types for public API
+export type {
+    InitializationCompletionInfo,
+    InitializationCompletionType,
+    InitializationMode,
+    InitializationPhase,
+    InitializationConfig,
+} from "@/core/initialization/types";
+
 export interface Insets {
     top: number;
     left: number;
