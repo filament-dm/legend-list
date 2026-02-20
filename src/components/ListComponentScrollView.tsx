@@ -81,6 +81,21 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
     const scrollRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
+    // One-time injection of global webkit-scrollbar hiding style
+    useLayoutEffect(() => {
+        const styleId = "legendlist-hide-scrollbar";
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement("style");
+            style.id = styleId;
+            style.textContent = `
+            .legendlist-hide-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+        `;
+            document.head.appendChild(style);
+        }
+    }, []); // Empty deps - only run once
+
     useImperativeHandle(ref, () => {
         const api: ScrollViewMethods = {
             getBoundingClientRect: () => scrollRef.current?.getBoundingClientRect(),
@@ -204,12 +219,22 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         return () => resizeObserver.disconnect();
     }, [onLayout]);
 
+    // Hide scrollbars if either indicator prop is false (matches react-native-web behavior)
+    const hideScrollbar =
+        showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
+
     const scrollViewStyle: CSSProperties = {
         overflow: "auto",
         overflowX: horizontal ? "auto" : showsHorizontalScrollIndicator ? "auto" : "hidden",
         overflowY: horizontal ? (showsVerticalScrollIndicator ? "auto" : "hidden") : "auto",
         position: "relative", // Ensure proper positioning context
         WebkitOverflowScrolling: "touch", // iOS momentum scrolling
+        width: horizontal ? "100%" : undefined,
+        // Add Firefox/IE scrollbar hiding (inline styles)
+        ...(hideScrollbar && {
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+        }),
         ...StyleSheet.flatten(style),
     };
 
@@ -226,7 +251,12 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         ExtraPropsFromRN;
 
     return (
-        <div ref={scrollRef} {...(webProps as HTMLAttributes<HTMLDivElement>)} style={scrollViewStyle}>
+        <div
+            ref={scrollRef}
+            className={hideScrollbar ? "legendlist-hide-scrollbar" : undefined}
+            {...(webProps as HTMLAttributes<HTMLDivElement>)}
+            style={scrollViewStyle}
+        >
             {refreshControl}
             <div ref={contentRef} style={contentStyle}>
                 {children}
