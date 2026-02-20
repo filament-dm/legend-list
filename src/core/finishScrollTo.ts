@@ -9,6 +9,7 @@ export function finishScrollTo(ctx: StateContext) {
     if (state?.scrollingTo) {
         // Save scrollingTo before clearing it so we can pass it to commitPendingAdjust
         const scrollingTo = state.scrollingTo;
+        const callback = scrollingTo.onSettled;
 
         state.scrollHistory.length = 0;
         state.initialScroll = undefined;
@@ -30,5 +31,16 @@ export function finishScrollTo(ctx: StateContext) {
         setInitialRenderState(ctx, { didInitialScroll: true });
 
         checkThresholds(ctx);
+
+        // Notify initialization manager that initial scroll completed
+        if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+            ctx.initializationManager.markInitialScrollComplete();
+            ctx.initializationManager.transitionToStabilizingPhase();
+        }
+
+        // Invoke callback after all state cleanup and updates are complete
+        if (callback) {
+            callback();
+        }
     }
 }
