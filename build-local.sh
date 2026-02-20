@@ -91,4 +91,29 @@ cat > section-list.d.ts << 'EOF'
 export * from './dist/section-list';
 EOF
 
+# Platform-specific exports (new in beta.33)
+cat > react-native.js << 'EOF'
+module.exports = require('./dist/list-react-native.js');
+EOF
+
+cat > react-native.mjs << 'EOF'
+export * from './dist/list-react-native.mjs';
+EOF
+
+cat > react-native.d.ts << 'EOF'
+export * from './dist/list-react-native';
+EOF
+
+cat > react.js << 'EOF'
+module.exports = require('./dist/list-react.js');
+EOF
+
+cat > react.mjs << 'EOF'
+export * from './dist/list-react.mjs';
+EOF
+
+cat > react.d.ts << 'EOF'
+export * from './dist/list-react';
+EOF
+
 echo "Build complete!"
