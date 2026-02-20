@@ -86,6 +86,7 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const state = ctx.state;
     const { idsInView, positions, props } = state;
     const {
+        alignItemsAtEnd,
         maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition },
     } = props;
     const isWeb = Platform.OS === "web";
@@ -122,17 +123,39 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             // If we're currently scrolling to a target index, do MVCP for its position
             targetId = getId(state, scrollTarget);
         } else if (idsInView.length > 0 && state.didContainersLayout && !dataChanged) {
-            // Do MVCP for the first item fully in view
-            targetId = idsInView.find((id) => indexByKey.get(id) !== undefined);
+            // Do MVCP for the first (or last if alignItemsAtEnd) item fully in view
+            if (alignItemsAtEnd) {
+                // For chat UIs with alignItemsAtEnd, anchor to the bottom-most visible item
+                for (let i = idsInView.length - 1; i >= 0; i--) {
+                    const id = idsInView[i];
+                    if (indexByKey.get(id) !== undefined) {
+                        targetId = id;
+                        break;
+                    }
+                }
+            } else {
+                targetId = idsInView.find((id) => indexByKey.get(id) !== undefined);
+            }
         }
 
         if (dataChanged && idsInView.length > 0 && state.didContainersLayout) {
             // Capture visible anchors for fallback in case the primary anchor disappears after data updates.
-            for (let i = 0; i < idsInView.length; i++) {
-                const id = idsInView[i];
-                const index = indexByKey.get(id);
-                if (index !== undefined) {
-                    idsInViewWithPositions.push({ id, position: positions.get(id)! });
+            // For alignItemsAtEnd, iterate backwards to prioritize bottom-most items
+            if (alignItemsAtEnd) {
+                for (let i = idsInView.length - 1; i >= 0; i--) {
+                    const id = idsInView[i];
+                    const index = indexByKey.get(id);
+                    if (index !== undefined) {
+                        idsInViewWithPositions.push({ id, position: positions.get(id)! });
+                    }
+                }
+            } else {
+                for (let i = 0; i < idsInView.length; i++) {
+                    const id = idsInView[i];
+                    const index = indexByKey.get(id);
+                    if (index !== undefined) {
+                        idsInViewWithPositions.push({ id, position: positions.get(id)! });
+                    }
                 }
             }
         }
