@@ -41,11 +41,11 @@ export function scrollToIndex(
     scrollTo(ctx, {
         animated,
         index,
+        isScrollToEnd,
         itemSize,
         offset: firstIndexOffset,
+        onSettled,
         viewOffset,
         viewPosition: viewPosition ?? 0,
-        isScrollToEnd,
-        onSettled,
     });
 }

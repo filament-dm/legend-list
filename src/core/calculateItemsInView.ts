@@ -136,11 +136,7 @@ function handleStickyRecycling(
 /**
  * Get the appropriate MVCP handler based on current mode
  */
-function getMvcpHandler(
-    ctx: StateContext,
-    mode: MvcpMode,
-    dataChanged?: boolean,
-): (() => void) | undefined {
+function getMvcpHandler(ctx: StateContext, mode: MvcpMode, dataChanged?: boolean): (() => void) | undefined {
     switch (mode) {
         case MvcpMode.NONE:
             return undefined; // MVCP disabled during SCROLLING phase

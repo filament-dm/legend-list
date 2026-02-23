@@ -1,14 +1,13 @@
 import { setSize } from "@/core/setSize";
 import type { StateContext } from "@/state/state";
-import { roundSize } from "@/utils/helpers";
 
 export function getItemSize(
     ctx: StateContext,
     key: string,
     index: number,
     data: any,
-    useAverageSize?: boolean,
-    preferCachedSize?: boolean,
+    _useAverageSize?: boolean,
+    _preferCachedSize?: boolean,
 ) {
     const state = ctx.state;
     const {

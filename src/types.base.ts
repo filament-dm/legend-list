@@ -9,9 +9,9 @@ import type { StylesAsSharedValue } from "@/typesInternal";
 export type {
     InitializationCompletionInfo,
     InitializationCompletionType,
+    InitializationConfig,
     InitializationMode,
     InitializationPhase,
-    InitializationConfig,
 } from "@/core/initialization/types";
 
 export interface Insets {

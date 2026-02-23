@@ -232,7 +232,12 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                     // pagination prepends estimated items), totalSize is unreliable and
                     // the guard would incorrectly zero legitimate diffs, causing drift.
                     const allMeasured = state.sizesKnown.size >= (state.props.data?.length ?? 0);
-                    if (allMeasured && diff !== 0 && isEndAnchoredScrollTarget && state.scroll + state.scrollLength > totalSize) {
+                    if (
+                        allMeasured &&
+                        diff !== 0 &&
+                        isEndAnchoredScrollTarget &&
+                        state.scroll + state.scrollLength > totalSize
+                    ) {
                         // If we're scrolling to the end of the list, then there's two potential issues we workaround:
                         // 1. List items above the scroll target may be in view so we don't want to take too much adjusting
                         // 2. Adjusting too much could cause the list to scroll back up

@@ -220,8 +220,7 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
     }, [onLayout]);
 
     // Hide scrollbars if either indicator prop is false (matches react-native-web behavior)
-    const hideScrollbar =
-        showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
+    const hideScrollbar = showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
 
     const scrollViewStyle: CSSProperties = {
         overflow: "auto",
@@ -232,8 +231,8 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         width: horizontal ? "100%" : undefined,
         // Add Firefox/IE scrollbar hiding (inline styles)
         ...(hideScrollbar && {
-            scrollbarWidth: "none",
             msOverflowStyle: "none",
+            scrollbarWidth: "none",
         }),
         ...StyleSheet.flatten(style),
     };
@@ -252,8 +251,8 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
 
     return (
         <div
-            ref={scrollRef}
             className={hideScrollbar ? "legendlist-hide-scrollbar" : undefined}
+            ref={scrollRef}
             {...(webProps as HTMLAttributes<HTMLDivElement>)}
             style={scrollViewStyle}
         >

@@ -1673,7 +1673,7 @@ function setSize(ctx, itemKey, size) {
 }
 
 // src/utils/getItemSize.ts
-function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
+function getItemSize(ctx, key, index, data, _useAverageSize, _preferCachedSize) {
   var _a3;
   const state = ctx.state;
   const {
@@ -1883,11 +1883,42 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b;
+  var _a3, _b, _c, _d;
   const state = ctx.state;
   if (state == null ? void 0 : state.scrollingTo) {
     const scrollingTo = state.scrollingTo;
     const callback = scrollingTo.onSettled;
+    if (scrollingTo.isScrollToEnd) {
+      const currentLastIndex = state.props.data.length - 1;
+      const isAtEnd = state.isAtEnd;
+      const retryCount = (_a3 = scrollingTo.retryCount) != null ? _a3 : 0;
+      const MAX_RETRIES = 3;
+      const dataChanged = scrollingTo.index !== currentLastIndex;
+      const notAtBottom = !isAtEnd;
+      const shouldRetry = (dataChanged || notAtBottom) && currentLastIndex >= 0 && retryCount < MAX_RETRIES;
+      if (shouldRetry) {
+        state.scrollHistory.length = 0;
+        state.scrollingTo = void 0;
+        const targetId = getId(state, currentLastIndex);
+        const itemSize = getItemSize(ctx, targetId, currentLastIndex, state.props.data[currentLastIndex]);
+        const currentOffset = calculateOffsetForIndex(ctx, currentLastIndex);
+        scrollTo(ctx, {
+          animated: false,
+          // Don't animate the correction
+          forceScroll: true,
+          index: currentLastIndex,
+          isScrollToEnd: true,
+          itemKey: targetId,
+          itemSize,
+          offset: currentOffset,
+          onSettled: callback,
+          retryCount: retryCount + 1,
+          viewOffset: scrollingTo.viewOffset,
+          viewPosition: (_b = scrollingTo.viewPosition) != null ? _b : 1
+        });
+        return;
+      }
+    }
     state.scrollHistory.length = 0;
     state.initialScroll = void 0;
     state.initialAnchor = void 0;
@@ -1895,8 +1926,8 @@ function finishScrollTo(ctx) {
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
-    if ((_a3 = state.props) == null ? void 0 : _a3.data) {
-      (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true });
+    if ((_c = state.props) == null ? void 0 : _c.data) {
+      (_d = state.triggerCalculateItemsInView) == null ? void 0 : _d.call(state, { forceFullItemPositions: true });
     }
     if (PlatformAdjustBreaksScroll) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
@@ -1998,6 +2029,13 @@ function scrollTo(ctx, params) {
   let offset = precomputedWithViewOffset ? scrollTargetOffset : calculateOffsetWithOffsetPosition(ctx, scrollTargetOffset, scrollTarget);
   offset = clampScrollOffset(ctx, offset, scrollTarget);
   state.scrollHistory.length = 0;
+  if (!forceScroll && Math.abs(offset - state.scroll) < 1) {
+    if (!noScrollingTo) {
+      state.scrollingTo = scrollTarget;
+    }
+    finishScrollTo(ctx);
+    return;
+  }
   if (!noScrollingTo) {
     state.scrollingTo = scrollTarget;
   }
@@ -2006,6 +2044,7 @@ function scrollTo(ctx, params) {
     doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
   } else {
     state.scroll = offset;
+    setTimeout(() => finishScrollTo(ctx), 100);
   }
 }
 
@@ -3040,12 +3079,12 @@ function scrollToIndex(ctx, {
   scrollTo(ctx, {
     animated,
     index,
+    isScrollToEnd,
     itemSize,
     offset: firstIndexOffset,
+    onSettled,
     viewOffset,
-    viewPosition: viewPosition != null ? viewPosition : 0,
-    isScrollToEnd,
-    onSettled
+    viewPosition: viewPosition != null ? viewPosition : 0
   });
 }
 
@@ -3877,7 +3916,19 @@ var ScrollAdjustHandler = class {
       if (pending !== 0) {
         let targetScroll;
         if ((scrollTarget == null ? void 0 : scrollTarget.index) !== void 0) {
-          const currentOffset = calculateOffsetForIndex(this.ctx, scrollTarget.index);
+          let targetIndex = scrollTarget.index;
+          if (scrollTarget.isScrollToEnd) {
+            const currentLastIndex = state.props.data.length - 1;
+            if (currentLastIndex >= 0 && currentLastIndex !== targetIndex) {
+              targetIndex = currentLastIndex;
+            }
+          } else if (scrollTarget.itemKey !== void 0) {
+            const currentIndex = state.indexByKey.get(scrollTarget.itemKey);
+            if (currentIndex !== void 0) {
+              targetIndex = currentIndex;
+            }
+          }
+          const currentOffset = calculateOffsetForIndex(this.ctx, targetIndex);
           targetScroll = calculateOffsetWithOffsetPosition(this.ctx, currentOffset, scrollTarget);
           targetScroll = clampScrollOffset(this.ctx, targetScroll, scrollTarget);
         } else {
@@ -4201,29 +4252,29 @@ function createImperativeHandle(ctx) {
       }
       if (ctx.initializationManager.isInitializing()) {
         ctx.initializationManager.exitInitialization({
-          type: "failed" /* FAILED */,
+          isImperative: ctx.initializationManager.isImperativeInit(),
           mode: ctx.initializationManager.getMode(),
           reason: "Interrupted by jumpToLatest call",
           timelineId: state.props.timelineId,
-          isImperative: ctx.initializationManager.isImperativeInit()
+          type: "failed" /* FAILED */
         });
       }
       ctx.initializationManager.enterInitialization({
-        timelineId: state.props.timelineId || "live-timeline",
         isImperative: true,
         // Mark as imperative to avoid timeline tracking update
         mode: "chat" /* CHAT */,
         // CHAT mode: anchors to bottom, viewPosition 1.0
-        targetViewPosition: 1
+        targetViewPosition: 1,
+        timelineId: state.props.timelineId || "live-timeline"
       });
       const scrollPrepared = ctx.initializationManager.prepareInitialScroll(data, keyExtractor);
       if (!scrollPrepared) {
         ctx.initializationManager.exitInitialization({
-          type: "failed" /* FAILED */,
+          isImperative: true,
           mode: ctx.initializationManager.getMode(),
           reason: "Failed to prepare scroll in jumpToLatest",
           timelineId: state.props.timelineId,
-          isImperative: true
+          type: "failed" /* FAILED */
         });
         return;
       }
@@ -4231,15 +4282,15 @@ function createImperativeHandle(ctx) {
       const stylePaddingBottom = state.props.stylePaddingBottom || 0;
       const footerSize = peek$(ctx, "footerSize") || 0;
       scrollToIndex(ctx, {
-        index: lastIndex,
-        viewPosition: 1,
-        viewOffset: -stylePaddingBottom - footerSize + ((options == null ? void 0 : options.viewOffset) || 0),
         animated: (_a3 = options == null ? void 0 : options.animated) != null ? _a3 : true,
+        index: lastIndex,
         isScrollToEnd: true,
         // Enable retry logic if data changes during scroll
         onSettled: () => {
           ctx.initializationManager.transitionToStabilizingPhase();
-        }
+        },
+        viewOffset: -stylePaddingBottom - footerSize + ((options == null ? void 0 : options.viewOffset) || 0),
+        viewPosition: 1
       });
     },
     reportContentInset: (inset) => {
@@ -4466,7 +4517,7 @@ var LegendList = typedMemo2(
   })
 );
 var LegendListInner = typedForwardRef(function LegendListInner2(props, forwardedRef) {
-  var _a3, _b, _c, _d, _e;
+  var _a3, _b, _c, _d, _e, _f, _g;
   const {
     alignItemsAtEnd = false,
     alwaysRender,
@@ -4604,6 +4655,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         containerItemTypes: /* @__PURE__ */ new Map(),
         contentInsetOverride: void 0,
         dataChangeNeedsScrollUpdate: false,
+        dataRefWhenMeasured: /* @__PURE__ */ new Map(),
         didColumnsChange: false,
         didDataChange: false,
         enableScrollForNextCalculateItemsInView: true,
@@ -4657,7 +4709,6 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         scrollTime: 0,
         sizes: /* @__PURE__ */ new Map(),
         sizesKnown: /* @__PURE__ */ new Map(),
-        dataRefWhenMeasured: /* @__PURE__ */ new Map(),
         stabilizationStableFrames: 0,
         startBuffered: -1,
         startNoBuffer: -1,
@@ -4763,52 +4814,84 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   }
   const timelineChanged = timelineId !== state.lastTimelineId;
   const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+  console.log("[TIMELINE DEBUG] LegendList render", {
+    timelineChanged,
+    anchorChanged,
+    timelineId,
+    lastTimelineId: state.lastTimelineId,
+    stabilizationAnchorId,
+    lastStabilizationAnchorId: state.lastStabilizationAnchorId,
+    dataLength: (_d = dataProp == null ? void 0 : dataProp.length) != null ? _d : 0,
+    hasInitialScrollProp: !!initialScrollProp,
+    isInitializing: ctx.initializationManager.isInitializing(),
+    initPhase: ctx.initializationManager.getCurrentPhase()
+  });
   if (timelineChanged) {
+    console.log("[TIMELINE DEBUG] Timeline changed detected!");
     if (ctx.initializationManager.isImperativeInit()) {
+      console.log("[TIMELINE DEBUG] Skipping - imperative init in progress");
       return;
     }
-    const isSwitchingFromFocused = (_d = state.lastTimelineId) == null ? void 0 : _d.includes("focused-timeline");
+    const isSwitchingFromFocused = (_e = state.lastTimelineId) == null ? void 0 : _e.includes("focused-timeline");
     const isSwitchingToLive = timelineId == null ? void 0 : timelineId.includes("live-timeline");
     const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+    console.log("[TIMELINE DEBUG] Switch analysis:", {
+      isSwitchingFromFocused,
+      isSwitchingToLive,
+      shouldExitEarly
+    });
     state.lastTimelineId = timelineId;
     state.lastStabilizationAnchorId = stabilizationAnchorId;
+    console.log("[TIMELINE DEBUG] Updated tracking, entering initialization");
     ctx.initializationManager.enterInitialization({
       anchorId: stabilizationAnchorId,
       timelineId: timelineId || ""
     });
     if (shouldExitEarly) {
+      console.log("[TIMELINE DEBUG] Early exit path - focused\u2192live without anchor");
       ctx.initializationManager.exitInitialization({
-        type: "early-exit" /* EARLY_EXIT */,
         mode: ctx.initializationManager.getMode(),
-        timelineId: timelineId || ""
+        timelineId: timelineId || "",
+        type: "early-exit" /* EARLY_EXIT */
       });
     } else {
+      console.log("[TIMELINE DEBUG] Normal init flow - checking data availability");
       if (!initialScrollProp && dataProp && dataProp.length > 0) {
+        console.log("[TIMELINE DEBUG] Data available, preparing scroll");
         const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
           dataProp,
           keyExtractor
         );
         if (scrollPrepared) {
+          console.log("[TIMELINE DEBUG] \u2705 Scroll prepared successfully, entering SCROLLING phase");
           ctx.initializationManager.enterScrollingPhase();
           setRenderNum((v) => v + 1);
         } else {
+          console.log("[TIMELINE DEBUG] \u274C Scroll prep failed - anchor not found in data");
           ctx.initializationManager.exitInitialization({
-            type: "failed" /* FAILED */,
             mode: ctx.initializationManager.getMode(),
             reason: "Scroll preparation failed - anchor not found in data",
-            timelineId: timelineId || ""
+            timelineId: timelineId || "",
+            type: "failed" /* FAILED */
           });
         }
       } else {
+        console.log("[TIMELINE DEBUG] \u274C NO DATA OR HAS INITIAL SCROLL PROP - exiting initialization", {
+          hasInitialScrollProp: !!initialScrollProp,
+          initialScrollPropValue: initialScrollProp,
+          hasDataProp: !!dataProp,
+          dataLength: (_f = dataProp == null ? void 0 : dataProp.length) != null ? _f : 0
+        });
         ctx.initializationManager.exitInitialization({
-          type: "failed" /* FAILED */,
           mode: ctx.initializationManager.getMode(),
           reason: "No data or has initialScroll prop",
-          timelineId: timelineId || ""
+          timelineId: timelineId || "",
+          type: "failed" /* FAILED */
         });
       }
     }
   } else if (anchorChanged) {
+    console.log("[TIMELINE DEBUG] Only anchor changed (no timeline change)");
     state.lastStabilizationAnchorId = stabilizationAnchorId;
   }
   const initialContentOffset = React2.useMemo(() => {
@@ -4873,8 +4956,15 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     }
   }, []);
   const doInitialScroll = React2.useCallback(() => {
-    const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
-    if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+    const {
+      initialScroll,
+      didFinishInitialScroll,
+      queuedInitialLayout,
+      scrollingTo,
+      didContainersLayout,
+      scrollLength
+    } = state;
+    if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo && didContainersLayout && scrollLength > 0) {
       scrollTo(ctx, {
         animated: false,
         index: initialScroll == null ? void 0 : initialScroll.index,
@@ -4900,6 +4990,16 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     }
   }, [snapToIndices]);
   React2.useLayoutEffect(() => {
+    var _a4;
+    console.log("[DATA DEBUG] useLayoutEffect fired - data changed", {
+      dataLength: (_a4 = dataProp == null ? void 0 : dataProp.length) != null ? _a4 : 0,
+      dataVersion,
+      numColumns: numColumnsProp,
+      isInitializing: ctx.initializationManager.isInitializing(),
+      initPhase: ctx.initializationManager.getCurrentPhase(),
+      timelineId,
+      lastTimelineId: state.lastTimelineId
+    });
     const {
       didColumnsChange,
       didDataChange,
@@ -5012,7 +5112,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         }
       ),
       refScrollView: combinedRef,
-      scrollAdjustHandler: (_e = refState.current) == null ? void 0 : _e.scrollAdjustHandler,
+      scrollAdjustHandler: (_g = refState.current) == null ? void 0 : _g.scrollAdjustHandler,
       scrollEventThrottle: 0,
       snapToIndices,
       stickyHeaderIndices,

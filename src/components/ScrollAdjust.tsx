@@ -24,10 +24,7 @@ export function ScrollAdjust() {
                 const prevScroll = el.scrollTop;
                 const nextScroll = prevScroll + scrollDelta;
                 const totalSize = el.scrollHeight;
-                if (
-                    scrollDelta > 0 &&
-                    totalSize < nextScroll + el.clientHeight
-                ) {
+                if (scrollDelta > 0 && totalSize < nextScroll + el.clientHeight) {
                     // If trying to scroll out of bounds of the scroll element's current size
                     // it would clamp the scroll and not do the full adjustment. So we need to
                     // add padding to the scroll element to allow the scroll to complete.
