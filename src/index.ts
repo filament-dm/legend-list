@@ -14,6 +14,12 @@ export {
     useViewability,
     useViewabilityAmount,
 } from "@/state/ContextContainer";
+export {
+    InitializationCompletionType,
+    InitializationMode,
+    InitializationPhase,
+} from "@/core/initialization/types";
+export type { InitializationCompletionInfo } from "@/core/initialization/types";
 export * from "./types.root";
 
 if (IS_DEV) {

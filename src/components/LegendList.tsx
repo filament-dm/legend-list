@@ -23,6 +23,7 @@ import { checkResetContainers } from "@/core/checkResetContainers";
 import { clampScrollOffset } from "@/core/clampScrollOffset";
 import { doInitialAllocateContainers } from "@/core/doInitialAllocateContainers";
 import { handleLayout } from "@/core/handleLayout";
+import { InitializationCompletionType } from "@/core/initialization/types";
 import { onScroll } from "@/core/onScroll";
 import { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
 import { scrollTo } from "@/core/scrollTo";
@@ -116,6 +117,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         contentInset,
         data: dataProp = [],
         dataVersion,
+        debugInitialization,
         drawDistance = 250,
         estimatedItemSize = 100,
         estimatedListSize,
@@ -139,6 +141,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         overrideItemLayout,
         onEndReached,
         onEndReachedThreshold = 0.5,
+        onInitializationComplete,
         onItemSizeChanged,
         onMetricsChange,
         onLayout: onLayoutProp,
@@ -158,10 +161,12 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         renderItem,
         scrollEventThrottle,
         snapToIndices,
+        stabilizationAnchorId,
         stickyHeaderIndices: stickyHeaderIndicesProp,
         stickyIndices: stickyIndicesDeprecated, // TODOV3: Remove from v3 release
         style: styleProp,
         suggestEstimatedItemSize,
+        timelineId,
         viewabilityConfig,
         viewabilityConfigCallbackPairs,
         waitForInitialLayout = true,
@@ -291,16 +296,23 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 initialScroll: initialScrollProp,
                 isAtEnd: false,
                 isAtStart: false,
+                isEndBufferSufficient: false,
                 isEndReached: null,
                 isFirst: true,
+                isInitializing: false,
+                isStartBufferSufficient: false,
                 isStartReached: null,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
                 lastScrollDelta: 0,
+                lastStabilizationAnchorId: undefined,
+                lastTimelineId: undefined,
                 loadStartTime: Date.now(),
                 minIndexSizeChanged: 0,
                 nativeContentInset: undefined,
                 nativeMarginTop: 0,
+                pendingEndRequest: false,
+                pendingStartRequest: false,
                 positions: new Map(),
                 props: {} as any,
                 queuedCalculateItemsInView: 0,
@@ -364,6 +376,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         contentInset,
         data: dataProp,
         dataVersion,
+        debugInitialization: !!debugInitialization,
         drawDistance,
         estimatedItemSize,
         getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),
@@ -379,6 +392,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         numColumns: numColumnsProp,
         onEndReached,
         onEndReachedThreshold,
+        onInitializationComplete,
         onItemSizeChanged,
         onLoad,
         onScroll: throttleScrollFn,
@@ -389,12 +403,14 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         recycleItems: !!recycleItems,
         renderItem: renderItem!,
         snapToIndices,
+        stabilizationAnchorId,
         stickyIndicesArr: stickyHeaderIndices ?? [],
         stickyIndicesSet: useMemo(() => new Set(stickyHeaderIndices ?? []), [stickyHeaderIndices?.join(",")]),
         stickyPositionComponentInternal,
         stylePaddingBottom: stylePaddingBottomState,
         stylePaddingTop: stylePaddingTopState,
         suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+        timelineId,
     };
 
     state.refScroller = refScroller;
@@ -440,6 +456,75 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         initializeStateVars(false);
         updateItemPositions(ctx, /*dataChanged*/ true);
     }
+
+    // Timeline change detection for initialization system
+    const timelineChanged = timelineId !== state.lastTimelineId;
+    const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+
+    if (timelineChanged) {
+        // Skip timeline detection if imperative initialization is running (e.g., jumpToLatest)
+        if (ctx.initializationManager.isImperativeInit()) {
+            return;
+        }
+
+        // Detect early exit case: focused → live timeline without anchor
+        const isSwitchingFromFocused = state.lastTimelineId?.includes("focused-timeline");
+        const isSwitchingToLive = timelineId?.includes("live-timeline");
+        const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+
+        // Update tracking before entering initialization
+        state.lastTimelineId = timelineId;
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
+
+        // Enter initialization via the InitializationManager
+        ctx.initializationManager.enterInitialization({
+            anchorId: stabilizationAnchorId,
+            timelineId: timelineId || "",
+        });
+
+        if (shouldExitEarly) {
+            // Exit early for natural timeline switches
+            ctx.initializationManager.exitInitialization({
+                type: InitializationCompletionType.EARLY_EXIT,
+                mode: ctx.initializationManager.getMode(),
+                timelineId: timelineId || "",
+            });
+        } else {
+            // Normal initialization flow: prepare scroll if we have data
+            if (!initialScrollProp && dataProp && dataProp.length > 0) {
+                const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+                    dataProp as readonly unknown[],
+                    keyExtractor as (item: unknown, index: number) => string,
+                );
+
+                if (scrollPrepared) {
+                    ctx.initializationManager.enterScrollingPhase();
+                    // Force re-render to trigger initialContentOffset memo recalculation
+                    setRenderNum((v) => v + 1);
+                } else {
+                    // Scroll preparation failed
+                    ctx.initializationManager.exitInitialization({
+                        type: InitializationCompletionType.FAILED,
+                        mode: ctx.initializationManager.getMode(),
+                        reason: "Scroll preparation failed - anchor not found in data",
+                        timelineId: timelineId || "",
+                    });
+                }
+            } else {
+                // No data yet or has explicit initialScroll prop
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "No data or has initialScroll prop",
+                    timelineId: timelineId || "",
+                });
+            }
+        }
+    } else if (anchorChanged) {
+        // Just anchor changed, update tracking without triggering initialization
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
+    }
+
     const initialContentOffset = useMemo(() => {
         let value: number;
         const { initialScroll, initialAnchor } = refState.current!;

@@ -64,6 +64,29 @@ function getContentSize(ctx) {
   return headerSize + footerSize + totalSize + stylePaddingTop + stylePaddingBottom + (contentInsetBottom || 0);
 }
 
+// src/core/initialization/types.ts
+var InitializationPhase = /* @__PURE__ */ ((InitializationPhase2) => {
+  InitializationPhase2["IDLE"] = "IDLE";
+  InitializationPhase2["SCROLLING"] = "SCROLLING";
+  InitializationPhase2["STABILIZING"] = "STABILIZING";
+  return InitializationPhase2;
+})(InitializationPhase || {});
+var InitializationMode = /* @__PURE__ */ ((InitializationMode2) => {
+  InitializationMode2["CHAT"] = "chat";
+  InitializationMode2["MID_TIMELINE"] = "mid-timeline";
+  InitializationMode2["CHAT_WITH_TARGET"] = "chat-with-target";
+  InitializationMode2["IDLE"] = "idle";
+  return InitializationMode2;
+})(InitializationMode || {});
+var InitializationCompletionType = /* @__PURE__ */ ((InitializationCompletionType2) => {
+  InitializationCompletionType2["EARLY_EXIT"] = "early-exit";
+  InitializationCompletionType2["STABILIZED_MID_TIMELINE"] = "stabilized-mid-timeline";
+  InitializationCompletionType2["STABILIZED_CHAT"] = "stabilized-chat";
+  InitializationCompletionType2["STABILIZED_CHAT_WITH_TARGET"] = "stabilized-chat-with-target";
+  InitializationCompletionType2["FAILED"] = "failed";
+  return InitializationCompletionType2;
+})(InitializationCompletionType || {});
+
 // src/core/initialization/InitializationManager.ts
 var InitializationManager = class {
   constructor(ctx) {
@@ -2379,6 +2402,9 @@ function requestAdjust(ctx, positionDiff, dataChanged) {
     };
     state.scroll += positionDiff;
     state.scrollForNextCalculateItemsInView = void 0;
+    if (state.isInitializing && Math.abs(positionDiff) > 1) {
+      ctx.initializationManager.onMVCPAdjusted();
+    }
     const readyToRender = peek$(ctx, "readyToRender");
     if (readyToRender) {
       doit();
@@ -2387,6 +2413,38 @@ function requestAdjust(ctx, positionDiff, dataChanged) {
       requestAnimationFrame(doit);
     }
   }
+}
+
+// src/core/initialization/mvcpInitialization.ts
+function prepareInitializationMVCP(ctx) {
+  var _a3;
+  const state = ctx.state;
+  const manager = ctx.initializationManager;
+  const anchorId = manager.getMVCPAnchorOverride();
+  if (!anchorId) return void 0;
+  const anchorIndex = state.indexByKey.get(anchorId);
+  if (anchorIndex === void 0) {
+    return void 0;
+  }
+  const prevPosition = state.positions.get(anchorId);
+  if (prevPosition === void 0) {
+    return void 0;
+  }
+  const targetViewPosition = (_a3 = manager.getTargetViewPosition()) != null ? _a3 : 0.5;
+  return () => {
+    const newPosition = state.positions.get(anchorId);
+    if (newPosition === void 0) {
+      return;
+    }
+    const targetScroll = newPosition - targetViewPosition * state.scrollLength;
+    const contentSize = getContentSize(ctx);
+    const maxScroll = Math.max(0, contentSize - state.scrollLength);
+    const clampedTargetScroll = Math.max(0, Math.min(targetScroll, maxScroll));
+    const scrollAdjustment = clampedTargetScroll - state.scroll;
+    if (Math.abs(scrollAdjustment) > 0.1) {
+      requestAdjust(ctx, scrollAdjustment);
+    }
+  };
 }
 
 // src/core/mvcp.ts
@@ -3187,7 +3245,14 @@ function comparatorByDistance(a, b) {
 }
 
 // src/core/scrollToIndex.ts
-function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPosition }) {
+function scrollToIndex(ctx, {
+  index,
+  viewOffset = 0,
+  animated = true,
+  viewPosition,
+  isScrollToEnd,
+  onSettled
+}) {
   const state = ctx.state;
   const { data } = state.props;
   if (index >= data.length) {
@@ -3209,7 +3274,9 @@ function scrollToIndex(ctx, { index, viewOffset = 0, animated = true, viewPositi
     itemSize,
     offset: firstIndexOffset,
     viewOffset,
-    viewPosition: viewPosition != null ? viewPosition : 0
+    viewPosition: viewPosition != null ? viewPosition : 0,
+    isScrollToEnd,
+    onSettled
   });
 }
 
@@ -3300,6 +3367,21 @@ function handleStickyRecycling(ctx, stickyArray, scroll, drawDistance, currentSt
     }
   }
 }
+function getMvcpHandler(ctx, mode, dataChanged) {
+  switch (mode) {
+    case "none" /* NONE */:
+      return void 0;
+    // MVCP disabled during SCROLLING phase
+    case "regular" /* REGULAR */:
+      return prepareMVCP(ctx, dataChanged);
+    // Normal MVCP
+    case "initialization" /* INITIALIZATION */:
+      return prepareInitializationMVCP(ctx);
+    // Initialization MVCP with absolute anchor lock
+    default:
+      return void 0;
+  }
+}
 function calculateItemsInView(ctx, params = {}) {
   const state = ctx.state;
   reactDom.unstable_batchedUpdates(() => {
@@ -3379,6 +3461,10 @@ function calculateItemsInView(ctx, params = {}) {
       scrollBufferTop = drawDistance * 1.5;
       scrollBufferBottom = drawDistance * 0.5;
     }
+    if (state.isInitializing) {
+      scrollBufferTop *= 4;
+      scrollBufferBottom *= 4;
+    }
     const scrollTopBuffered = scroll - scrollBufferTop;
     const scrollBottom = scroll + scrollLength + (scroll < 0 ? -scroll : 0);
     const scrollBottomBuffered = scrollBottom + scrollBufferBottom;
@@ -3392,7 +3478,8 @@ function calculateItemsInView(ctx, params = {}) {
         }
       }
     }
-    const checkMVCP = doMVCP ? prepareMVCP(ctx, dataChanged) : void 0;
+    const mvcpMode = peek$(ctx, "mvcpMode");
+    const checkMVCP = doMVCP ? getMvcpHandler(ctx, mvcpMode, dataChanged) : void 0;
     if (dataChanged) {
       indexByKey.clear();
       idCache.length = 0;
@@ -3702,6 +3789,9 @@ function calculateItemsInView(ctx, params = {}) {
       if (item !== void 0) {
         onStickyHeaderChange({ index: nextActiveStickyIndex, item });
       }
+    }
+    if (state.isInitializing && ctx.initializationManager.getCurrentPhase() === "STABILIZING" /* STABILIZING */) {
+      ctx.initializationManager.checkStabilization();
     }
   });
 }
@@ -4352,6 +4442,57 @@ function createImperativeHandle(ctx) {
       start: state.startNoBuffer,
       startBuffered: state.startBuffered
     }),
+    jumpToLatest: (options) => {
+      var _a3;
+      const data = state.props.data;
+      const keyExtractor = state.props.keyExtractor;
+      if (!data || data.length === 0) {
+        console.warn("[jumpToLatest] No data available, cannot jump to latest");
+        return;
+      }
+      if (ctx.initializationManager.isInitializing()) {
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "Interrupted by jumpToLatest call",
+          timelineId: state.props.timelineId,
+          isImperative: ctx.initializationManager.isImperativeInit()
+        });
+      }
+      ctx.initializationManager.enterInitialization({
+        timelineId: state.props.timelineId || "live-timeline",
+        isImperative: true,
+        // Mark as imperative to avoid timeline tracking update
+        mode: "chat" /* CHAT */,
+        // CHAT mode: anchors to bottom, viewPosition 1.0
+        targetViewPosition: 1
+      });
+      const scrollPrepared = ctx.initializationManager.prepareInitialScroll(data, keyExtractor);
+      if (!scrollPrepared) {
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "Failed to prepare scroll in jumpToLatest",
+          timelineId: state.props.timelineId,
+          isImperative: true
+        });
+        return;
+      }
+      const lastIndex = data.length - 1;
+      const stylePaddingBottom = state.props.stylePaddingBottom || 0;
+      const footerSize = peek$(ctx, "footerSize") || 0;
+      scrollToIndex(ctx, {
+        index: lastIndex,
+        viewPosition: 1,
+        viewOffset: -stylePaddingBottom - footerSize + ((options == null ? void 0 : options.viewOffset) || 0),
+        animated: (_a3 = options == null ? void 0 : options.animated) != null ? _a3 : true,
+        isScrollToEnd: true,
+        // Enable retry logic if data changes during scroll
+        onSettled: () => {
+          ctx.initializationManager.transitionToStabilizingPhase();
+        }
+      });
+    },
     reportContentInset: (inset) => {
       state.contentInsetOverride = inset != null ? inset : void 0;
       updateScroll(ctx, state.scroll, true);
@@ -4576,7 +4717,7 @@ var LegendList = typedMemo(
   })
 );
 var LegendListInner = typedForwardRef(function LegendListInner2(props, forwardedRef) {
-  var _a3, _b, _c, _d;
+  var _a3, _b, _c, _d, _e;
   const {
     alignItemsAtEnd = false,
     alwaysRender,
@@ -4585,6 +4726,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     contentInset,
     data: dataProp = [],
     dataVersion,
+    debugInitialization,
     drawDistance = 250,
     estimatedItemSize = 100,
     estimatedListSize,
@@ -4608,6 +4750,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     overrideItemLayout,
     onEndReached,
     onEndReachedThreshold = 0.5,
+    onInitializationComplete,
     onItemSizeChanged,
     onMetricsChange,
     onLayout: onLayoutProp,
@@ -4627,11 +4770,13 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     renderItem,
     scrollEventThrottle,
     snapToIndices,
+    stabilizationAnchorId,
     stickyHeaderIndices: stickyHeaderIndicesProp,
     stickyIndices: stickyIndicesDeprecated,
     // TODOV3: Remove from v3 release
     style: styleProp,
     suggestEstimatedItemSize,
+    timelineId,
     viewabilityConfig,
     viewabilityConfigCallbackPairs,
     waitForInitialLayout = true,
@@ -4730,16 +4875,23 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         initialScroll: initialScrollProp,
         isAtEnd: false,
         isAtStart: false,
+        isEndBufferSufficient: false,
         isEndReached: null,
         isFirst: true,
+        isInitializing: false,
+        isStartBufferSufficient: false,
         isStartReached: null,
         lastBatchingAction: Date.now(),
         lastLayout: void 0,
         lastScrollDelta: 0,
+        lastStabilizationAnchorId: void 0,
+        lastTimelineId: void 0,
         loadStartTime: Date.now(),
         minIndexSizeChanged: 0,
         nativeContentInset: void 0,
         nativeMarginTop: 0,
+        pendingEndRequest: false,
+        pendingStartRequest: false,
         positions: /* @__PURE__ */ new Map(),
         props: {},
         queuedCalculateItemsInView: 0,
@@ -4794,6 +4946,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     contentInset,
     data: dataProp,
     dataVersion,
+    debugInitialization: !!debugInitialization,
     drawDistance,
     estimatedItemSize,
     getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),
@@ -4809,6 +4962,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     numColumns: numColumnsProp,
     onEndReached,
     onEndReachedThreshold,
+    onInitializationComplete,
     onItemSizeChanged,
     onLoad,
     onScroll: throttleScrollFn,
@@ -4819,12 +4973,14 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     recycleItems: !!recycleItems,
     renderItem,
     snapToIndices,
+    stabilizationAnchorId,
     stickyIndicesArr: stickyHeaderIndices != null ? stickyHeaderIndices : [],
     stickyIndicesSet: React3.useMemo(() => new Set(stickyHeaderIndices != null ? stickyHeaderIndices : []), [stickyHeaderIndices == null ? void 0 : stickyHeaderIndices.join(",")]),
     stickyPositionComponentInternal,
     stylePaddingBottom: stylePaddingBottomState,
     stylePaddingTop: stylePaddingTopState,
-    suggestEstimatedItemSize: !!suggestEstimatedItemSize
+    suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+    timelineId
   };
   state.refScroller = refScroller;
   const memoizedLastItemKeys = React3.useMemo(() => {
@@ -4855,6 +5011,56 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       /*dataChanged*/
       true
     );
+  }
+  const timelineChanged = timelineId !== state.lastTimelineId;
+  const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+  if (timelineChanged) {
+    if (ctx.initializationManager.isImperativeInit()) {
+      return;
+    }
+    const isSwitchingFromFocused = (_d = state.lastTimelineId) == null ? void 0 : _d.includes("focused-timeline");
+    const isSwitchingToLive = timelineId == null ? void 0 : timelineId.includes("live-timeline");
+    const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+    state.lastTimelineId = timelineId;
+    state.lastStabilizationAnchorId = stabilizationAnchorId;
+    ctx.initializationManager.enterInitialization({
+      anchorId: stabilizationAnchorId,
+      timelineId: timelineId || ""
+    });
+    if (shouldExitEarly) {
+      ctx.initializationManager.exitInitialization({
+        type: "early-exit" /* EARLY_EXIT */,
+        mode: ctx.initializationManager.getMode(),
+        timelineId: timelineId || ""
+      });
+    } else {
+      if (!initialScrollProp && dataProp && dataProp.length > 0) {
+        const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+          dataProp,
+          keyExtractor
+        );
+        if (scrollPrepared) {
+          ctx.initializationManager.enterScrollingPhase();
+          setRenderNum((v) => v + 1);
+        } else {
+          ctx.initializationManager.exitInitialization({
+            type: "failed" /* FAILED */,
+            mode: ctx.initializationManager.getMode(),
+            reason: "Scroll preparation failed - anchor not found in data",
+            timelineId: timelineId || ""
+          });
+        }
+      } else {
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "No data or has initialScroll prop",
+          timelineId: timelineId || ""
+        });
+      }
+    }
+  } else if (anchorChanged) {
+    state.lastStabilizationAnchorId = stabilizationAnchorId;
   }
   const initialContentOffset = React3.useMemo(() => {
     let value;
@@ -5040,7 +5246,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         }
       ),
       refScrollView: combinedRef,
-      scrollAdjustHandler: (_d = refState.current) == null ? void 0 : _d.scrollAdjustHandler,
+      scrollAdjustHandler: (_e = refState.current) == null ? void 0 : _e.scrollAdjustHandler,
       scrollEventThrottle: 0,
       snapToIndices,
       stickyHeaderIndices,
@@ -5059,6 +5265,9 @@ if (IS_DEV) {
   );
 }
 
+exports.InitializationCompletionType = InitializationCompletionType;
+exports.InitializationMode = InitializationMode;
+exports.InitializationPhase = InitializationPhase;
 exports.LegendList = LegendList3;
 exports.typedForwardRef = typedForwardRef;
 exports.typedMemo = typedMemo;

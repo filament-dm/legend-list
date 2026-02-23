@@ -1068,6 +1068,7 @@ type LegendListRef$1 = {
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
         onSettled?: () => void;
+        isScrollToEnd?: boolean;
     }): void;
     /**
      * Scrolls to a specific item in the list.

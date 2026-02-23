@@ -1,3 +1,4 @@
+import { InitializationCompletionType, InitializationMode } from "@/core/initialization/types";
 import { scrollTo } from "@/core/scrollTo";
 import { scrollToIndex } from "@/core/scrollToIndex";
 import { updateScroll } from "@/core/updateScroll";
@@ -89,6 +90,68 @@ export function createImperativeHandle(ctx: StateContext): LegendListRef {
             start: state.startNoBuffer,
             startBuffered: state.startBuffered,
         }),
+        jumpToLatest: (options) => {
+            const data = state.props.data;
+            const keyExtractor = state.props.keyExtractor;
+
+            // Guard: Check that data exists and has items
+            if (!data || data.length === 0) {
+                console.warn("[jumpToLatest] No data available, cannot jump to latest");
+                return;
+            }
+
+            // Exit any current initialization before starting new one
+            if (ctx.initializationManager.isInitializing()) {
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "Interrupted by jumpToLatest call",
+                    timelineId: state.props.timelineId,
+                    isImperative: ctx.initializationManager.isImperativeInit(),
+                });
+            }
+
+            // Step 1: Enter initialization in CHAT mode
+            ctx.initializationManager.enterInitialization({
+                timelineId: state.props.timelineId || "live-timeline",
+                isImperative: true, // Mark as imperative to avoid timeline tracking update
+                mode: InitializationMode.CHAT, // CHAT mode: anchors to bottom, viewPosition 1.0
+                targetViewPosition: 1.0,
+            });
+
+            // Step 2 & 3: Identify most recent message and prepare scroll
+            const scrollPrepared = ctx.initializationManager.prepareInitialScroll(data, keyExtractor!);
+
+            if (!scrollPrepared) {
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "Failed to prepare scroll in jumpToLatest",
+                    timelineId: state.props.timelineId,
+                    isImperative: true,
+                });
+                return;
+            }
+
+            // Step 4: Perform scroll to last item
+            const lastIndex = data.length - 1;
+            const stylePaddingBottom = state.props.stylePaddingBottom || 0;
+            const footerSize = peek$(ctx, "footerSize") || 0;
+
+            scrollToIndex(ctx, {
+                index: lastIndex,
+                viewPosition: 1.0,
+                viewOffset: -stylePaddingBottom - footerSize + (options?.viewOffset || 0),
+                animated: options?.animated ?? true,
+                isScrollToEnd: true, // Enable retry logic if data changes during scroll
+                onSettled: () => {
+                    // Step 5: Transition to STABILIZING phase after scroll completes
+                    ctx.initializationManager.transitionToStabilizingPhase();
+                },
+            });
+
+            // Step 6: Exit happens automatically via checkStabilization after 3 stable frames
+        },
         reportContentInset: (inset) => {
             state.contentInsetOverride = inset ?? undefined;
             updateScroll(ctx, state.scroll, true);

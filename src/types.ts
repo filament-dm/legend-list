@@ -221,6 +221,54 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
     maintainVisibleContentPosition?: boolean | MaintainVisibleContentPositionConfig<ItemT>;
 
     /**
+     * Timeline identifier that signals when the list is in initialization mode.
+     * When this value changes, the list enters initialization mode and will
+     * absolutely lock MVCP to the stabilizationAnchorId (if provided) until
+     * stabilization completes.
+     *
+     * Use case: Set to a unique identifier when navigating to a new timeline
+     * or jumping to a specific message. The changing value triggers initialization
+     * mode, preventing scroll jumps during pagination.
+     *
+     * Example: "conversation-123:message-456"
+     */
+    timelineId?: string;
+
+    /**
+     * Optional anchor ID to maintain on screen during initialization.
+     * When timelineId changes (entering initialization mode), MVCP will
+     * absolutely prioritize keeping this item stable while items load around it.
+     *
+     * Use case: When loading a focused timeline or navigating to a specific message,
+     * set this to the target message ID along with a new timelineId.
+     */
+    stabilizationAnchorId?: string;
+
+    /**
+     * Callback fired when initialization completes.
+     *
+     * @param info - Information about how/why initialization completed, including:
+     *   - type: The type of completion (stabilized, early exit, failed)
+     *   - mode: The initialization mode that was active
+     *   - reason: Optional failure reason (only for failed completions)
+     *   - timelineId: The timeline that was being initialized
+     *   - isImperative: Whether this was an imperative initialization (jumpToLatest, etc.)
+     *
+     * You can use the completion info to distinguish between different types of completions:
+     * - timeline-switch-early-exit: Timeline switch without anchor (no action needed)
+     * - stabilized-chat: jumpToLatest completed (run pendingScrollAction)
+     * - stabilized-mid-timeline: Focused timeline completed (run pendingScrollAction)
+     * - failed: Initialization failed (handle error)
+     */
+    onInitializationComplete?: (info: import("@/core/initialization/types").InitializationCompletionInfo) => void;
+
+    /**
+     * Enable debug console logging for initialization manager.
+     * @default false
+     */
+    debugInitialization?: boolean;
+
+    /**
      * Number of columns to render items in.
      * @default 1
      */
@@ -480,6 +528,14 @@ export interface InternalState {
     isEndReached: boolean | null;
     isFirst?: boolean;
     isStartReached: boolean | null;
+    isInitializing: boolean;
+    isEndBufferSufficient: boolean;
+    isStartBufferSufficient: boolean;
+    lastTimelineId: string | undefined;
+    lastStabilizationAnchorId: string | undefined;
+    pendingEndRequest: boolean;
+    pendingStartRequest: boolean;
+    stabilizationStableFrames: number;
     lastBatchingAction: number;
     lastLayout: LayoutRectangle | undefined;
     lastScrollAdjustForHistory?: number;
@@ -487,6 +543,12 @@ export interface InternalState {
     loadStartTime: number;
     maintainingScrollAtEnd?: boolean;
     minIndexSizeChanged: number | undefined;
+    mvcpAnchorLock?: {
+        id: string;
+        position: number;
+        quietPasses: number;
+        expiresAt: number;
+    };
     contentInsetOverride?: Partial<Insets> | null;
     nativeContentInset?: Insets;
     nativeMarginTop: number;
@@ -496,6 +558,7 @@ export interface InternalState {
     positions: Map<string, number>;
     previousData?: readonly unknown[];
     queuedCalculateItemsInView: number | undefined;
+    queuedMVCPRecalculate?: number;
     queuedInitialLayout?: boolean | undefined;
     refScroller: React.RefObject<ScrollView>;
     scroll: number;
@@ -539,6 +602,8 @@ export interface InternalState {
         contentInset: Insets | undefined;
         data: readonly any[];
         dataVersion: Key | undefined;
+        debugInitialization: boolean;
+        drawDistance: number;
         estimatedItemSize: number | undefined;
         getEstimatedItemSize: LegendListProps["getEstimatedItemSize"];
         getFixedItemSize: LegendListProps["getFixedItemSize"];
@@ -553,16 +618,19 @@ export interface InternalState {
         numColumns: number;
         onEndReached: LegendListProps["onEndReached"];
         onEndReachedThreshold: number | null | undefined;
+        onInitializationComplete: LegendListProps["onInitializationComplete"];
         onItemSizeChanged: LegendListProps["onItemSizeChanged"];
         onLoad: LegendListProps["onLoad"];
         onScroll: LegendListProps["onScroll"];
         onStartReached: LegendListProps["onStartReached"];
+        stabilizationAnchorId: LegendListProps["stabilizationAnchorId"];
+        timelineId: LegendListProps["timelineId"];
         onStartReachedThreshold: number | null | undefined;
         onStickyHeaderChange: LegendListProps["onStickyHeaderChange"];
         overrideItemLayout: LegendListProps["overrideItemLayout"];
         recycleItems: boolean;
         renderItem: LegendListProps["renderItem"];
-        scrollBuffer: number;
+        scrollBuffer?: number;
         snapToIndices: number[] | undefined;
         stickyPositionComponentInternal: React.ComponentType<any> | undefined;
         stickyIndicesArr: number[];

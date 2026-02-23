@@ -824,6 +824,7 @@ export type LegendListRef = {
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
         onSettled?: () => void;
+        isScrollToEnd?: boolean;
     }): void;
 
     /**
