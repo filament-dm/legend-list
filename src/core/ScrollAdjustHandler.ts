@@ -50,8 +50,26 @@ export class ScrollAdjustHandler {
                 // If we have a scroll target with an index, recalculate the correct
                 // position based on where the target item is NOW, not just add pendingAdjust
                 if (scrollTarget?.index !== undefined) {
+                    let targetIndex = scrollTarget.index;
+
+                    // Special handling for scrollToEnd: always resolve to current last index
+                    if (scrollTarget.isScrollToEnd) {
+                        const currentLastIndex = state.props.data.length - 1;
+                        if (currentLastIndex >= 0 && currentLastIndex !== targetIndex) {
+                            targetIndex = currentLastIndex;
+                        }
+                    }
+                    // If we have itemKey, look up the current index (handles data changes like prepending)
+                    // This prevents the stale index bug where the index points to a different item after data changes
+                    else if (scrollTarget.itemKey !== undefined) {
+                        const currentIndex = state.indexByKey.get(scrollTarget.itemKey);
+                        if (currentIndex !== undefined) {
+                            targetIndex = currentIndex;
+                        }
+                    }
+
                     // Get the target item's current position
-                    const currentOffset = calculateOffsetForIndex(this.ctx, scrollTarget.index);
+                    const currentOffset = calculateOffsetForIndex(this.ctx, targetIndex);
                     // Apply viewOffset and viewPosition to get the final scroll position
                     targetScroll = calculateOffsetWithOffsetPosition(this.ctx, currentOffset, scrollTarget);
                     targetScroll = clampScrollOffset(this.ctx, targetScroll, scrollTarget);
