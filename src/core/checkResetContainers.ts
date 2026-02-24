@@ -31,5 +31,5 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
         checkThresholds(ctx);
     }
 
-    delete state.previousData;
+    state.previousData = dataProp;
 }

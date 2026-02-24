@@ -27,6 +27,11 @@ export function requestAdjust(ctx: StateContext, positionDiff: number, dataChang
         state.scroll += positionDiff;
         state.scrollForNextCalculateItemsInView = undefined;
 
+        // Track MVCP adjustments during initialization to reset stabilization counter
+        if (state.isInitializing && Math.abs(positionDiff) > 1.0) {
+            ctx.initializationManager.onMVCPAdjusted();
+        }
+
         const readyToRender = peek$(ctx, "readyToRender");
 
         if (readyToRender) {
