@@ -169,6 +169,10 @@ export function updateOneItemSize(ctx: StateContext, itemKey: string, sizeObj: {
     const size = Platform.OS === "web" ? Math.round(rawSize) : roundSize(rawSize);
     const prevSizeKnown = sizesKnown.get(itemKey);
     sizesKnown.set(itemKey, size);
+    // Store the data reference at measurement time so getItemSize can detect content changes
+    if (data[index] !== undefined) {
+        state.dataRefWhenMeasured.set(itemKey, data[index]);
+    }
 
     // Update averages per item type
     // If user has provided getEstimatedItemSize that has precedence over averages
