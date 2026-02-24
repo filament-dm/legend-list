@@ -287,6 +287,11 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      */
     maintainVisibleContentPosition?: boolean | MaintainVisibleContentPositionConfig<ItemT>;
     /**
+     * Web only: when true, listens to window/body scrolling instead of rendering a scrollable list container.
+     * @default false
+     */
+    useWindowScroll?: boolean;
+    /**
      * Timeline identifier that signals when the list is in initialization mode.
      * When this value changes, the list enters initialization mode and will
      * absolutely lock MVCP to the stabilizationAnchorId (if provided) until
@@ -519,7 +524,7 @@ type LegendListState = {
     listen: <T extends LegendListListenerType>(listenerType: T, callback: (value: ListenerTypeValueMap[T]) => void) => () => void;
     listenToPosition: (key: string, callback: (value: number) => void) => () => void;
     positionAtIndex: (index: number) => number;
-    positions: Map<string, number>;
+    positionByKey: (key: string) => number | undefined;
     scroll: number;
     scrollLength: number;
     scrollVelocity: number;
@@ -736,6 +741,11 @@ type KeysToOmit = "animatedProps" | "getEstimatedItemSize" | "getFixedItemSize" 
 type PropsBase<ItemT> = LegendListPropsBase<ItemT, ComponentProps<typeof Reanimated.ScrollView>>;
 interface AnimatedLegendListPropsBase<ItemT> extends Omit<PropsBase<ItemT>, KeysToOmit> {
     refScrollView?: React$1.Ref<Reanimated.ScrollView>;
+    /**
+     * Reanimated layout transition applied to each item container position view.
+     * Example: `LinearTransition.duration(280)`.
+     */
+    itemLayoutAnimation?: ComponentProps<typeof Reanimated.View>["layout"];
 }
 type OtherAnimatedLegendListProps<ItemT> = Pick<PropsBase<ItemT>, KeysToOmit>;
 type AnimatedLegendListProps<ItemT> = Omit<AnimatedLegendListPropsBase<ItemT>, "refLegendList" | "ref"> & OtherAnimatedLegendListProps<ItemT>;

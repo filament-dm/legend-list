@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { forwardRef, useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect, forwardRef } from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
 import { useAnimatedRef, useSharedValue, isWorkletFunction, useAnimatedScrollHandler, runOnJS, useComposedEventHandler, useAnimatedProps, useAnimatedStyle } from 'react-native-reanimated';
@@ -28,6 +28,7 @@ var useCombinedRef = (...refs) => {
   }, refs);
   return callback;
 };
+var typedForwardRef = forwardRef;
 
 // src/integrations/keyboard.tsx
 var clampProgress = (progress) => {
@@ -53,7 +54,7 @@ var calculateKeyboardTargetOffset = (startOffset, keyboardHeight, isOpening, pro
   const delta = (isOpening ? keyboardHeight : -keyboardHeight) * normalizedProgress;
   return Math.max(0, startOffset + delta);
 };
-var KeyboardAvoidingLegendList = forwardRef(function KeyboardAvoidingLegendList2(props, forwardedRef) {
+var KeyboardAvoidingLegendList = typedForwardRef(function KeyboardAvoidingLegendList2(props, forwardedRef) {
   const {
     contentContainerStyle: contentContainerStyleProp,
     contentInset: contentInsetProp,

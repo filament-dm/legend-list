@@ -1,16 +1,33 @@
-import * as React3 from 'react';
-import React3__default, { forwardRef, useReducer, useEffect, createContext, useRef, useState, useMemo, useCallback, useLayoutEffect, useImperativeHandle, memo, useContext } from 'react';
-import { useSyncExternalStore } from 'use-sync-external-store/shim';
-import { unstable_batchedUpdates, flushSync } from 'react-dom';
+'use strict';
+
+var React2 = require('react');
+var reactNative = require('react-native');
+var shim = require('use-sync-external-store/shim');
+
+function _interopNamespace(e) {
+  if (e && e.__esModule) return e;
+  var n = Object.create(null);
+  if (e) {
+    Object.keys(e).forEach(function (k) {
+      if (k !== 'default') {
+        var d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: function () { return e[k]; }
+        });
+      }
+    });
+  }
+  n.default = e;
+  return Object.freeze(n);
+}
+
+var React2__namespace = /*#__PURE__*/_interopNamespace(React2);
 
 // src/components/LegendList.tsx
-forwardRef(function AnimatedView2(props, ref) {
-  return /* @__PURE__ */ React3.createElement("div", { ref, ...props });
-});
-var View = forwardRef(function View2(props, ref) {
-  return /* @__PURE__ */ React3.createElement("div", { ref, ...props });
-});
-var Text = View;
+reactNative.Animated.View;
+var View = reactNative.View;
+var Text = reactNative.Text;
 
 // src/state/getContentInsetEnd.ts
 function getContentInsetEnd(state) {
@@ -438,7 +455,7 @@ var InitializationManager = class {
       return false;
     }
     const anchorIndex = this.ctx.state.indexByKey.get(this.state.anchorId);
-    const hasPosition = this.ctx.state.positions.has(this.state.anchorId);
+    const hasPosition = anchorIndex !== void 0 && this.ctx.state.positions[anchorIndex] !== void 0;
     if (anchorIndex === void 0) {
       this.exitInitialization({
         isImperative: this.state.isImperative,
@@ -483,7 +500,7 @@ var InitializationManager = class {
     if (!this.state.didCompleteInitialScroll) return false;
     if (this.state.didInitialRecenter) return false;
     const anchorIndex = this.ctx.state.indexByKey.get(this.state.anchorId);
-    const hasPosition = this.ctx.state.positions.has(this.state.anchorId);
+    const hasPosition = anchorIndex !== void 0 && this.ctx.state.positions[anchorIndex] !== void 0;
     return anchorIndex !== void 0 && hasPosition;
   }
   /**
@@ -610,15 +627,13 @@ var InitializationManager = class {
     return false;
   }
 };
-
-// src/platform/Animated.tsx
-var createAnimatedValue = (value) => value;
+var createAnimatedValue = (value) => new reactNative.Animated.Value(value);
 
 // src/state/state.tsx
-var ContextState = React3.createContext(null);
+var ContextState = React2__namespace.createContext(null);
 var contextNum = 0;
 function StateProvider({ children }) {
-  const [value] = React3.useState(() => {
+  const [value] = React2__namespace.useState(() => {
     const ctx = {
       animatedScrollY: createAnimatedValue(0),
       columnWrapperStyle: void 0,
@@ -645,10 +660,10 @@ function StateProvider({ children }) {
     ctx.initializationManager = new InitializationManager(ctx);
     return ctx;
   });
-  return /* @__PURE__ */ React3.createElement(ContextState.Provider, { value }, children);
+  return /* @__PURE__ */ React2__namespace.createElement(ContextState.Provider, { value }, children);
 }
 function useStateContext() {
-  return React3.useContext(ContextState);
+  return React2__namespace.useContext(ContextState);
 }
 function createSelectorFunctionsArr(ctx, signalNames) {
   let lastValues = [];
@@ -729,23 +744,23 @@ function notifyPosition$(ctx, key, value) {
   }
 }
 function useArr$(signalNames) {
-  const ctx = React3.useContext(ContextState);
-  const { subscribe, get } = React3.useMemo(() => createSelectorFunctionsArr(ctx, signalNames), [ctx, signalNames]);
-  const value = useSyncExternalStore(subscribe, get);
+  const ctx = React2__namespace.useContext(ContextState);
+  const { subscribe, get } = React2__namespace.useMemo(() => createSelectorFunctionsArr(ctx, signalNames), [ctx, signalNames]);
+  const value = shim.useSyncExternalStore(subscribe, get);
   return value;
 }
 function useSelector$(signalName, selector) {
-  const ctx = React3.useContext(ContextState);
-  const { subscribe, get } = React3.useMemo(() => createSelectorFunctionsArr(ctx, [signalName]), [ctx, signalName]);
-  const value = useSyncExternalStore(subscribe, () => selector(get()[0]));
+  const ctx = React2__namespace.useContext(ContextState);
+  const { subscribe, get } = React2__namespace.useMemo(() => createSelectorFunctionsArr(ctx, [signalName]), [ctx, signalName]);
+  const value = shim.useSyncExternalStore(subscribe, () => selector(get()[0]));
   return value;
 }
 
 // src/components/DebugView.tsx
 var DebugRow = ({ children }) => {
-  return /* @__PURE__ */ React3.createElement(View, { style: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" } }, children);
+  return /* @__PURE__ */ React2__namespace.createElement(View, { style: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" } }, children);
 };
-var DebugView = React3.memo(function DebugView2({ state }) {
+var DebugView = React2__namespace.memo(function DebugView2({ state }) {
   const ctx = useStateContext();
   const [totalSize = 0, scrollAdjust = 0, rawScroll = 0, scroll = 0, _numContainers = 0, _numContainersPooled = 0] = useArr$([
     "totalSize",
@@ -756,11 +771,11 @@ var DebugView = React3.memo(function DebugView2({ state }) {
     "numContainersPooled"
   ]);
   const contentSize = getContentSize(ctx);
-  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+  const [, forceUpdate] = React2.useReducer((x) => x + 1, 0);
   useInterval(() => {
     forceUpdate();
   }, 100);
-  return /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React2__namespace.createElement(
     View,
     {
       pointerEvents: "none",
@@ -776,16 +791,16 @@ var DebugView = React3.memo(function DebugView2({ state }) {
         top: 0
       }
     },
-    /* @__PURE__ */ React3.createElement(DebugRow, null, /* @__PURE__ */ React3.createElement(Text, null, "TotalSize:"), /* @__PURE__ */ React3.createElement(Text, null, totalSize.toFixed(2))),
-    /* @__PURE__ */ React3.createElement(DebugRow, null, /* @__PURE__ */ React3.createElement(Text, null, "ContentSize:"), /* @__PURE__ */ React3.createElement(Text, null, contentSize.toFixed(2))),
-    /* @__PURE__ */ React3.createElement(DebugRow, null, /* @__PURE__ */ React3.createElement(Text, null, "At end:"), /* @__PURE__ */ React3.createElement(Text, null, String(state.isAtEnd))),
-    /* @__PURE__ */ React3.createElement(DebugRow, null, /* @__PURE__ */ React3.createElement(Text, null, "ScrollAdjust:"), /* @__PURE__ */ React3.createElement(Text, null, scrollAdjust.toFixed(2))),
-    /* @__PURE__ */ React3.createElement(DebugRow, null, /* @__PURE__ */ React3.createElement(Text, null, "RawScroll: "), /* @__PURE__ */ React3.createElement(Text, null, rawScroll.toFixed(2))),
-    /* @__PURE__ */ React3.createElement(DebugRow, null, /* @__PURE__ */ React3.createElement(Text, null, "ComputedScroll: "), /* @__PURE__ */ React3.createElement(Text, null, scroll.toFixed(2)))
+    /* @__PURE__ */ React2__namespace.createElement(DebugRow, null, /* @__PURE__ */ React2__namespace.createElement(Text, null, "TotalSize:"), /* @__PURE__ */ React2__namespace.createElement(Text, null, totalSize.toFixed(2))),
+    /* @__PURE__ */ React2__namespace.createElement(DebugRow, null, /* @__PURE__ */ React2__namespace.createElement(Text, null, "ContentSize:"), /* @__PURE__ */ React2__namespace.createElement(Text, null, contentSize.toFixed(2))),
+    /* @__PURE__ */ React2__namespace.createElement(DebugRow, null, /* @__PURE__ */ React2__namespace.createElement(Text, null, "At end:"), /* @__PURE__ */ React2__namespace.createElement(Text, null, String(state.isAtEnd))),
+    /* @__PURE__ */ React2__namespace.createElement(DebugRow, null, /* @__PURE__ */ React2__namespace.createElement(Text, null, "ScrollAdjust:"), /* @__PURE__ */ React2__namespace.createElement(Text, null, scrollAdjust.toFixed(2))),
+    /* @__PURE__ */ React2__namespace.createElement(DebugRow, null, /* @__PURE__ */ React2__namespace.createElement(Text, null, "RawScroll: "), /* @__PURE__ */ React2__namespace.createElement(Text, null, rawScroll.toFixed(2))),
+    /* @__PURE__ */ React2__namespace.createElement(DebugRow, null, /* @__PURE__ */ React2__namespace.createElement(Text, null, "ComputedScroll: "), /* @__PURE__ */ React2__namespace.createElement(Text, null, scroll.toFixed(2)))
   );
 });
 function useInterval(callback, delay) {
-  useEffect(() => {
+  React2.useEffect(() => {
     const interval = setInterval(callback, delay);
     return () => clearInterval(interval);
   }, [delay]);
@@ -803,8 +818,14 @@ var IS_DEV = (_a2 = processDev != null ? processDev : metroDev) != null ? _a2 : 
 var POSITION_OUT_OF_VIEW = -1e7;
 var ENABLE_DEVMODE = IS_DEV && false;
 var ENABLE_DEBUG_VIEW = IS_DEV && false;
-var typedForwardRef = forwardRef;
-var typedMemo = memo;
+
+// src/constants-platform.native.ts
+var f = global.nativeFabricUIManager;
+var IsNewArchitecture = f !== void 0 && f != null;
+var useAnimatedValue = (initialValue) => {
+  const [animAnimatedValue] = React2.useState(() => new reactNative.Animated.Value(initialValue));
+  return animAnimatedValue;
+};
 
 // src/utils/helpers.ts
 function isFunction(obj) {
@@ -852,78 +873,155 @@ function findContainerId(ctx, key) {
   return -1;
 }
 
-// src/components/PositionView.tsx
+// src/hooks/useValue$.ts
+function useValue$(key, params) {
+  const { getValue, delay } = params || {};
+  const ctx = useStateContext();
+  const getNewValue = () => {
+    var _a3;
+    return (_a3 = getValue ? getValue(peek$(ctx, key)) : peek$(ctx, key)) != null ? _a3 : 0;
+  };
+  const animValue = useAnimatedValue(getNewValue());
+  React2.useMemo(() => {
+    let prevValue;
+    let didQueueTask = false;
+    listen$(ctx, key, () => {
+      const newValue = getNewValue();
+      if (delay !== void 0) {
+        const fn = () => {
+          didQueueTask = false;
+          const latestValue = getNewValue();
+          if (latestValue !== void 0) {
+            animValue.setValue(latestValue);
+          }
+        };
+        const delayValue = isFunction(delay) ? delay(newValue, prevValue) : delay;
+        prevValue = newValue;
+        if (!didQueueTask) {
+          didQueueTask = true;
+          if (delayValue === void 0) {
+            fn();
+          } else if (delayValue === 0) {
+            queueMicrotask(fn);
+          } else {
+            setTimeout(fn, delayValue);
+          }
+        }
+      } else {
+        animValue.setValue(newValue);
+      }
+    });
+  }, []);
+  return animValue;
+}
+var typedMemo = React2.memo;
+var getComponent = (Component) => {
+  if (React2__namespace.isValidElement(Component)) {
+    return Component;
+  }
+  if (Component) {
+    return /* @__PURE__ */ React2__namespace.createElement(Component, null);
+  }
+  return null;
+};
+
+// src/components/PositionView.native.tsx
 var PositionViewState = typedMemo(function PositionViewState2({
   id,
   horizontal,
   style,
   refView,
-  ...props
+  ...rest
 }) {
   const [position = POSITION_OUT_OF_VIEW] = useArr$([`containerPosition${id}`]);
-  const base = {
-    contain: "paint layout style"
-  };
-  const composed = isArray(style) ? Object.assign({}, ...style) : style;
-  const combinedStyle = horizontal ? { ...base, ...composed, left: position } : { ...base, ...composed, top: position };
-  const { animatedScrollY, onLayout, index, ...webProps } = props;
-  return /* @__PURE__ */ React3.createElement("div", { ref: refView, ...webProps, style: combinedStyle });
+  return /* @__PURE__ */ React2__namespace.createElement(
+    reactNative.View,
+    {
+      ref: refView,
+      style: [
+        style,
+        horizontal ? { transform: [{ translateX: position }] } : { transform: [{ translateY: position }] }
+      ],
+      ...rest
+    }
+  );
+});
+var PositionViewAnimated = typedMemo(function PositionViewAnimated2({
+  id,
+  horizontal,
+  style,
+  refView,
+  ...rest
+}) {
+  const position$ = useValue$(`containerPosition${id}`, {
+    getValue: (v) => v != null ? v : POSITION_OUT_OF_VIEW
+  });
+  let position;
+  if (reactNative.Platform.OS === "ios" || reactNative.Platform.OS === "android") {
+    position = horizontal ? { transform: [{ translateX: position$ }] } : { transform: [{ translateY: position$ }] };
+  } else {
+    position = horizontal ? { left: position$ } : { top: position$ };
+  }
+  return /* @__PURE__ */ React2__namespace.createElement(reactNative.Animated.View, { ref: refView, style: [style, position], ...rest });
 });
 var PositionViewSticky = typedMemo(function PositionViewSticky2({
   id,
   horizontal,
   style,
   refView,
+  animatedScrollY,
   index,
-  animatedScrollY: _animatedScrollY,
   stickyHeaderConfig,
   children,
   ...rest
 }) {
-  const [position = POSITION_OUT_OF_VIEW, activeStickyIndex] = useArr$([
+  const [position = POSITION_OUT_OF_VIEW, headerSize = 0, stylePaddingTop = 0] = useArr$([
     `containerPosition${id}`,
-    "activeStickyIndex"
+    "headerSize",
+    "stylePaddingTop"
   ]);
-  const base = {
-    contain: "paint layout style"
-  };
-  const composed = React3.useMemo(
-    () => {
-      var _a3;
-      return (_a3 = isArray(style) ? Object.assign({}, ...style) : style) != null ? _a3 : {};
-    },
-    [style]
-  );
-  const viewStyle = React3.useMemo(() => {
+  const transform = React2__namespace.useMemo(() => {
     var _a3;
-    const styleBase = { ...base, ...composed };
-    delete styleBase.transform;
-    const stickyConfigOffset = (_a3 = stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.offset) != null ? _a3 : 0;
-    const offset = stickyConfigOffset != null ? stickyConfigOffset : 0;
-    const isActive = activeStickyIndex === index;
-    styleBase.position = isActive ? "sticky" : "absolute";
-    styleBase.zIndex = index + 1e3;
-    if (horizontal) {
-      styleBase.left = isActive ? offset : position;
-    } else {
-      styleBase.top = isActive ? offset : position;
+    if (animatedScrollY) {
+      const stickyConfigOffset = (_a3 = stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.offset) != null ? _a3 : 0;
+      const stickyStart = position + headerSize + stylePaddingTop - stickyConfigOffset;
+      const stickyPosition = animatedScrollY.interpolate({
+        extrapolateLeft: "clamp",
+        extrapolateRight: "extend",
+        inputRange: [stickyStart, stickyStart + 5e3],
+        outputRange: [position, position + 5e3]
+      });
+      return horizontal ? [{ translateX: stickyPosition }] : [{ translateY: stickyPosition }];
     }
-    return styleBase;
-  }, [composed, horizontal, position, index, activeStickyIndex, stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.offset]);
-  return /* @__PURE__ */ React3.createElement("div", { ref: refView, style: viewStyle, ...rest }, children);
+  }, [animatedScrollY, headerSize, horizontal, position, stylePaddingTop, stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.offset]);
+  const viewStyle = React2__namespace.useMemo(() => [style, { zIndex: index + 1e3 }, { transform }], [style, transform]);
+  const renderStickyHeaderBackdrop = React2__namespace.useMemo(() => {
+    if (!(stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent)) {
+      return null;
+    }
+    return /* @__PURE__ */ React2__namespace.createElement(
+      reactNative.View,
+      {
+        style: {
+          inset: 0,
+          pointerEvents: "none",
+          position: "absolute"
+        }
+      },
+      getComponent(stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent)
+    );
+  }, [stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent]);
+  return /* @__PURE__ */ React2__namespace.createElement(reactNative.Animated.View, { ref: refView, style: viewStyle, ...rest }, renderStickyHeaderBackdrop, children);
 });
-var PositionView = PositionViewState;
-
-// src/constants-platform.ts
-var IsNewArchitecture = true;
+var PositionView = IsNewArchitecture ? PositionViewState : PositionViewAnimated;
 function useInit(cb) {
-  useState(() => cb());
+  React2.useState(() => cb());
 }
 
 // src/state/ContextContainer.ts
-var ContextContainer = createContext(null);
+var ContextContainer = React2.createContext(null);
 function useContextContainer() {
-  return useContext(ContextContainer);
+  return React2.useContext(ContextContainer);
 }
 function useViewability(callback, configId) {
   const ctx = useStateContext();
@@ -939,7 +1037,7 @@ function useViewability(callback, configId) {
       callback(value);
     }
   });
-  useEffect(() => {
+  React2.useEffect(() => {
     if (!containerContext) {
       return;
     }
@@ -964,7 +1062,7 @@ function useViewabilityAmount(callback) {
       callback(value);
     }
   });
-  useEffect(() => {
+  React2.useEffect(() => {
     if (!containerContext) {
       return;
     }
@@ -977,11 +1075,11 @@ function useViewabilityAmount(callback) {
 }
 function useRecyclingEffect(effect) {
   const containerContext = useContextContainer();
-  const prevValues = useRef({
+  const prevValues = React2.useRef({
     prevIndex: void 0,
     prevItem: void 0
   });
-  useEffect(() => {
+  React2.useEffect(() => {
     if (!containerContext) {
       return;
     }
@@ -1017,17 +1115,17 @@ function useRecyclingState(valueOrFun) {
     }
     return valueOrFun;
   };
-  const [stateValue, setStateValue] = useState(() => {
+  const [stateValue, setStateValue] = React2.useState(() => {
     return computeValue(containerContext);
   });
-  const prevItemKeyRef = useRef((_a3 = containerContext == null ? void 0 : containerContext.itemKey) != null ? _a3 : null);
+  const prevItemKeyRef = React2.useRef((_a3 = containerContext == null ? void 0 : containerContext.itemKey) != null ? _a3 : null);
   const currentItemKey = (_b = containerContext == null ? void 0 : containerContext.itemKey) != null ? _b : null;
   if (currentItemKey !== null && prevItemKeyRef.current !== currentItemKey) {
     prevItemKeyRef.current = currentItemKey;
     setStateValue(computeValue(containerContext));
   }
   const triggerLayout = containerContext == null ? void 0 : containerContext.triggerLayout;
-  const setState = useCallback(
+  const setState = React2.useCallback(
     (newState) => {
       if (!triggerLayout) {
         return;
@@ -1062,7 +1160,7 @@ var noop = () => {
 };
 function useSyncLayout() {
   const containerContext = useContextContainer();
-  if (containerContext) {
+  if (IsNewArchitecture && containerContext) {
     const { triggerLayout: syncLayout } = containerContext;
     return syncLayout;
   } else {
@@ -1073,123 +1171,51 @@ function useSyncLayout() {
 // src/components/Separator.tsx
 function Separator({ ItemSeparatorComponent, leadingItem }) {
   const isLastItem = useIsLastItem();
-  return isLastItem ? null : /* @__PURE__ */ React3.createElement(ItemSeparatorComponent, { leadingItem });
+  return isLastItem ? null : /* @__PURE__ */ React2__namespace.createElement(ItemSeparatorComponent, { leadingItem });
 }
-
-// src/hooks/createResizeObserver.ts
-var globalResizeObserver = null;
-function getGlobalResizeObserver() {
-  if (!globalResizeObserver) {
-    globalResizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const callbacks = callbackMap.get(entry.target);
-        if (callbacks) {
-          for (const callback of callbacks) {
-            callback(entry);
-          }
-        }
-      }
-    });
-  }
-  return globalResizeObserver;
-}
-var callbackMap = /* @__PURE__ */ new WeakMap();
-function createResizeObserver(element, callback) {
-  if (typeof ResizeObserver === "undefined") {
-    return () => {
-    };
-  }
-  if (!element) {
-    return () => {
-    };
-  }
-  const observer = getGlobalResizeObserver();
-  let callbacks = callbackMap.get(element);
-  if (!callbacks) {
-    callbacks = /* @__PURE__ */ new Set();
-    callbackMap.set(element, callbacks);
-    observer.observe(element);
-  }
-  callbacks.add(callback);
-  return () => {
-    if (callbacks) {
-      callbacks.delete(callback);
-      if (callbacks.size === 0) {
-        callbackMap.delete(element);
-        observer.unobserve(element);
-      }
-    }
-  };
-}
-
-// src/hooks/useOnLayoutSync.tsx
 function useOnLayoutSync({
   ref,
   onLayoutProp,
-  onLayoutChange,
-  webLayoutResync
-}, deps) {
-  useLayoutEffect(() => {
-    var _a3, _b;
-    const current = ref.current;
-    const scrollableNode = (_b = (_a3 = current == null ? void 0 : current.getScrollableNode) == null ? void 0 : _a3.call(current)) != null ? _b : null;
-    const element = scrollableNode || current;
-    if (!element) {
-      return;
-    }
-    const emit = (layout, fromLayoutEffect) => {
-      if (layout.height === 0 && layout.width === 0) {
-        return;
+  onLayoutChange
+}, deps = []) {
+  const lastLayoutRef = React2.useRef(null);
+  const onLayout = React2.useCallback(
+    (event) => {
+      var _a3, _b;
+      const { layout } = event.nativeEvent;
+      if (layout.height !== ((_a3 = lastLayoutRef.current) == null ? void 0 : _a3.height) || layout.width !== ((_b = lastLayoutRef.current) == null ? void 0 : _b.width)) {
+        onLayoutChange(layout, false);
+        onLayoutProp == null ? void 0 : onLayoutProp(event);
+        lastLayoutRef.current = layout;
       }
-      onLayoutChange(layout, fromLayoutEffect);
-      onLayoutProp == null ? void 0 : onLayoutProp({ nativeEvent: { layout } });
-    };
-    const rect = element.getBoundingClientRect();
-    emit(toLayout(rect), true);
-    let prevRect = rect;
-    return createResizeObserver(element, (entry) => {
-      var _a4;
-      const target = entry.target instanceof HTMLElement ? entry.target : void 0;
-      const rectObserved = (_a4 = entry.contentRect) != null ? _a4 : target == null ? void 0 : target.getBoundingClientRect();
-      const didSizeChange = rectObserved.width !== prevRect.width || rectObserved.height !== prevRect.height;
-      const shouldResyncLayout = !!(webLayoutResync == null ? void 0 : webLayoutResync());
-      if (didSizeChange || shouldResyncLayout) {
-        prevRect = rectObserved;
-        emit(toLayout(rectObserved), false);
+    },
+    [onLayoutChange]
+  );
+  if (IsNewArchitecture) {
+    React2.useLayoutEffect(() => {
+      if (ref.current) {
+        ref.current.measure((x, y, width, height) => {
+          const layout = { height, width, x, y };
+          lastLayoutRef.current = layout;
+          onLayoutChange(layout, true);
+        });
       }
-    });
-  }, deps || []);
-  return {};
-}
-function toLayout(rect) {
-  if (!rect) {
-    return { height: 0, width: 0, x: 0, y: 0 };
+    }, deps);
   }
-  return {
-    height: rect.height,
-    width: rect.width,
-    x: rect.left,
-    y: rect.top
-  };
+  return { onLayout };
 }
+var Platform2 = reactNative.Platform;
+var PlatformAdjustBreaksScroll = Platform2.OS === "android";
+var typedForwardRef = React2.forwardRef;
+var typedMemo2 = React2.memo;
 
-// src/platform/Platform.ts
-var Platform = {
-  // Widen the type to avoid unreachable-branch lints in cross-platform code that compares against other OSes
-  OS: "web"
-};
-
-// src/utils/isInMVCPActiveMode.ts
+// src/utils/isInMVCPActiveMode.native.ts
 function isInMVCPActiveMode(state) {
-  const lock = state.mvcpAnchorLock;
-  if (lock && Date.now() > lock.expiresAt) {
-    state.mvcpAnchorLock = void 0;
-  }
-  return state.dataChangeNeedsScrollUpdate || !!state.mvcpAnchorLock;
+  return state.dataChangeNeedsScrollUpdate;
 }
 
 // src/components/Container.tsx
-var Container = typedMemo(function Container2({
+var Container = typedMemo2(function Container2({
   id,
   recycleItems,
   horizontal,
@@ -1200,6 +1226,7 @@ var Container = typedMemo(function Container2({
 }) {
   const ctx = useStateContext();
   const { columnWrapperStyle, animatedScrollY } = ctx;
+  const positionComponentInternal = ctx.state.props.positionComponentInternal;
   const stickyPositionComponentInternal = ctx.state.props.stickyPositionComponentInternal;
   const [column = 0, span = 1, data, itemKey, numColumns = 1, extraData, isSticky] = useArr$([
     `containerColumn${id}`,
@@ -1210,7 +1237,7 @@ var Container = typedMemo(function Container2({
     "extraData",
     `containerSticky${id}`
   ]);
-  const itemLayoutRef = useRef({
+  const itemLayoutRef = React2.useRef({
     didLayout: false,
     horizontal,
     itemKey,
@@ -1220,13 +1247,13 @@ var Container = typedMemo(function Container2({
   itemLayoutRef.current.horizontal = horizontal;
   itemLayoutRef.current.itemKey = itemKey;
   itemLayoutRef.current.updateItemSize = updateItemSize2;
-  const ref = useRef(null);
-  const [layoutRenderCount, forceLayoutRender] = useState(0);
+  const ref = React2.useRef(null);
+  const [layoutRenderCount, forceLayoutRender] = React2.useState(0);
   const resolvedColumn = column > 0 ? column : 1;
   const resolvedSpan = Math.min(Math.max(span || 1, 1), numColumns);
   const otherAxisPos = numColumns > 1 ? `${(resolvedColumn - 1) / numColumns * 100}%` : 0;
   const otherAxisSize = numColumns > 1 ? `${resolvedSpan / numColumns * 100}%` : void 0;
-  const style = useMemo(() => {
+  const style = React2.useMemo(() => {
     let paddingStyles;
     if (columnWrapperStyle) {
       const { columnGap, rowGap, gap } = columnWrapperStyle;
@@ -1258,12 +1285,12 @@ var Container = typedMemo(function Container2({
       ...paddingStyles || {}
     };
   }, [horizontal, otherAxisPos, otherAxisSize, columnWrapperStyle, numColumns]);
-  const renderedItemInfo = useMemo(
+  const renderedItemInfo = React2.useMemo(
     () => itemKey !== void 0 ? getRenderedItem2(itemKey) : null,
     [itemKey, data, extraData]
   );
   const { index, renderedItem } = renderedItemInfo || {};
-  const contextValue = useMemo(() => {
+  const contextValue = React2.useMemo(() => {
     ctx.viewRefs.set(id, ref);
     return {
       containerId: id,
@@ -1275,7 +1302,8 @@ var Container = typedMemo(function Container2({
       value: data
     };
   }, [id, itemKey, index, data]);
-  const onLayoutChange = useCallback((rectangle) => {
+  const onLayoutChange = React2.useCallback((rectangle) => {
+    var _a3, _b;
     const {
       horizontal: currentHorizontal,
       itemKey: currentItemKey,
@@ -1296,7 +1324,7 @@ var Container = typedMemo(function Container2({
       updateItemSizeFn(currentItemKey, layout);
       itemLayoutRef.current.didLayout = true;
     };
-    const shouldDeferWebShrinkLayoutUpdate = !isInMVCPActiveMode(ctx.state) && prevSize !== void 0 && size + 1 < prevSize;
+    const shouldDeferWebShrinkLayoutUpdate = Platform2.OS === "web" && !isInMVCPActiveMode(ctx.state) && prevSize !== void 0 && size + 1 < prevSize;
     if (shouldDeferWebShrinkLayoutUpdate) {
       const token = pendingShrinkToken + 1;
       itemLayoutRef.current.pendingShrinkToken = token;
@@ -1314,8 +1342,13 @@ var Container = typedMemo(function Container2({
       });
       return;
     }
-    {
+    if (IsNewArchitecture || size > 0) {
       doUpdate();
+    } else {
+      (_b = (_a3 = ref.current) == null ? void 0 : _a3.measure) == null ? void 0 : _b.call(_a3, (_x, _y, width, height) => {
+        layout = { height, width };
+        doUpdate();
+      });
     }
   }, []);
   const { onLayout } = useOnLayoutSync(
@@ -1326,8 +1359,31 @@ var Container = typedMemo(function Container2({
     },
     [itemKey, layoutRenderCount]
   );
-  const PositionComponent = isSticky ? stickyPositionComponentInternal ? stickyPositionComponentInternal : PositionViewSticky : PositionView;
-  return /* @__PURE__ */ React3.createElement(
+  if (!IsNewArchitecture) {
+    React2.useEffect(() => {
+      if (!isNullOrUndefined(itemKey)) {
+        itemLayoutRef.current.didLayout = false;
+        const timeout = setTimeout(() => {
+          if (!itemLayoutRef.current.didLayout) {
+            const {
+              itemKey: currentItemKey,
+              lastSize,
+              updateItemSize: updateItemSizeFn
+            } = itemLayoutRef.current;
+            if (lastSize && !isNullOrUndefined(currentItemKey)) {
+              updateItemSizeFn(currentItemKey, lastSize);
+              itemLayoutRef.current.didLayout = true;
+            }
+          }
+        }, 16);
+        return () => {
+          clearTimeout(timeout);
+        };
+      }
+    }, [itemKey]);
+  }
+  const PositionComponent = isSticky ? stickyPositionComponentInternal ? stickyPositionComponentInternal : PositionViewSticky : positionComponentInternal ? positionComponentInternal : PositionView;
+  return /* @__PURE__ */ React2__namespace.createElement(
     PositionComponent,
     {
       animatedScrollY: isSticky ? animatedScrollY : void 0,
@@ -1340,164 +1396,37 @@ var Container = typedMemo(function Container2({
       stickyHeaderConfig,
       style
     },
-    /* @__PURE__ */ React3.createElement(ContextContainer.Provider, { value: contextValue }, renderedItem, renderedItemInfo && ItemSeparatorComponent && /* @__PURE__ */ React3.createElement(Separator, { ItemSeparatorComponent, leadingItem: renderedItemInfo.item }))
+    /* @__PURE__ */ React2__namespace.createElement(ContextContainer.Provider, { value: contextValue }, renderedItem, renderedItemInfo && ItemSeparatorComponent && /* @__PURE__ */ React2__namespace.createElement(Separator, { ItemSeparatorComponent, leadingItem: renderedItemInfo.item }))
   );
 });
 
-// src/utils/reordering.ts
-var mapFn = (element) => {
-  const indexStr = element.getAttribute("index");
-  return [element, indexStr === null ? null : parseInt(indexStr)];
-};
-function sortDOMElements(container) {
-  const elements = Array.from(container.children);
-  if (elements.length <= 1) return elements;
-  const items = elements.map(mapFn);
-  items.sort((a, b) => {
-    const aKey = a[1];
-    const bKey = b[1];
-    if (aKey === null) {
-      return 1;
-    }
-    if (bKey === null) {
-      return -1;
-    }
-    return aKey - bKey;
-  });
-  const targetPositions = /* @__PURE__ */ new Map();
-  items.forEach((item, index) => {
-    targetPositions.set(item[0], index);
-  });
-  const currentPositions = elements.map((el) => targetPositions.get(el));
-  const lis = findLIS(currentPositions);
-  const stableIndices = new Set(lis);
-  for (let targetPos = 0; targetPos < items.length; targetPos++) {
-    const element = items[targetPos][0];
-    const currentPos = elements.indexOf(element);
-    if (!stableIndices.has(currentPos)) {
-      let nextStableElement = null;
-      for (let i = targetPos + 1; i < items.length; i++) {
-        const nextEl = items[i][0];
-        const nextCurrentPos = elements.indexOf(nextEl);
-        if (stableIndices.has(nextCurrentPos)) {
-          nextStableElement = nextEl;
-          break;
-        }
-      }
-      if (nextStableElement) {
-        container.insertBefore(element, nextStableElement);
-      } else {
-        container.appendChild(element);
-      }
-    }
-  }
-}
-function findLIS(arr) {
-  const n = arr.length;
-  const tails = [];
-  const predecessors = new Array(n).fill(-1);
-  const indices = [];
-  for (let i = 0; i < n; i++) {
-    const num = arr[i];
-    let left = 0, right = tails.length;
-    while (left < right) {
-      const mid = Math.floor((left + right) / 2);
-      if (arr[indices[mid]] < num) {
-        left = mid + 1;
-      } else {
-        right = mid;
-      }
-    }
-    if (left === tails.length) {
-      tails.push(num);
-      indices.push(i);
-    } else {
-      tails[left] = num;
-      indices[left] = i;
-    }
-    if (left > 0) {
-      predecessors[i] = indices[left - 1];
-    }
-  }
-  const result = [];
-  let k = indices[indices.length - 1];
-  while (k !== -1) {
-    result.unshift(k);
-    k = predecessors[k];
-  }
-  return result;
-}
-
-// src/hooks/useDOMOrder.ts
-function useDOMOrder(ref) {
-  const ctx = useStateContext();
-  const debounceRef = useRef(void 0);
-  useEffect(() => {
-    const unsubscribe = listen$(ctx, "lastPositionUpdate", () => {
-      if (debounceRef.current !== void 0) {
-        clearTimeout(debounceRef.current);
-      }
-      debounceRef.current = setTimeout(() => {
-        const parent = ref.current;
-        if (parent) {
-          sortDOMElements(parent);
-        }
-        debounceRef.current = void 0;
-      }, 500);
-    });
-    return () => {
-      unsubscribe();
-      if (debounceRef.current !== void 0) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [ctx]);
-}
-
-// src/components/Containers.tsx
-var ContainersInner = typedMemo(function ContainersInner2({ horizontal, numColumns, children }) {
-  const ref = useRef(null);
-  const ctx = useStateContext();
-  const columnWrapperStyle = ctx.columnWrapperStyle;
-  const [totalSize, otherAxisSize] = useArr$(["totalSize", "otherAxisSize"]);
-  useDOMOrder(ref);
-  const style = horizontal ? { minHeight: otherAxisSize, position: "relative", width: totalSize } : { height: totalSize, minWidth: otherAxisSize, position: "relative" };
-  if (columnWrapperStyle && numColumns > 1) {
-    const { columnGap, rowGap, gap } = columnWrapperStyle;
-    const gapX = columnGap || gap || 0;
-    const gapY = rowGap || gap || 0;
-    if (horizontal) {
-      if (gapY) {
-        style.marginTop = style.marginBottom = -gapY / 2;
-      }
-      if (gapX) {
-        style.marginRight = -gapX;
-      }
-    } else {
-      if (gapX) {
-        style.marginLeft = style.marginRight = -gapX;
-      }
-      if (gapY) {
-        style.marginBottom = -gapY;
-      }
-    }
-  }
-  return /* @__PURE__ */ React3.createElement("div", { ref, style }, children);
-});
+// src/components/Containers.native.tsx
 var Containers = typedMemo(function Containers2({
   horizontal,
   recycleItems,
   ItemSeparatorComponent,
   waitForInitialLayout,
+  stickyHeaderConfig,
   updateItemSize: updateItemSize2,
-  getRenderedItem: getRenderedItem2,
-  stickyHeaderConfig
+  getRenderedItem: getRenderedItem2
 }) {
+  const ctx = useStateContext();
+  const columnWrapperStyle = ctx.columnWrapperStyle;
   const [numContainers, numColumns] = useArr$(["numContainersPooled", "numColumns"]);
+  const animSize = useValue$("totalSize", {
+    // Use a microtask if increasing the size significantly, otherwise use a timeout
+    // If this is the initial scroll, we don't want to delay because we want to update the size immediately
+    delay: (value, prevValue) => {
+      var _a3;
+      return !((_a3 = ctx.state) == null ? void 0 : _a3.initialScroll) ? !prevValue || value - prevValue > 20 ? 0 : 200 : void 0;
+    }
+  });
+  const animOpacity = waitForInitialLayout && !IsNewArchitecture ? useValue$("readyToRender", { getValue: (value) => value ? 1 : 0 }) : void 0;
+  const otherAxisSize = useValue$("otherAxisSize", { delay: 0 });
   const containers = [];
   for (let i = 0; i < numContainers; i++) {
     containers.push(
-      /* @__PURE__ */ React3.createElement(
+      /* @__PURE__ */ React2__namespace.createElement(
         Container,
         {
           getRenderedItem: getRenderedItem2,
@@ -1512,13 +1441,34 @@ var Containers = typedMemo(function Containers2({
       )
     );
   }
-  return /* @__PURE__ */ React3.createElement(ContainersInner, { horizontal, numColumns, waitForInitialLayout }, containers);
+  const style = horizontal ? { minHeight: otherAxisSize, opacity: animOpacity, width: animSize } : { height: animSize, minWidth: otherAxisSize, opacity: animOpacity };
+  if (columnWrapperStyle) {
+    const { columnGap, rowGap, gap } = columnWrapperStyle;
+    const gapX = columnGap || gap || 0;
+    const gapY = rowGap || gap || 0;
+    if (horizontal) {
+      if (gapY && numColumns > 1) {
+        style.marginVertical = -gapY / 2;
+      }
+      if (gapX) {
+        style.marginRight = -gapX;
+      }
+    } else {
+      if (gapX && numColumns > 1) {
+        style.marginHorizontal = -gapX;
+      }
+      if (gapY) {
+        style.marginBottom = -gapY;
+      }
+    }
+  }
+  return /* @__PURE__ */ React2__namespace.createElement(reactNative.Animated.View, { style }, containers);
 });
 function DevNumbers() {
   return IS_DEV && // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
-  React3.memo(function DevNumbers2() {
-    return Array.from({ length: 100 }).map((_, index) => /* @__PURE__ */ React3.createElement(
-      "div",
+  React2__namespace.memo(function DevNumbers2() {
+    return Array.from({ length: 100 }).map((_, index) => /* @__PURE__ */ React2__namespace.createElement(
+      reactNative.View,
       {
         key: index,
         style: {
@@ -1529,280 +1479,40 @@ function DevNumbers() {
           width: "100%"
         }
       },
-      /* @__PURE__ */ React3.createElement("div", { style: { color: "red" } }, index * 100)
+      /* @__PURE__ */ React2__namespace.createElement(reactNative.Text, { style: { color: "red" } }, index * 100)
     ));
   });
 }
-
-// src/platform/StyleSheet.tsx
-function flattenStyles(styles) {
-  if (isArray(styles)) {
-    return Object.assign({}, ...styles.filter(Boolean));
-  }
-  return styles;
-}
-var StyleSheet = {
-  create: (styles) => styles,
-  flatten: (style) => flattenStyles(style)
-};
-
-// src/components/ListComponentScrollView.tsx
-var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
-  children,
-  style,
-  contentContainerStyle,
-  horizontal = false,
-  contentOffset,
-  maintainVisibleContentPosition,
-  onScroll: onScroll2,
-  onMomentumScrollEnd,
-  showsHorizontalScrollIndicator = true,
-  showsVerticalScrollIndicator = true,
-  refreshControl,
-  onLayout,
-  ...props
-}, ref) {
-  const scrollRef = useRef(null);
-  const contentRef = useRef(null);
-  useLayoutEffect(() => {
-    const styleId = "legendlist-hide-scrollbar";
-    if (!document.getElementById(styleId)) {
-      const styleElement = document.createElement("style");
-      styleElement.id = styleId;
-      styleElement.textContent = `
-            .legendlist-hide-scrollbar::-webkit-scrollbar {
-                display: none;
-            }
-        `;
-      document.head.appendChild(styleElement);
-    }
-  }, []);
-  useImperativeHandle(ref, () => {
-    const api = {
-      getBoundingClientRect: () => {
-        var _a3;
-        return (_a3 = scrollRef.current) == null ? void 0 : _a3.getBoundingClientRect();
-      },
-      getScrollableNode: () => scrollRef.current,
-      getScrollResponder: () => scrollRef.current,
-      scrollBy: (x, y) => {
-        const el = scrollRef.current;
-        if (!el) return;
-        el.scrollBy(x, y);
-      },
-      scrollTo: (options) => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const { x = 0, y = 0, animated = true } = options;
-        el.scrollTo({ behavior: animated ? "smooth" : "auto", left: x, top: y });
-      },
-      scrollToEnd: (options = {}) => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const { animated = true } = options;
-        if (horizontal) {
-          el.scrollTo({ behavior: animated ? "smooth" : "auto", left: el.scrollWidth });
-        } else {
-          el.scrollTo({ behavior: animated ? "smooth" : "auto", top: el.scrollHeight });
-        }
-      },
-      scrollToOffset: (params) => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const { offset, animated = true } = params;
-        if (horizontal) {
-          el.scrollTo({ behavior: animated ? "smooth" : "auto", left: offset });
-        } else {
-          el.scrollTo({ behavior: animated ? "smooth" : "auto", top: offset });
-        }
-      }
-    };
-    return api;
-  }, [horizontal]);
-  const handleScroll = useCallback(
-    (event) => {
-      if (!onScroll2 || !(event == null ? void 0 : event.target)) {
-        return;
-      }
-      const target = event.target;
-      const scrollEvent = {
-        nativeEvent: {
-          contentOffset: {
-            x: target.scrollLeft,
-            y: target.scrollTop
-          },
-          contentSize: {
-            height: target.scrollHeight,
-            width: target.scrollWidth
-          },
-          layoutMeasurement: {
-            height: target.clientHeight,
-            width: target.clientWidth
-          }
-        }
-      };
-      onScroll2(scrollEvent);
-    },
-    [onScroll2, onMomentumScrollEnd]
-  );
-  useLayoutEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-    element.addEventListener("scroll", handleScroll);
-    return () => {
-      element.removeEventListener("scroll", handleScroll);
-    };
-  }, [handleScroll]);
-  useEffect(() => {
-    const doScroll = () => {
-      if (contentOffset && scrollRef.current) {
-        scrollRef.current.scrollLeft = contentOffset.x || 0;
-        scrollRef.current.scrollTop = contentOffset.y || 0;
-      }
-    };
-    doScroll();
-    requestAnimationFrame(doScroll);
-  }, [contentOffset == null ? void 0 : contentOffset.x, contentOffset == null ? void 0 : contentOffset.y]);
-  useLayoutEffect(() => {
-    if (!onLayout || !scrollRef.current) return;
-    const element = scrollRef.current;
-    const fireLayout = () => {
-      const rect = element.getBoundingClientRect();
-      onLayout({
-        nativeEvent: {
-          layout: {
-            height: rect.height,
-            width: rect.width,
-            x: rect.left,
-            y: rect.top
-          }
-        }
-      });
-    };
-    fireLayout();
-    const resizeObserver = new ResizeObserver(() => {
-      fireLayout();
-    });
-    resizeObserver.observe(element);
-    return () => resizeObserver.disconnect();
-  }, [onLayout]);
-  const hideScrollbar = showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
-  const scrollViewStyle = {
-    overflow: "auto",
-    overflowX: horizontal ? "auto" : showsHorizontalScrollIndicator ? "auto" : "hidden",
-    overflowY: horizontal ? showsVerticalScrollIndicator ? "auto" : "hidden" : "auto",
-    position: "relative",
-    // Ensure proper positioning context
-    WebkitOverflowScrolling: "touch",
-    // iOS momentum scrolling
-    width: horizontal ? "100%" : void 0,
-    // Add Firefox/IE scrollbar hiding (inline styles)
-    ...hideScrollbar && {
-      msOverflowStyle: "none",
-      scrollbarWidth: "none"
-    },
-    ...StyleSheet.flatten(style)
-  };
-  const contentStyle = {
-    display: horizontal ? "flex" : "block",
-    flexDirection: horizontal ? "row" : void 0,
-    minHeight: horizontal ? void 0 : "100%",
-    minWidth: horizontal ? "100%" : void 0,
-    ...StyleSheet.flatten(contentContainerStyle)
-  };
-  const { contentInset, scrollEventThrottle, ScrollComponent, ...webProps } = props;
-  return /* @__PURE__ */ React3.createElement(
-    "div",
-    {
-      className: hideScrollbar ? "legendlist-hide-scrollbar" : void 0,
-      ref: scrollRef,
-      ...webProps,
-      style: scrollViewStyle
-    },
-    refreshControl,
-    /* @__PURE__ */ React3.createElement("div", { ref: contentRef, style: contentStyle }, children)
-  );
-});
-function useValueListener$(key, callback) {
-  const ctx = useStateContext();
-  useLayoutEffect(() => {
-    const unsubscribe = listen$(ctx, key, (value) => {
-      callback(value);
-    });
-    return unsubscribe;
-  }, [callback, ctx, key]);
-}
-
-// src/components/ScrollAdjust.tsx
+var ListComponentScrollView = reactNative.Animated.ScrollView;
 function ScrollAdjust() {
-  const ctx = useStateContext();
-  const lastScrollOffsetRef = React3.useRef(0);
-  const resetPaddingRafRef = React3.useRef(void 0);
-  const callback = React3.useCallback(() => {
-    var _a3;
-    const scrollAdjust = peek$(ctx, "scrollAdjust");
-    const scrollAdjustUserOffset = peek$(ctx, "scrollAdjustUserOffset");
-    const scrollOffset = (scrollAdjust || 0) + (scrollAdjustUserOffset || 0);
-    const scrollView = (_a3 = ctx.state) == null ? void 0 : _a3.refScroller.current;
-    if (scrollView && scrollOffset !== lastScrollOffsetRef.current) {
-      const scrollDelta = scrollOffset - lastScrollOffsetRef.current;
-      if (scrollDelta !== 0) {
-        const el = scrollView.getScrollableNode();
-        const prevScroll = el.scrollTop;
-        const nextScroll = prevScroll + scrollDelta;
-        const totalSize = el.scrollHeight;
-        if (scrollDelta > 0 && totalSize < nextScroll + el.clientHeight) {
-          const paddingBottom = ctx.state.props.stylePaddingBottom || 0;
-          const child = el.firstElementChild;
-          const pad = (nextScroll + el.clientHeight - totalSize) * 2;
-          child.style.paddingBottom = `${pad}px`;
-          void el.offsetHeight;
-          scrollView.scrollBy(0, scrollDelta);
-          if (resetPaddingRafRef.current !== void 0) {
-            cancelAnimationFrame(resetPaddingRafRef.current);
-          }
-          resetPaddingRafRef.current = requestAnimationFrame(() => {
-            resetPaddingRafRef.current = void 0;
-            child.style.paddingBottom = paddingBottom ? `${paddingBottom}px` : "0";
-          });
-        } else {
-          scrollView.scrollBy(0, scrollDelta);
-        }
-        const actualScroll = el.scrollTop;
-        const expectedScroll = prevScroll + scrollDelta;
-        const drift = actualScroll - expectedScroll;
-        if (Math.abs(drift) > 1) {
-          ctx.state.scroll += drift;
-        }
+  const bias = 1e7;
+  const [scrollAdjust, scrollAdjustUserOffset] = useArr$(["scrollAdjust", "scrollAdjustUserOffset"]);
+  const scrollOffset = (scrollAdjust || 0) + (scrollAdjustUserOffset || 0) + bias;
+  return /* @__PURE__ */ React2__namespace.createElement(
+    reactNative.View,
+    {
+      style: {
+        height: 0,
+        left: 0,
+        position: "absolute",
+        top: scrollOffset,
+        width: 0
       }
-      lastScrollOffsetRef.current = scrollOffset;
     }
-  }, [ctx]);
-  useValueListener$("scrollAdjust", callback);
-  useValueListener$("scrollAdjustUserOffset", callback);
-  return null;
+  );
 }
 function SnapWrapper({ ScrollComponent, ...props }) {
   const [snapToOffsets] = useArr$(["snapToOffsets"]);
-  return /* @__PURE__ */ React3.createElement(ScrollComponent, { ...props, snapToOffsets });
+  return /* @__PURE__ */ React2__namespace.createElement(ScrollComponent, { ...props, snapToOffsets });
 }
-var LayoutView = ({ onLayoutChange, refView, children, ...rest }) => {
-  const ref = refView != null ? refView : useRef();
-  useOnLayoutSync({ onLayoutChange, ref });
-  return /* @__PURE__ */ React3.createElement("div", { ...rest, ref }, children);
-};
-var getComponent = (Component) => {
-  if (React3.isValidElement(Component)) {
-    return Component;
-  }
-  if (Component) {
-    return /* @__PURE__ */ React3.createElement(Component, null);
-  }
-  return null;
+var LayoutView = ({ onLayoutChange, refView, ...rest }) => {
+  const ref = refView != null ? refView : React2.useRef();
+  const { onLayout } = useOnLayoutSync({ onLayoutChange, ref });
+  return /* @__PURE__ */ React2__namespace.createElement(reactNative.View, { ...rest, onLayout, ref });
 };
 
 // src/components/ListComponent.tsx
-var ListComponent = typedMemo(function ListComponent2({
+var ListComponent = typedMemo2(function ListComponent2({
   canRender,
   style,
   contentContainerStyle,
@@ -1828,18 +1538,19 @@ var ListComponent = typedMemo(function ListComponent2({
   snapToIndices,
   stickyHeaderConfig,
   stickyHeaderIndices,
+  useWindowScroll = false,
   ...rest
 }) {
   const ctx = useStateContext();
   const maintainVisibleContentPosition = ctx.state.props.maintainVisibleContentPosition;
-  const ScrollComponent = renderScrollComponent ? useMemo(
-    () => React3.forwardRef(
+  const ScrollComponent = renderScrollComponent ? React2.useMemo(
+    () => React2__namespace.forwardRef(
       (props, ref) => renderScrollComponent({ ...props, ref })
     ),
     [renderScrollComponent]
   ) : ListComponentScrollView;
   const SnapOrScroll = snapToIndices ? SnapWrapper : ScrollComponent;
-  useLayoutEffect(() => {
+  React2.useLayoutEffect(() => {
     if (!ListHeaderComponent) {
       set$(ctx, "headerSize", 0);
     }
@@ -1847,10 +1558,11 @@ var ListComponent = typedMemo(function ListComponent2({
       set$(ctx, "footerSize", 0);
     }
   }, [ListHeaderComponent, ListFooterComponent, ctx]);
-  return /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React2__namespace.createElement(
     SnapOrScroll,
     {
       ...rest,
+      ...ScrollComponent === ListComponentScrollView ? { useWindowScroll } : {},
       contentContainerStyle: [
         contentContainerStyle,
         horizontal ? {
@@ -1866,10 +1578,10 @@ var ListComponent = typedMemo(function ListComponent2({
       ScrollComponent: snapToIndices ? ScrollComponent : void 0,
       style
     },
-    /* @__PURE__ */ React3.createElement(ScrollAdjust, null),
-    ListHeaderComponent && /* @__PURE__ */ React3.createElement(LayoutView, { onLayoutChange: onLayoutHeader, style: ListHeaderComponentStyle }, getComponent(ListHeaderComponent)),
+    /* @__PURE__ */ React2__namespace.createElement(ScrollAdjust, null),
+    ListHeaderComponent && /* @__PURE__ */ React2__namespace.createElement(LayoutView, { onLayoutChange: onLayoutHeader, style: ListHeaderComponentStyle }, getComponent(ListHeaderComponent)),
     ListEmptyComponent && getComponent(ListEmptyComponent),
-    canRender && !ListEmptyComponent && /* @__PURE__ */ React3.createElement(
+    canRender && !ListEmptyComponent && /* @__PURE__ */ React2__namespace.createElement(
       Containers,
       {
         getRenderedItem: getRenderedItem2,
@@ -1881,7 +1593,7 @@ var ListComponent = typedMemo(function ListComponent2({
         waitForInitialLayout
       }
     ),
-    ListFooterComponent && /* @__PURE__ */ React3.createElement(
+    ListFooterComponent && /* @__PURE__ */ React2__namespace.createElement(
       LayoutView,
       {
         onLayoutChange: (layout) => {
@@ -1892,9 +1604,27 @@ var ListComponent = typedMemo(function ListComponent2({
       },
       getComponent(ListFooterComponent)
     ),
-    IS_DEV && ENABLE_DEVMODE && /* @__PURE__ */ React3.createElement(DevNumbers, null)
+    IS_DEV && ENABLE_DEVMODE && /* @__PURE__ */ React2__namespace.createElement(DevNumbers, null)
   );
 });
+
+// src/core/calculateOffsetForIndex.ts
+function calculateOffsetForIndex(ctx, index) {
+  const state = ctx.state;
+  let position = 0;
+  if (index !== void 0) {
+    position = state.positions[index] || 0;
+    const paddingTop = peek$(ctx, "stylePaddingTop");
+    if (paddingTop) {
+      position += paddingTop;
+    }
+    const headerSize = peek$(ctx, "headerSize");
+    if (headerSize) {
+      position += headerSize;
+    }
+  }
+  return position;
+}
 
 // src/utils/getId.ts
 function getId(state, index) {
@@ -1906,24 +1636,6 @@ function getId(state, index) {
   const id = ret;
   state.idCache[index] = id;
   return id;
-}
-
-// src/core/calculateOffsetForIndex.ts
-function calculateOffsetForIndex(ctx, index) {
-  const state = ctx.state;
-  let position = 0;
-  if (index !== void 0) {
-    position = state.positions.get(getId(state, index)) || 0;
-    const paddingTop = peek$(ctx, "stylePaddingTop");
-    if (paddingTop) {
-      position += paddingTop;
-    }
-    const headerSize = peek$(ctx, "headerSize");
-    if (headerSize) {
-      position += headerSize;
-    }
-  }
-  return position;
 }
 
 // src/core/addTotalSize.ts
@@ -1941,7 +1653,9 @@ function addTotalSize(ctx, key, add) {
     totalSize += add;
   }
   if (prevTotalSize !== totalSize) {
-    {
+    if (!IsNewArchitecture && state.initialScroll && totalSize < prevTotalSize) {
+      state.pendingTotalSize = totalSize;
+    } else {
       state.pendingTotalSize = void 0;
       state.totalSize = totalSize;
       set$(ctx, "totalSize", totalSize);
@@ -1978,10 +1692,8 @@ function getItemSize(ctx, key, index, data, _useAverageSize, _preferCachedSize) 
     }
   }
   let size;
-  if (size === void 0) {
-    const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
-    size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
-  }
+  const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
+  size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
   setSize(ctx, key, size);
   return size;
 }
@@ -2007,7 +1719,7 @@ function clampScrollOffset(ctx, offset, scrollTarget) {
   const state = ctx.state;
   const contentSize = getContentSize(ctx);
   let clampedOffset = offset;
-  if (Number.isFinite(contentSize) && Number.isFinite(state.scrollLength) && (Platform.OS !== "android")) {
+  if (Number.isFinite(contentSize) && Number.isFinite(state.scrollLength) && (Platform2.OS !== "android" || state.lastLayout)) {
     const baseMaxOffset = Math.max(0, contentSize - state.scrollLength);
     const viewOffset = scrollTarget == null ? void 0 : scrollTarget.viewOffset;
     const extraEndOffset = typeof viewOffset === "number" && viewOffset < 0 ? -viewOffset : 0;
@@ -2104,37 +1816,54 @@ function checkAtBottom(ctx) {
 
 // src/utils/checkAtTop.ts
 function checkAtTop(ctx) {
-  var _a3;
   const state = ctx == null ? void 0 : ctx.state;
   if (!state || state.initialScroll || state.scrollingTo) {
     return;
   }
   const {
-    scrollLength,
+    dataChangeEpoch,
+    isStartReached,
+    props: { data, onStartReachedThreshold },
     scroll,
-    props: { onStartReachedThreshold }
+    scrollLength,
+    startReachedSnapshot,
+    startReachedSnapshotDataChangeEpoch,
+    totalSize
   } = state;
-  const distanceFromTop = scroll;
-  state.isAtStart = distanceFromTop <= 0;
+  const dataLength = data.length;
+  const threshold = onStartReachedThreshold * scrollLength;
+  const dataChanged = startReachedSnapshotDataChangeEpoch !== dataChangeEpoch;
+  const withinThreshold = threshold > 0 && Math.abs(scroll) <= threshold;
+  const allowReentryOnDataChange = !!isStartReached && withinThreshold && !!dataChanged && !isInMVCPActiveMode(state);
+  if (isStartReached && threshold > 0 && scroll > threshold && startReachedSnapshot && (dataChanged || startReachedSnapshot.contentSize !== totalSize || startReachedSnapshot.dataLength !== dataLength)) {
+    state.isStartReached = false;
+    state.startReachedSnapshot = void 0;
+    state.startReachedSnapshotDataChangeEpoch = void 0;
+  }
+  state.isAtStart = scroll <= 0;
+  if (isStartReached && withinThreshold && dataChanged && !allowReentryOnDataChange) {
+    return;
+  }
   state.isStartReached = checkThreshold(
-    distanceFromTop,
+    scroll,
     false,
-    onStartReachedThreshold * scrollLength,
+    threshold,
     state.isStartReached,
-    state.startReachedSnapshot,
+    allowReentryOnDataChange ? void 0 : startReachedSnapshot,
     {
-      contentSize: state.totalSize,
-      dataLength: (_a3 = state.props.data) == null ? void 0 : _a3.length,
+      contentSize: totalSize,
+      dataLength,
       scrollPosition: scroll
     },
     (distance) => {
-      var _a4, _b;
-      return (_b = (_a4 = state.props).onStartReached) == null ? void 0 : _b.call(_a4, { distanceFromStart: distance });
+      var _a3, _b;
+      return (_b = (_a3 = state.props).onStartReached) == null ? void 0 : _b.call(_a3, { distanceFromStart: distance });
     },
     (snapshot) => {
       state.startReachedSnapshot = snapshot;
+      state.startReachedSnapshotDataChangeEpoch = snapshot ? dataChangeEpoch : void 0;
     },
-    false
+    allowReentryOnDataChange
   );
 }
 
@@ -2174,6 +1903,8 @@ function finishScrollTo(ctx) {
   var _a3, _b, _c, _d, _e, _f;
   const state = ctx.state;
   if (state == null ? void 0 : state.scrollingTo) {
+    const resolvePendingScroll = state.pendingScrollResolve;
+    state.pendingScrollResolve = void 0;
     const scrollingTo = state.scrollingTo;
     const callback = scrollingTo.onSettled;
     if (scrollingTo.isScrollToEnd) {
@@ -2217,11 +1948,12 @@ function finishScrollTo(ctx) {
     if ((_c = state.props) == null ? void 0 : _c.data) {
       (_d = state.triggerCalculateItemsInView) == null ? void 0 : _d.call(state, { doMVCP: true, forceFullItemPositions: true });
     }
-    {
+    if (PlatformAdjustBreaksScroll) {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
     }
     setInitialRenderState(ctx, { didInitialScroll: true });
     checkThresholds(ctx);
+    resolvePendingScroll == null ? void 0 : resolvePendingScroll();
     if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
       if (state.props.debugInitialization) {
         console.log("[finishScrollTo] Initial scroll complete, transitioning to STABILIZING", {
@@ -2245,82 +1977,75 @@ function finishScrollTo(ctx) {
   }
 }
 
-// src/core/doScrollTo.ts
-var SCROLL_END_IDLE_MS = 80;
-var SCROLL_END_MAX_MS = 1500;
-var SMOOTH_SCROLL_DURATION_MS = 320;
-var SCROLL_END_TARGET_EPSILON = 1;
-function doScrollTo(ctx, params) {
-  const state = ctx.state;
-  const { animated, horizontal, offset } = params;
-  const scroller = state.refScroller.current;
-  const node = typeof (scroller == null ? void 0 : scroller.getScrollableNode) === "function" ? scroller.getScrollableNode() : scroller;
-  if (node) {
-    const left = horizontal ? offset : 0;
-    const top = horizontal ? 0 : offset;
-    node.scrollTo({ behavior: animated ? "smooth" : "auto", left, top });
-    if (animated) {
-      listenForScrollEnd(ctx, node, {
-        horizontal: !!horizontal,
-        targetOffset: offset
-      });
-    } else {
-      state.scroll = offset;
-      setTimeout(() => {
-        finishScrollTo(ctx);
-      }, 100);
+// src/core/checkFinishedScroll.ts
+function checkFinishedScroll(ctx) {
+  ctx.state.animFrameCheckFinishedScroll = requestAnimationFrame(() => checkFinishedScrollFrame(ctx));
+}
+function checkFinishedScrollFrame(ctx) {
+  const scrollingTo = ctx.state.scrollingTo;
+  if (scrollingTo) {
+    const { state } = ctx;
+    state.animFrameCheckFinishedScroll = void 0;
+    const scroll = state.scrollPending;
+    const adjust = state.scrollAdjustHandler.getAdjust();
+    const clampedTargetOffset = clampScrollOffset(
+      ctx,
+      scrollingTo.offset - (scrollingTo.viewOffset || 0),
+      scrollingTo
+    );
+    const maxOffset = clampScrollOffset(ctx, scroll, scrollingTo);
+    const diff1 = Math.abs(scroll - clampedTargetOffset);
+    const diff2 = Math.abs(diff1 - adjust);
+    const isNotOverscrolled = Math.abs(scroll - maxOffset) < 1;
+    const isAtTarget = diff1 < 1 || !scrollingTo.animated && diff2 < 1;
+    if (isNotOverscrolled && isAtTarget) {
+      finishScrollTo(ctx);
     }
   }
 }
-function listenForScrollEnd(ctx, node, params) {
-  const { horizontal, targetOffset } = params;
-  const supportsScrollEnd = "onscrollend" in node;
-  let idleTimeout;
-  let maxTimeout;
-  let settled = false;
-  const targetToken = ctx.state.scrollingTo;
-  const cleanup = () => {
-    node.removeEventListener("scroll", onScroll2);
-    if (supportsScrollEnd) {
-      node.removeEventListener("scrollend", onScrollEnd);
-    }
-    if (idleTimeout) {
-      clearTimeout(idleTimeout);
-    }
-    if (maxTimeout) {
-      clearTimeout(maxTimeout);
-    }
-  };
-  const finish = (reason) => {
-    if (settled) return;
-    if (targetToken !== ctx.state.scrollingTo) {
-      settled = true;
-      cleanup();
-      return;
-    }
-    const currentOffset = horizontal ? node.scrollLeft : node.scrollTop;
-    const isNearTarget = Math.abs(currentOffset - targetOffset) <= SCROLL_END_TARGET_EPSILON;
-    if (reason === "scrollend" && !isNearTarget) {
-      return;
-    }
-    settled = true;
-    cleanup();
-    finishScrollTo(ctx);
-  };
-  const onScroll2 = () => {
-    if (idleTimeout) {
-      clearTimeout(idleTimeout);
-    }
-    idleTimeout = setTimeout(() => finish("idle"), SCROLL_END_IDLE_MS);
-  };
-  const onScrollEnd = () => finish("scrollend");
-  node.addEventListener("scroll", onScroll2);
-  if (supportsScrollEnd) {
-    node.addEventListener("scrollend", onScrollEnd);
-    maxTimeout = setTimeout(() => finish("max"), SCROLL_END_MAX_MS);
-  } else {
-    idleTimeout = setTimeout(() => finish("idle"), SMOOTH_SCROLL_DURATION_MS);
-    maxTimeout = setTimeout(() => finish("max"), SCROLL_END_MAX_MS);
+function checkFinishedScrollFallback(ctx) {
+  const state = ctx.state;
+  const scrollingTo = state.scrollingTo;
+  const slowTimeout = (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll) || !state.didContainersLayout;
+  state.timeoutCheckFinishedScrollFallback = setTimeout(
+    () => {
+      let numChecks = 0;
+      const checkHasScrolled = () => {
+        state.timeoutCheckFinishedScrollFallback = void 0;
+        const isStillScrollingTo = state.scrollingTo;
+        if (isStillScrollingTo) {
+          numChecks++;
+          if (state.hasScrolled || numChecks > 5) {
+            finishScrollTo(ctx);
+          } else {
+            state.timeoutCheckFinishedScrollFallback = setTimeout(checkHasScrolled, 100);
+          }
+        }
+      };
+      checkHasScrolled();
+    },
+    slowTimeout ? 500 : 100
+  );
+}
+
+// src/core/doScrollTo.native.ts
+function doScrollTo(ctx, params) {
+  const state = ctx.state;
+  const { animated, horizontal, offset } = params;
+  const isAnimated = !!animated;
+  const { refScroller } = state;
+  const scroller = refScroller.current;
+  if (!scroller) {
+    return;
+  }
+  scroller.scrollTo({
+    animated: isAnimated,
+    x: horizontal ? offset : 0,
+    y: horizontal ? 0 : offset
+  });
+  if (!isAnimated) {
+    state.scroll = offset;
+    checkFinishedScrollFallback(ctx);
   }
 }
 
@@ -2352,7 +2077,7 @@ function scrollTo(ctx, params) {
     state.scrollingTo = scrollTarget;
   }
   state.scrollPending = offset;
-  if (forceScroll || !isInitialScroll || Platform.OS === "android") {
+  if (forceScroll || !isInitialScroll || Platform2.OS === "android") {
     doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
   } else {
     if (state.props.debugInitialization) {
@@ -2372,10 +2097,15 @@ function scrollTo(ctx, params) {
   }
 }
 
+// src/platform/flushSync.native.ts
+var flushSync = (fn) => {
+  fn();
+};
+
 // src/core/updateScroll.ts
 function updateScroll(ctx, newScroll, forceUpdate) {
   const state = ctx.state;
-  const { scrollingTo, scrollAdjustHandler, lastScrollAdjustForHistory } = state;
+  const { ignoreScrollFromMVCP, lastScrollAdjustForHistory, scrollAdjustHandler, scrollHistory, scrollingTo } = state;
   const prevScroll = state.scroll;
   state.hasScrolled = true;
   state.lastBatchingAction = Date.now();
@@ -2383,22 +2113,17 @@ function updateScroll(ctx, newScroll, forceUpdate) {
   const adjust = scrollAdjustHandler.getAdjust();
   const adjustChanged = lastScrollAdjustForHistory !== void 0 && Math.abs(adjust - lastScrollAdjustForHistory) > 0.1;
   if (adjustChanged) {
-    state.scrollHistory.length = 0;
+    scrollHistory.length = 0;
   }
   state.lastScrollAdjustForHistory = adjust;
-  if (scrollingTo === void 0 && !(state.scrollHistory.length === 0 && newScroll === state.scroll)) {
+  if (scrollingTo === void 0 && !(scrollHistory.length === 0 && newScroll === state.scroll)) {
     if (!adjustChanged) {
-      state.scrollHistory.push({ scroll: newScroll, time: currentTime });
+      scrollHistory.push({ scroll: newScroll, time: currentTime });
     }
   }
-  if (state.scrollHistory.length > 5) {
-    state.scrollHistory.shift();
+  if (scrollHistory.length > 5) {
+    scrollHistory.shift();
   }
-  state.scrollPrev = prevScroll;
-  state.scrollPrevTime = state.scrollTime;
-  state.scroll = newScroll;
-  state.scrollTime = currentTime;
-  const ignoreScrollFromMVCP = state.ignoreScrollFromMVCP;
   if (ignoreScrollFromMVCP && !scrollingTo) {
     const { lt, gt } = ignoreScrollFromMVCP;
     if (lt && newScroll < lt || gt && newScroll > gt) {
@@ -2406,6 +2131,10 @@ function updateScroll(ctx, newScroll, forceUpdate) {
       return;
     }
   }
+  state.scrollPrev = prevScroll;
+  state.scrollPrevTime = state.scrollTime;
+  state.scroll = newScroll;
+  state.scrollTime = currentTime;
   const scrollDelta = Math.abs(newScroll - prevScroll);
   const scrollLength = state.scrollLength;
   const lastCalculated = state.scrollLastCalculate;
@@ -2420,7 +2149,7 @@ function updateScroll(ctx, newScroll, forceUpdate) {
       (_a3 = state.triggerCalculateItemsInView) == null ? void 0 : _a3.call(state, { doMVCP: scrollingTo !== void 0 });
       checkThresholds(ctx);
     };
-    if (scrollLength > 0 && scrollingTo === void 0 && scrollDelta > scrollLength) {
+    if (Platform2.OS === "web" && scrollLength > 0 && scrollingTo === void 0 && scrollDelta > scrollLength) {
       flushSync(runCalculateItems);
     } else {
       runCalculateItems();
@@ -2434,8 +2163,14 @@ function updateScroll(ctx, newScroll, forceUpdate) {
 function requestAdjust(ctx, positionDiff, dataChanged) {
   const state = ctx.state;
   if (Math.abs(positionDiff) > 0.1) {
+    const needsScrollWorkaround = Platform2.OS === "android" && !IsNewArchitecture && dataChanged && state.scroll <= positionDiff;
     const doit = () => {
-      {
+      if (needsScrollWorkaround) {
+        scrollTo(ctx, {
+          noScrollingTo: true,
+          offset: state.scroll
+        });
+      } else {
         state.scrollAdjustHandler.requestAdjust(positionDiff);
         if (state.adjustingFromInitialMount) {
           state.adjustingFromInitialMount--;
@@ -2450,11 +2185,86 @@ function requestAdjust(ctx, positionDiff, dataChanged) {
     const readyToRender = peek$(ctx, "readyToRender");
     if (readyToRender) {
       doit();
+      if (Platform2.OS !== "web") {
+        const threshold = state.scroll - positionDiff / 2;
+        if (!state.ignoreScrollFromMVCP) {
+          state.ignoreScrollFromMVCP = {};
+        }
+        if (positionDiff > 0) {
+          state.ignoreScrollFromMVCP.lt = threshold;
+        } else {
+          state.ignoreScrollFromMVCP.gt = threshold;
+        }
+        if (state.ignoreScrollFromMVCPTimeout) {
+          clearTimeout(state.ignoreScrollFromMVCPTimeout);
+        }
+        const delay = needsScrollWorkaround ? 250 : 100;
+        state.ignoreScrollFromMVCPTimeout = setTimeout(() => {
+          state.ignoreScrollFromMVCP = void 0;
+          const shouldForceUpdate = state.ignoreScrollFromMVCPIgnored && state.scrollProcessingEnabled !== false;
+          if (shouldForceUpdate) {
+            state.ignoreScrollFromMVCPIgnored = false;
+            state.scrollPending = state.scroll;
+            updateScroll(ctx, state.scroll, true);
+          }
+        }, delay);
+      }
     } else {
       state.adjustingFromInitialMount = (state.adjustingFromInitialMount || 0) + 1;
       requestAnimationFrame(doit);
     }
   }
+}
+
+// src/core/ensureInitialAnchor.ts
+var INITIAL_ANCHOR_TOLERANCE = 0.5;
+var INITIAL_ANCHOR_MAX_ATTEMPTS = 4;
+var INITIAL_ANCHOR_SETTLED_TICKS = 2;
+function ensureInitialAnchor(ctx) {
+  var _a3, _b, _c, _d, _e;
+  const state = ctx.state;
+  const { initialAnchor, didContainersLayout, scroll, scrollLength } = state;
+  const anchor = initialAnchor;
+  const item = state.props.data[anchor.index];
+  if (!didContainersLayout) {
+    return;
+  }
+  const id = getId(state, anchor.index);
+  if (state.positions[anchor.index] === void 0) {
+    return;
+  }
+  const size = getItemSize(ctx, id, anchor.index, item);
+  if (size === void 0) {
+    return;
+  }
+  const availableSpace = Math.max(0, scrollLength - size);
+  const desiredOffset = calculateOffsetForIndex(ctx, anchor.index) - ((_a3 = anchor.viewOffset) != null ? _a3 : 0) - ((_b = anchor.viewPosition) != null ? _b : 0) * availableSpace;
+  const clampedDesiredOffset = clampScrollOffset(ctx, desiredOffset, anchor);
+  const delta = clampedDesiredOffset - scroll;
+  if (Math.abs(delta) <= INITIAL_ANCHOR_TOLERANCE) {
+    const settledTicks = ((_c = anchor.settledTicks) != null ? _c : 0) + 1;
+    if (settledTicks >= INITIAL_ANCHOR_SETTLED_TICKS) {
+      state.initialAnchor = void 0;
+    } else {
+      anchor.settledTicks = settledTicks;
+    }
+    return;
+  }
+  if (((_d = anchor.attempts) != null ? _d : 0) >= INITIAL_ANCHOR_MAX_ATTEMPTS) {
+    state.initialAnchor = void 0;
+    return;
+  }
+  const lastDelta = anchor.lastDelta;
+  if (lastDelta !== void 0 && Math.abs(delta) >= Math.abs(lastDelta)) {
+    state.initialAnchor = void 0;
+    return;
+  }
+  Object.assign(anchor, {
+    attempts: ((_e = anchor.attempts) != null ? _e : 0) + 1,
+    lastDelta: delta,
+    settledTicks: 0
+  });
+  requestAdjust(ctx, delta);
 }
 
 // src/core/initialization/mvcpInitialization.ts
@@ -2468,13 +2278,14 @@ function prepareInitializationMVCP(ctx) {
   if (anchorIndex === void 0) {
     return void 0;
   }
-  const prevPosition = state.positions.get(anchorId);
+  const prevPosition = state.positions[anchorIndex];
   if (prevPosition === void 0) {
     return void 0;
   }
   const targetViewPosition = (_a3 = manager.getTargetViewPosition()) != null ? _a3 : 0.5;
   return () => {
-    const newPosition = state.positions.get(anchorId);
+    const anchorIndex2 = state.indexByKey.get(anchorId);
+    const newPosition = anchorIndex2 !== void 0 ? state.positions[anchorIndex2] : void 0;
     if (newPosition === void 0) {
       return;
     }
@@ -2484,7 +2295,7 @@ function prepareInitializationMVCP(ctx) {
     const clampedTargetScroll = Math.max(0, Math.min(targetScroll, maxScroll));
     const scrollAdjustment = clampedTargetScroll - state.scroll;
     if (Math.abs(scrollAdjustment) > 0.1) {
-      requestAdjust(ctx, scrollAdjustment);
+      requestAdjust(ctx, scrollAdjustment, false);
     }
   };
 }
@@ -2511,7 +2322,7 @@ function resolveAnchorLock(state, enableMVCPAnchorLock, mvcpData, now) {
   return lock;
 }
 function updateAnchorLock(state, params) {
-  {
+  if (Platform2.OS === "web") {
     const { anchorId, anchorPosition, dataChanged, now, positionDiff } = params;
     const enableMVCPAnchorLock = !!dataChanged || !!state.mvcpAnchorLock;
     const mvcpData = state.props.maintainVisibleContentPosition.data;
@@ -2539,10 +2350,11 @@ function prepareMVCP(ctx, dataChanged) {
     alignItemsAtEnd,
     maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition }
   } = props;
+  const isWeb = Platform2.OS === "web";
   const now = Date.now();
-  const enableMVCPAnchorLock = (!!dataChanged || !!state.mvcpAnchorLock);
+  const enableMVCPAnchorLock = isWeb && (!!dataChanged || !!state.mvcpAnchorLock);
   const scrollingTo = state.scrollingTo;
-  const anchorLock = resolveAnchorLock(state, enableMVCPAnchorLock, mvcpData, now) ;
+  const anchorLock = isWeb ? resolveAnchorLock(state, enableMVCPAnchorLock, mvcpData, now) : void 0;
   let prevPosition;
   let targetId;
   const idsInViewWithPositions = [];
@@ -2556,6 +2368,9 @@ function prepareMVCP(ctx, dataChanged) {
       targetId = anchorLock.id;
       prevPosition = anchorLock.position;
     } else if (scrollTarget !== void 0) {
+      if (!IsNewArchitecture && (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll)) {
+        return void 0;
+      }
       targetId = getId(state, scrollTarget);
     } else if (idsInView.length > 0 && state.didContainersLayout && !dataChanged) {
       if (alignItemsAtEnd) {
@@ -2576,7 +2391,10 @@ function prepareMVCP(ctx, dataChanged) {
           const id = idsInView[i];
           const index = indexByKey.get(id);
           if (index !== void 0) {
-            idsInViewWithPositions.push({ id, position: positions.get(id) });
+            const position = positions[index];
+            if (position !== void 0) {
+              idsInViewWithPositions.push({ id, position });
+            }
           }
         }
       } else {
@@ -2584,13 +2402,19 @@ function prepareMVCP(ctx, dataChanged) {
           const id = idsInView[i];
           const index = indexByKey.get(id);
           if (index !== void 0) {
-            idsInViewWithPositions.push({ id, position: positions.get(id) });
+            const position = positions[index];
+            if (position !== void 0) {
+              idsInViewWithPositions.push({ id, position });
+            }
           }
         }
       }
     }
     if (targetId !== void 0 && prevPosition === void 0) {
-      prevPosition = positions.get(targetId);
+      const targetIndex = indexByKey.get(targetId);
+      if (targetIndex !== void 0) {
+        prevPosition = positions[targetIndex];
+      }
     }
     return () => {
       var _a3, _b;
@@ -2599,7 +2423,7 @@ function prepareMVCP(ctx, dataChanged) {
       let anchorPositionForLock;
       let skipTargetAnchor = false;
       const data = state.props.data;
-      const shouldValidateLockedAnchor = dataChanged && mvcpData && scrollTarget === void 0 && targetId !== void 0 && (anchorLock == null ? void 0 : anchorLock.id) === targetId && shouldRestorePosition !== void 0;
+      const shouldValidateLockedAnchor = isWeb && dataChanged && mvcpData && scrollTarget === void 0 && targetId !== void 0 && (anchorLock == null ? void 0 : anchorLock.id) === targetId && shouldRestorePosition !== void 0;
       if (shouldValidateLockedAnchor && targetId !== void 0) {
         const index = indexByKey.get(targetId);
         if (index !== void 0) {
@@ -2610,7 +2434,13 @@ function prepareMVCP(ctx, dataChanged) {
           }
         }
       }
-      const shouldUseFallbackVisibleAnchor = dataChanged && mvcpData && scrollTarget === void 0 && (targetId === void 0 || positions.get(targetId) === void 0 || skipTargetAnchor);
+      const shouldUseFallbackVisibleAnchor = dataChanged && mvcpData && scrollTarget === void 0 && (() => {
+        if (targetId === void 0 || skipTargetAnchor) {
+          return true;
+        }
+        const targetIndex = indexByKey.get(targetId);
+        return targetIndex === void 0 || positions[targetIndex] === void 0;
+      })();
       if (shouldUseFallbackVisibleAnchor) {
         for (let i = 0; i < idsInViewWithPositions.length; i++) {
           const { id, position } = idsInViewWithPositions[i];
@@ -2621,7 +2451,7 @@ function prepareMVCP(ctx, dataChanged) {
               continue;
             }
           }
-          const newPosition = positions.get(id);
+          const newPosition = index !== void 0 ? positions[index] : void 0;
           if (newPosition !== void 0) {
             positionDiff = newPosition - position;
             anchorIdForLock = id;
@@ -2631,7 +2461,8 @@ function prepareMVCP(ctx, dataChanged) {
         }
       }
       if (!skipTargetAnchor && targetId !== void 0 && prevPosition !== void 0) {
-        const newPosition = positions.get(targetId);
+        const targetIndex = indexByKey.get(targetId);
+        const newPosition = targetIndex !== void 0 ? positions[targetIndex] : void 0;
         if (newPosition !== void 0) {
           const totalSize = getContentSize(ctx);
           let diff = newPosition - prevPosition;
@@ -2665,7 +2496,7 @@ function prepareMVCP(ctx, dataChanged) {
         positionDiff
       });
       if (Math.abs(positionDiff) > MVCP_POSITION_EPSILON) {
-        requestAdjust(ctx, positionDiff);
+        requestAdjust(ctx, positionDiff, dataChanged && mvcpData);
       }
     };
   }
@@ -2677,17 +2508,15 @@ function prepareColumnStartState(ctx, startIndex, useAverageSize) {
   const state = ctx.state;
   const numColumns = peek$(ctx, "numColumns");
   let rowStartIndex = startIndex;
-  const columnAtStart = state.columns.get(state.idCache[startIndex]);
+  const columnAtStart = state.columns[startIndex];
   if (columnAtStart !== 1) {
     rowStartIndex = findRowStartIndex(state, numColumns, startIndex);
   }
   let currentRowTop = 0;
-  const curId = state.idCache[rowStartIndex];
-  const column = state.columns.get(curId);
+  const column = state.columns[rowStartIndex];
   if (rowStartIndex > 0) {
     const prevIndex = rowStartIndex - 1;
-    const prevId = state.idCache[prevIndex];
-    const prevPosition = (_a3 = state.positions.get(prevId)) != null ? _a3 : 0;
+    const prevPosition = (_a3 = state.positions[prevIndex]) != null ? _a3 : 0;
     const prevRowStart = findRowStartIndex(state, numColumns, prevIndex);
     const prevRowHeight = calculateRowMaxSize(ctx, prevRowStart, prevIndex);
     currentRowTop = prevPosition + prevRowHeight;
@@ -2704,7 +2533,7 @@ function findRowStartIndex(state, numColumns, index) {
   }
   let rowStart = Math.max(0, index);
   while (rowStart > 0) {
-    const columnForIndex = state.columns.get(state.idCache[rowStart]);
+    const columnForIndex = state.columns[rowStart];
     if (columnForIndex === 1) {
       break;
     }
@@ -2737,7 +2566,7 @@ function calculateRowMaxSize(ctx, startIndex, endIndex, useAverageSize) {
 
 // src/core/updateTotalSize.ts
 function updateTotalSize(ctx) {
-  var _a3, _b, _c;
+  var _a3, _b;
   const state = ctx.state;
   const {
     positions,
@@ -2747,35 +2576,33 @@ function updateTotalSize(ctx) {
   if (data.length === 0) {
     addTotalSize(ctx, null, 0);
   } else {
-    const lastId = getId(state, data.length - 1);
-    if (lastId !== void 0) {
-      const lastPosition = positions.get(lastId);
-      if (lastPosition !== void 0) {
-        if (numColumns > 1) {
-          let rowStart = data.length - 1;
-          while (rowStart > 0) {
-            const rowId = (_b = state.idCache[rowStart]) != null ? _b : getId(state, rowStart);
-            const column = state.columns.get(rowId);
-            if (column === 1 || column === void 0) {
-              break;
-            }
-            rowStart -= 1;
+    const lastIndex = data.length - 1;
+    const lastId = getId(state, lastIndex);
+    const lastPosition = positions[lastIndex];
+    if (lastId !== void 0 && lastPosition !== void 0) {
+      if (numColumns > 1) {
+        let rowStart = lastIndex;
+        while (rowStart > 0) {
+          const column = state.columns[rowStart];
+          if (column === 1 || column === void 0) {
+            break;
           }
-          let maxSize = 0;
-          for (let i = rowStart; i < data.length; i++) {
-            const rowId = (_c = state.idCache[i]) != null ? _c : getId(state, i);
-            const size = getItemSize(ctx, rowId, i, data[i]);
-            if (size > maxSize) {
-              maxSize = size;
-            }
+          rowStart -= 1;
+        }
+        let maxSize = 0;
+        for (let i = rowStart; i <= lastIndex; i++) {
+          const rowId = (_b = state.idCache[i]) != null ? _b : getId(state, i);
+          const size = getItemSize(ctx, rowId, i, data[i]);
+          if (size > maxSize) {
+            maxSize = size;
           }
-          addTotalSize(ctx, null, lastPosition + maxSize);
-        } else {
-          const lastSize = getItemSize(ctx, lastId, data.length - 1, data[data.length - 1]);
-          if (lastSize !== void 0) {
-            const totalSize = lastPosition + lastSize;
-            addTotalSize(ctx, null, totalSize);
-          }
+        }
+        addTotalSize(ctx, null, lastPosition + maxSize);
+      } else {
+        const lastSize = getItemSize(ctx, lastId, lastIndex, data[lastIndex]);
+        if (lastSize !== void 0) {
+          const totalSize = lastPosition + lastSize;
+          addTotalSize(ctx, null, totalSize);
         }
       }
     }
@@ -2825,14 +2652,13 @@ var getScrollVelocity = (state) => {
 function updateSnapToOffsets(ctx) {
   const state = ctx.state;
   const {
-    positions,
     props: { snapToIndices }
   } = state;
   const snapToOffsets = Array(snapToIndices.length);
   for (let i = 0; i < snapToIndices.length; i++) {
     const idx = snapToIndices[i];
-    const key = getId(state, idx);
-    snapToOffsets[i] = positions.get(key);
+    getId(state, idx);
+    snapToOffsets[i] = state.positions[idx];
   }
   set$(ctx, "snapToOffsets", snapToOffsets);
 }
@@ -2844,8 +2670,9 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   scrollBottomBuffered: -1,
   startIndex: 0
 }) {
-  var _a3, _b, _c, _d, _e, _f;
+  var _a3, _b, _c, _d, _e;
   const state = ctx.state;
+  const hasPositionListeners = ctx.positionListeners.size > 0;
   const {
     columns,
     columnSpans,
@@ -2864,14 +2691,22 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
   const layoutConfig = overrideItemLayout ? { span: 1 } : void 0;
   const lastScrollDelta = state.lastScrollDelta;
   const velocity = getScrollVelocity(state);
-  const shouldOptimize = !forceFullUpdate && !dataChanged && (Math.abs(velocity) > 0 || state.scrollLength > 0 && lastScrollDelta > state.scrollLength);
+  const shouldOptimize = !forceFullUpdate && !dataChanged && (Math.abs(velocity) > 0 || Platform2.OS === "web" && state.scrollLength > 0 && lastScrollDelta > state.scrollLength);
   const maxVisibleArea = scrollBottomBuffered + 1e3;
   !doMVCP || dataChanged || state.scrollAdjustHandler.getAdjust() !== 0 || ((_b = peek$(ctx, "scrollAdjustPending")) != null ? _b : 0) !== 0;
   let currentRowTop = 0;
   let column = 1;
   let maxSizeInRow = 0;
   if (dataChanged) {
-    columnSpans.clear();
+    columnSpans.length = 0;
+  }
+  if (!hasColumns) {
+    if (columns.length) {
+      columns.length = 0;
+    }
+    if (columnSpans.length) {
+      columnSpans.length = 0;
+    }
   }
   if (startIndex > 0) {
     if (hasColumns) {
@@ -2883,12 +2718,13 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
     } else if (startIndex < dataLength) {
       const prevIndex = startIndex - 1;
       const prevId = getId(state, prevIndex);
-      const prevPosition = (_c = positions.get(prevId)) != null ? _c : 0;
+      const prevPosition = (_c = positions[prevIndex]) != null ? _c : 0;
       const prevSize = (_d = sizesKnown.get(prevId)) != null ? _d : getItemSize(ctx, prevId, prevIndex, data[prevIndex]);
       currentRowTop = prevPosition + prevSize;
     }
   }
   const needsIndexByKey = dataChanged || indexByKey.size === 0;
+  const canOverrideSpan = hasColumns && !!overrideItemLayout && !!layoutConfig;
   let didBreakEarly = false;
   let breakAt;
   for (let i = startIndex; i < dataLength; i++) {
@@ -2902,7 +2738,7 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
     }
     const id = (_e = idCache[i]) != null ? _e : getId(state, i);
     let span = 1;
-    if (hasColumns && overrideItemLayout && layoutConfig) {
+    if (canOverrideSpan) {
       layoutConfig.span = 1;
       overrideItemLayout(layoutConfig, data[i], i, numColumns, extraData);
       const requestedSpan = layoutConfig.span;
@@ -2915,7 +2751,8 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
       column = 1;
       maxSizeInRow = 0;
     }
-    const size = (_f = sizesKnown.get(id)) != null ? _f : getItemSize(ctx, id, i, data[i]);
+    const knownSize = sizesKnown.get(id);
+    const size = knownSize !== void 0 ? knownSize : getItemSize(ctx, id, i, data[i]);
     if (IS_DEV && needsIndexByKey) {
       if (indexByKeyForChecking.has(id)) {
         console.error(
@@ -2924,16 +2761,20 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
       }
       indexByKeyForChecking.set(id, i);
     }
-    if (currentRowTop !== positions.get(id)) {
-      positions.set(id, currentRowTop);
-      notifyPosition$(ctx, id, currentRowTop);
+    if (currentRowTop !== positions[i]) {
+      positions[i] = currentRowTop;
+      if (hasPositionListeners) {
+        notifyPosition$(ctx, id, currentRowTop);
+      }
     }
     if (needsIndexByKey) {
       indexByKey.set(id, i);
     }
-    columns.set(id, column);
-    columnSpans.set(id, span);
-    if (hasColumns) {
+    if (!hasColumns) {
+      currentRowTop += size;
+    } else {
+      columns[i] = column;
+      columnSpans[i] = span;
       if (size > maxSizeInRow) {
         maxSizeInRow = size;
       }
@@ -2943,8 +2784,6 @@ function updateItemPositions(ctx, dataChanged, { startIndex, scrollBottomBuffere
         column = 1;
         maxSizeInRow = 0;
       }
-    } else {
-      currentRowTop += size;
     }
   }
   if (!didBreakEarly) {
@@ -3096,14 +2935,38 @@ function shallowEqual(prev, next) {
   return true;
 }
 function computeViewability(state, ctx, viewabilityConfig, containerId, key, scrollSize, item, index) {
-  const { sizes, positions, scroll: scrollState } = state;
+  const { sizes, scroll: scrollState } = state;
   const topPad = (peek$(ctx, "stylePaddingTop") || 0) + (peek$(ctx, "headerSize") || 0);
   const { itemVisiblePercentThreshold, viewAreaCoveragePercentThreshold } = viewabilityConfig;
   const viewAreaMode = viewAreaCoveragePercentThreshold != null;
   const viewablePercentThreshold = viewAreaMode ? viewAreaCoveragePercentThreshold : itemVisiblePercentThreshold;
   const scroll = scrollState - topPad;
-  const top = positions.get(key) - scroll;
+  const position = state.positions[index];
   const size = sizes.get(key) || 0;
+  if (position === void 0) {
+    const value2 = {
+      containerId,
+      index,
+      isViewable: false,
+      item,
+      key,
+      percentOfScroller: 0,
+      percentVisible: 0,
+      scrollSize,
+      size,
+      sizeVisible: -1
+    };
+    const prev2 = ctx.mapViewabilityAmountValues.get(containerId);
+    if (!shallowEqual(prev2, value2)) {
+      ctx.mapViewabilityAmountValues.set(containerId, value2);
+      const cb = ctx.mapViewabilityAmountCallbacks.get(containerId);
+      if (cb) {
+        cb(value2);
+      }
+    }
+    return value2;
+  }
+  const top = position - scroll;
   const bottom = top + size;
   const isEntirelyVisible = top >= 0 && bottom <= scrollSize && bottom > top;
   const sizeVisible = isEntirelyVisible ? size : Math.min(bottom, scrollSize) - Math.max(top, 0);
@@ -3339,13 +3202,10 @@ function setDidLayout(ctx) {
 
 // src/core/calculateItemsInView.ts
 function findCurrentStickyIndex(stickyArray, scroll, state) {
-  var _a3;
-  const idCache = state.idCache;
   const positions = state.positions;
   for (let i = stickyArray.length - 1; i >= 0; i--) {
     const stickyIndex = stickyArray[i];
-    const stickyId = (_a3 = idCache[stickyIndex]) != null ? _a3 : getId(state, stickyIndex);
-    const stickyPos = stickyId ? positions.get(stickyId) : void 0;
+    const stickyPos = positions[stickyIndex];
     if (stickyPos !== void 0 && scroll >= stickyPos) {
       return i;
     }
@@ -3375,7 +3235,7 @@ function handleStickyActivation(ctx, stickyHeaderIndices, stickyArray, currentSt
   }
 }
 function handleStickyRecycling(ctx, stickyArray, scroll, drawDistance, currentStickyIdx, pendingRemoval, alwaysRenderIndicesSet) {
-  var _a3, _b, _c;
+  var _a3, _b;
   const state = ctx.state;
   for (const containerIndex of state.stickyContainerPool) {
     const itemKey = peek$(ctx, `containerItemKey${containerIndex}`);
@@ -3393,14 +3253,13 @@ function handleStickyRecycling(ctx, stickyArray, scroll, drawDistance, currentSt
     const nextIndex = stickyArray[arrayIdx + 1];
     let shouldRecycle = false;
     if (nextIndex) {
-      const nextId = (_a3 = state.idCache[nextIndex]) != null ? _a3 : getId(state, nextIndex);
-      const nextPos = nextId ? state.positions.get(nextId) : void 0;
+      const nextPos = state.positions[nextIndex];
       shouldRecycle = nextPos !== void 0 && scroll > nextPos + drawDistance * 2;
     } else {
-      const currentId = (_b = state.idCache[itemIndex]) != null ? _b : getId(state, itemIndex);
+      const currentId = (_a3 = state.idCache[itemIndex]) != null ? _a3 : getId(state, itemIndex);
       if (currentId) {
-        const currentPos = state.positions.get(currentId);
-        const currentSize = (_c = state.sizes.get(currentId)) != null ? _c : getItemSize(ctx, currentId, itemIndex, state.props.data[itemIndex]);
+        const currentPos = state.positions[itemIndex];
+        const currentSize = (_b = state.sizes.get(currentId)) != null ? _b : getItemSize(ctx, currentId, itemIndex, state.props.data[itemIndex]);
         shouldRecycle = currentPos !== void 0 && scroll > currentPos + currentSize + drawDistance * 3;
       }
     }
@@ -3426,8 +3285,8 @@ function getMvcpHandler(ctx, mode, dataChanged) {
 }
 function calculateItemsInView(ctx, params = {}) {
   const state = ctx.state;
-  unstable_batchedUpdates(() => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  reactNative.unstable_batchedUpdates(() => {
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const {
       columns,
       columnSpans,
@@ -3461,6 +3320,9 @@ function calculateItemsInView(ctx, params = {}) {
     const { dataChanged, doMVCP, forceFullItemPositions } = params;
     const prevNumContainers = peek$(ctx, "numContainers");
     if (!data || scrollLength === 0 || !prevNumContainers) {
+      if (!IsNewArchitecture && state.initialAnchor) {
+        ensureInitialAnchor(ctx);
+      }
       return;
     }
     const totalSize = getContentSize(ctx);
@@ -3515,7 +3377,10 @@ function calculateItemsInView(ctx, params = {}) {
       if (top === null && bottom === null) {
         state.scrollForNextCalculateItemsInView = void 0;
       } else if ((top === null || scrollTopBuffered > top) && (bottom === null || scrollBottomBuffered < bottom)) {
-        if (!isInMVCPActiveMode(state)) {
+        if (!IsNewArchitecture && state.initialAnchor) {
+          ensureInitialAnchor(ctx);
+        }
+        if (Platform2.OS !== "web" || !isInMVCPActiveMode(state)) {
           return;
         }
       }
@@ -3525,7 +3390,9 @@ function calculateItemsInView(ctx, params = {}) {
     if (dataChanged) {
       indexByKey.clear();
       idCache.length = 0;
-      positions.clear();
+      positions.length = 0;
+      columns.length = 0;
+      columnSpans.length = 0;
     }
     const startIndex = forceFullItemPositions || dataChanged ? 0 : (_b = minIndexSizeChanged != null ? minIndexSizeChanged : state.startBuffered) != null ? _b : 0;
     updateItemPositions(ctx, dataChanged, {
@@ -3554,7 +3421,7 @@ function calculateItemsInView(ctx, params = {}) {
     let loopStart = !dataChanged && startBufferedIdOrig ? indexByKey.get(startBufferedIdOrig) || 0 : 0;
     for (let i = loopStart; i >= 0; i--) {
       const id = (_c = idCache[i]) != null ? _c : getId(state, i);
-      const top = positions.get(id);
+      const top = positions[i];
       const size = (_d = sizes.get(id)) != null ? _d : getItemSize(ctx, id, i, data[i]);
       const bottom = top + size;
       if (bottom > scroll - scrollBufferTop) {
@@ -3565,8 +3432,7 @@ function calculateItemsInView(ctx, params = {}) {
     }
     if (numColumns > 1) {
       while (loopStart > 0) {
-        const loopId = (_e = idCache[loopStart]) != null ? _e : getId(state, loopStart);
-        const loopColumn = columns.get(loopId);
+        const loopColumn = columns[loopStart];
         if (loopColumn === 1 || loopColumn === void 0) {
           break;
         }
@@ -3587,9 +3453,9 @@ function calculateItemsInView(ctx, params = {}) {
     let firstFullyOnScreenIndex;
     const dataLength = data.length;
     for (let i = Math.max(0, loopStart); i < dataLength && (!foundEnd || i <= maxIndexRendered); i++) {
-      const id = (_f = idCache[i]) != null ? _f : getId(state, i);
-      const size = (_g = sizes.get(id)) != null ? _g : getItemSize(ctx, id, i, data[i]);
-      const top = positions.get(id);
+      const id = (_e = idCache[i]) != null ? _e : getId(state, i);
+      const size = (_f = sizes.get(id)) != null ? _f : getItemSize(ctx, id, i, data[i]);
+      const top = positions[i];
       if (!foundEnd) {
         if (startNoBuffer === null && top + size > scroll) {
           startNoBuffer = i;
@@ -3626,7 +3492,7 @@ function calculateItemsInView(ctx, params = {}) {
     const idsInView = [];
     const firstVisibleIndex = startNoBuffer != null ? startNoBuffer : firstFullyOnScreenIndex;
     for (let i = firstVisibleIndex; i <= endNoBuffer; i++) {
-      const id = (_h = idCache[i]) != null ? _h : getId(state, i);
+      const id = (_g = idCache[i]) != null ? _g : getId(state, i);
       idsInView.push(id);
     }
     Object.assign(state, {
@@ -3658,7 +3524,7 @@ function calculateItemsInView(ctx, params = {}) {
       const needNewContainers = [];
       const needNewContainersSet = /* @__PURE__ */ new Set();
       for (let i = startBuffered; i <= endBuffered; i++) {
-        const id = (_i = idCache[i]) != null ? _i : getId(state, i);
+        const id = (_h = idCache[i]) != null ? _h : getId(state, i);
         if (!containerItemKeys.has(id)) {
           needNewContainersSet.add(i);
           needNewContainers.push(i);
@@ -3667,7 +3533,7 @@ function calculateItemsInView(ctx, params = {}) {
       if (alwaysRenderArr.length > 0) {
         for (const index of alwaysRenderArr) {
           if (index < 0 || index >= dataLength) continue;
-          const id = (_j = idCache[index]) != null ? _j : getId(state, index);
+          const id = (_i = idCache[index]) != null ? _i : getId(state, index);
           if (id && !containerItemKeys.has(id) && !needNewContainersSet.has(index)) {
             needNewContainersSet.add(index);
             needNewContainers.push(index);
@@ -3705,7 +3571,7 @@ function calculateItemsInView(ctx, params = {}) {
         for (let idx = 0; idx < needNewContainers.length; idx++) {
           const i = needNewContainers[idx];
           const containerIndex = availableContainers[idx];
-          const id = (_k = idCache[i]) != null ? _k : getId(state, i);
+          const id = (_j = idCache[i]) != null ? _j : getId(state, i);
           const oldKey = peek$(ctx, `containerItemKey${containerIndex}`);
           if (oldKey && oldKey !== id) {
             containerItemKeys.delete(oldKey);
@@ -3746,7 +3612,7 @@ function calculateItemsInView(ctx, params = {}) {
       if (alwaysRenderArr.length > 0) {
         for (const index of alwaysRenderArr) {
           if (index < 0 || index >= dataLength) continue;
-          const id = (_l = idCache[index]) != null ? _l : getId(state, index);
+          const id = (_k = idCache[index]) != null ? _k : getId(state, index);
           const containerIndex = containerItemKeys.get(id);
           if (containerIndex !== void 0) {
             state.stickyContainerPool.add(containerIndex);
@@ -3786,15 +3652,14 @@ function calculateItemsInView(ctx, params = {}) {
         const itemIndex = indexByKey.get(itemKey);
         const item = data[itemIndex];
         if (item !== void 0) {
-          const id = (_m = idCache[itemIndex]) != null ? _m : getId(state, itemIndex);
-          const positionValue = positions.get(id);
+          const positionValue = positions[itemIndex];
           if (positionValue === void 0) {
             set$(ctx, `containerPosition${i}`, POSITION_OUT_OF_VIEW);
           } else {
             const shouldApplyAdjust = queuedInitialLayout || !initialScroll;
             const position = (positionValue || 0) - (shouldApplyAdjust ? scrollAdjustPending : 0);
-            const column = columns.get(id) || 1;
-            const span = columnSpans.get(id) || 1;
+            const column = columns[itemIndex] || 1;
+            const span = columnSpans[itemIndex] || 1;
             const prevPos = peek$(ctx, `containerPosition${i}`);
             const prevColumn = peek$(ctx, `containerColumn${i}`);
             const prevSpan = peek$(ctx, `containerSpan${i}`);
@@ -3816,7 +3681,7 @@ function calculateItemsInView(ctx, params = {}) {
         }
       }
     }
-    if (didChangePositions) {
+    if (Platform2.OS === "web" && didChangePositions) {
       set$(ctx, "lastPositionUpdate", Date.now());
     }
     if (!queuedInitialLayout && endBuffered !== null) {
@@ -3837,6 +3702,9 @@ function calculateItemsInView(ctx, params = {}) {
       ctx.initializationManager.checkStabilization();
     }
   });
+  if (!IsNewArchitecture && state.initialAnchor) {
+    ensureInitialAnchor(ctx);
+  }
 }
 
 // src/core/checkActualChange.ts
@@ -3857,57 +3725,6 @@ function checkActualChange(state, dataProp, previousData) {
     }
   }
   return false;
-}
-
-// src/core/checkFinishedScroll.ts
-function checkFinishedScroll(ctx) {
-  ctx.state.animFrameCheckFinishedScroll = requestAnimationFrame(() => checkFinishedScrollFrame(ctx));
-}
-function checkFinishedScrollFrame(ctx) {
-  const scrollingTo = ctx.state.scrollingTo;
-  if (scrollingTo) {
-    const { state } = ctx;
-    state.animFrameCheckFinishedScroll = void 0;
-    const scroll = state.scrollPending;
-    const adjust = state.scrollAdjustHandler.getAdjust();
-    const clampedTargetOffset = clampScrollOffset(
-      ctx,
-      scrollingTo.offset - (scrollingTo.viewOffset || 0),
-      scrollingTo
-    );
-    const maxOffset = clampScrollOffset(ctx, scroll, scrollingTo);
-    const diff1 = Math.abs(scroll - clampedTargetOffset);
-    const diff2 = Math.abs(diff1 - adjust);
-    const isNotOverscrolled = Math.abs(scroll - maxOffset) < 1;
-    const isAtTarget = diff1 < 1 || !scrollingTo.animated && diff2 < 1;
-    if (isNotOverscrolled && isAtTarget) {
-      finishScrollTo(ctx);
-    }
-  }
-}
-function checkFinishedScrollFallback(ctx) {
-  const state = ctx.state;
-  const scrollingTo = state.scrollingTo;
-  const slowTimeout = (scrollingTo == null ? void 0 : scrollingTo.isInitialScroll) || !state.didContainersLayout;
-  state.timeoutCheckFinishedScrollFallback = setTimeout(
-    () => {
-      let numChecks = 0;
-      const checkHasScrolled = () => {
-        state.timeoutCheckFinishedScrollFallback = void 0;
-        const isStillScrollingTo = state.scrollingTo;
-        if (isStillScrollingTo) {
-          numChecks++;
-          if (state.hasScrolled || numChecks > 5) {
-            finishScrollTo(ctx);
-          } else {
-            state.timeoutCheckFinishedScrollFallback = setTimeout(checkHasScrolled, 100);
-          }
-        }
-      };
-      checkHasScrolled();
-    },
-    slowTimeout ? 500 : 100
-  );
 }
 
 // src/core/doMaintainScrollAtEnd.ts
@@ -4061,7 +3878,7 @@ function doInitialAllocateContainers(ctx) {
     }
     set$(ctx, "numContainers", numContainers);
     set$(ctx, "numContainersPooled", numContainers * state.props.initialContainerPoolRatio);
-    if (state.lastLayout) {
+    if (!IsNewArchitecture || state.lastLayout) {
       if (state.initialScroll) {
         requestAnimationFrame(() => {
           calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
@@ -4171,7 +3988,7 @@ var ScrollAdjustHandler = class {
   }
   requestAdjust(add) {
     const scrollingTo = this.ctx.state.scrollingTo;
-    if ((scrollingTo == null ? void 0 : scrollingTo.animated) && !scrollingTo.isInitialScroll) {
+    if (PlatformAdjustBreaksScroll && (scrollingTo == null ? void 0 : scrollingTo.animated) && !scrollingTo.isInitialScroll) {
       this.pendingAdjust += add;
       set$(this.ctx, "scrollAdjustPending", this.pendingAdjust);
     } else {
@@ -4186,7 +4003,7 @@ var ScrollAdjustHandler = class {
     return this.appliedAdjust;
   }
   commitPendingAdjust(scrollTarget) {
-    {
+    if (PlatformAdjustBreaksScroll) {
       const state = this.ctx.state;
       const pending = this.pendingAdjust;
       this.pendingAdjust = 0;
@@ -4228,7 +4045,7 @@ var ScrollAdjustHandler = class {
 // src/core/updateItemSize.ts
 function runOrScheduleMVCPRecalculate(ctx) {
   const state = ctx.state;
-  {
+  if (Platform2.OS === "web") {
     if (!state.mvcpAnchorLock) {
       if (state.queuedMVCPRecalculate !== void 0) {
         cancelAnimationFrame(state.queuedMVCPRecalculate);
@@ -4244,6 +4061,8 @@ function runOrScheduleMVCPRecalculate(ctx) {
       state.queuedMVCPRecalculate = void 0;
       calculateItemsInView(ctx, { doMVCP: true });
     });
+  } else {
+    calculateItemsInView(ctx, { doMVCP: true });
   }
 }
 function updateItemSize(ctx, itemKey, sizeObj) {
@@ -4351,7 +4170,7 @@ function updateOneItemSize(ctx, itemKey, sizeObj) {
   const index = indexByKey.get(itemKey);
   const prevSize = getItemSize(ctx, itemKey, index, data[index]);
   const rawSize = horizontal ? sizeObj.width : sizeObj.height;
-  const size = Math.round(rawSize) ;
+  const size = Platform2.OS === "web" ? Math.round(rawSize) : roundSize(rawSize);
   const prevSizeKnown = sizesKnown.get(itemKey);
   sizesKnown.set(itemKey, size);
   if (data[index] !== void 0) {
@@ -4380,13 +4199,13 @@ function updateOneItemSize(ctx, itemKey, sizeObj) {
   return 0;
 }
 function useWrapIfItem(fn) {
-  return useMemo(
+  return React2.useMemo(
     () => fn ? (arg1, arg2, arg3) => arg1 !== void 0 && arg2 !== void 0 ? fn(arg1, arg2, arg3) : void 0 : void 0,
     [fn]
   );
 }
 var useCombinedRef = (...refs) => {
-  const callback = useCallback((element) => {
+  const callback = React2.useCallback((element) => {
     for (const ref of refs) {
       if (!ref) {
         continue;
@@ -4400,15 +4219,35 @@ var useCombinedRef = (...refs) => {
   }, refs);
   return callback;
 };
-
-// src/platform/RefreshControl.tsx
-function RefreshControl(_props) {
-  return null;
+function getWindowSize() {
+  const screenSize = reactNative.Dimensions.get("window");
+  return {
+    height: screenSize.height,
+    width: screenSize.width
+  };
 }
-
-// src/platform/useStickyScrollHandler.ts
-function useStickyScrollHandler(_stickyHeaderIndices, _horizontal, _ctx, onScroll2) {
-  return onScroll2;
+var StyleSheet = reactNative.StyleSheet;
+function useStickyScrollHandler(stickyHeaderIndices, horizontal, ctx, onScroll2) {
+  const shouldUseRnAnimatedEngine = !ctx.state.props.stickyPositionComponentInternal;
+  return React2.useMemo(() => {
+    if ((stickyHeaderIndices == null ? void 0 : stickyHeaderIndices.length) && shouldUseRnAnimatedEngine) {
+      const { animatedScrollY } = ctx;
+      return reactNative.Animated.event(
+        [
+          {
+            nativeEvent: {
+              contentOffset: { [horizontal ? "x" : "y"]: animatedScrollY }
+            }
+          }
+        ],
+        {
+          listener: onScroll2,
+          useNativeDriver: true
+        }
+      );
+    }
+    return onScroll2;
+  }, [stickyHeaderIndices == null ? void 0 : stickyHeaderIndices.join(","), horizontal, shouldUseRnAnimatedEngine]);
 }
 
 // src/utils/createColumnWrapperStyle.ts
@@ -4429,6 +4268,18 @@ function createColumnWrapperStyle(contentContainerStyle) {
 // src/utils/createImperativeHandle.ts
 function createImperativeHandle(ctx) {
   const state = ctx.state;
+  const runScrollWithPromise = (run) => new Promise((resolve) => {
+    var _a3;
+    (_a3 = state.pendingScrollResolve) == null ? void 0 : _a3.call(state);
+    state.pendingScrollResolve = resolve;
+    const didStartScroll = run();
+    if (!didStartScroll || !state.scrollingTo) {
+      if (state.pendingScrollResolve === resolve) {
+        state.pendingScrollResolve = void 0;
+      }
+      resolve();
+    }
+  });
   const scrollIndexIntoView = (options) => {
     if (state) {
       const { index, ...rest } = options;
@@ -4440,8 +4291,10 @@ function createImperativeHandle(ctx) {
           index,
           viewPosition
         });
+        return true;
       }
     }
+    return false;
   };
   const refScroller = state.refScroller;
   const clearCaches = (options) => {
@@ -4460,9 +4313,9 @@ function createImperativeHandle(ctx) {
     if (mode === "full") {
       state.indexByKey.clear();
       state.idCache.length = 0;
-      state.positions.clear();
-      state.columns.clear();
-      state.columnSpans.clear();
+      state.positions.length = 0;
+      state.columns.length = 0;
+      state.columnSpans.length = 0;
     }
     (_b = state.triggerCalculateItemsInView) == null ? void 0 : _b.call(state, { forceFullItemPositions: true });
   };
@@ -4487,8 +4340,11 @@ function createImperativeHandle(ctx) {
       isInitializing: state.isInitializing,
       listen: (signalName, cb) => listen$(ctx, signalName, cb),
       listenToPosition: (key, cb) => listenPosition$(ctx, key, cb),
-      positionAtIndex: (index) => state.positions.get(getId(state, index)),
-      positions: state.positions,
+      positionAtIndex: (index) => state.positions[index],
+      positionByKey: (key) => {
+        const index = state.indexByKey.get(key);
+        return index === void 0 ? void 0 : state.positions[index];
+      },
       scroll: state.scroll,
       scrollLength: state.scrollLength,
       scrollVelocity: getScrollVelocity(state),
@@ -4552,15 +4408,17 @@ function createImperativeHandle(ctx) {
       state.contentInsetOverride = inset != null ? inset : void 0;
       updateScroll(ctx, state.scroll, true);
     },
-    scrollIndexIntoView,
-    scrollItemIntoView: ({ item, ...props }) => {
+    scrollIndexIntoView: (options) => runScrollWithPromise(() => scrollIndexIntoView(options)),
+    scrollItemIntoView: ({ item, ...props }) => runScrollWithPromise(() => {
       const data = state.props.data;
       const index = data.indexOf(item);
       if (index !== -1) {
         scrollIndexIntoView({ index, ...props });
+        return true;
       }
-    },
-    scrollToEnd: (options) => {
+      return false;
+    }),
+    scrollToEnd: (options) => runScrollWithPromise(() => {
       const data = state.props.data;
       const stylePaddingBottom = state.props.stylePaddingBottom;
       const index = data.length - 1;
@@ -4573,17 +4431,27 @@ function createImperativeHandle(ctx) {
           viewOffset: -paddingBottom - footerSize + ((options == null ? void 0 : options.viewOffset) || 0),
           viewPosition: 1
         });
+        return true;
       }
-    },
-    scrollToIndex: (params) => scrollToIndex(ctx, params),
-    scrollToItem: ({ item, ...props }) => {
+      return false;
+    }),
+    scrollToIndex: (params) => runScrollWithPromise(() => {
+      scrollToIndex(ctx, params);
+      return true;
+    }),
+    scrollToItem: ({ item, ...props }) => runScrollWithPromise(() => {
       const data = state.props.data;
       const index = data.indexOf(item);
       if (index !== -1) {
         scrollToIndex(ctx, { index, ...props });
+        return true;
       }
-    },
-    scrollToOffset: (params) => scrollTo(ctx, params),
+      return false;
+    }),
+    scrollToOffset: (params) => runScrollWithPromise(() => {
+      scrollTo(ctx, params);
+      return true;
+    }),
     setScrollProcessingEnabled: (enabled) => {
       state.scrollProcessingEnabled = enabled;
     },
@@ -4666,7 +4534,7 @@ function getRenderedItem(ctx, key) {
       item,
       type: getItemType ? (_a3 = getItemType(item, index)) != null ? _a3 : "" : ""
     };
-    renderedItem = isFunction(renderItem) ? renderItem(itemProps) : React3__default.createElement(renderItem, itemProps);
+    renderedItem = isFunction(renderItem) ? renderItem(itemProps) : React2__namespace.default.createElement(renderItem, itemProps);
   }
   return { index, item: data[index], renderedItem };
 }
@@ -4707,16 +4575,16 @@ function setPaddingTop(ctx, { stylePaddingTop }) {
   }
 }
 function useThrottleDebounce(mode) {
-  const timeoutRef = useRef(null);
-  const lastCallTimeRef = useRef(0);
-  const lastArgsRef = useRef(null);
+  const timeoutRef = React2.useRef(null);
+  const lastCallTimeRef = React2.useRef(0);
+  const lastArgsRef = React2.useRef(null);
   const clearTimeoutRef = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
   };
-  const execute = useCallback(
+  const execute = React2.useCallback(
     (callback, delay, ...args) => {
       {
         const now = Date.now();
@@ -4753,7 +4621,7 @@ function useThrottledOnScroll(originalHandler, scrollEventThrottle) {
 }
 
 // src/components/LegendList.tsx
-var LegendList = typedMemo(
+var LegendList = typedMemo2(
   // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
   typedForwardRef(function LegendList2(props, forwardedRef) {
     const { children, data: dataProp, renderItem: renderItemProp, ...restProps } = props;
@@ -4761,14 +4629,14 @@ var LegendList = typedMemo(
     const processedProps = isChildrenMode ? {
       ...restProps,
       childrenMode: true,
-      data: (isArray(children) ? children : React3.Children.toArray(children)).flat(1),
+      data: (isArray(children) ? children : React2__namespace.Children.toArray(children)).flat(1),
       renderItem: ({ item }) => item
     } : {
       ...restProps,
       data: dataProp || [],
       renderItem: renderItemProp
     };
-    return /* @__PURE__ */ React3.createElement(StateProvider, null, /* @__PURE__ */ React3.createElement(LegendListInner, { ...processedProps, ref: forwardedRef }));
+    return /* @__PURE__ */ React2__namespace.createElement(StateProvider, null, /* @__PURE__ */ React2__namespace.createElement(LegendListInner, { ...processedProps, ref: forwardedRef }));
   })
 );
 var LegendListInner = typedForwardRef(function LegendListInner2(props, forwardedRef) {
@@ -4822,6 +4690,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     refreshControl,
     refreshing,
     refScrollView,
+    renderScrollComponent,
     renderItem,
     scrollEventThrottle,
     snapToIndices,
@@ -4831,6 +4700,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     // TODOV3: Remove from v3 release
     style: styleProp,
     suggestEstimatedItemSize,
+    useWindowScroll = false,
     timelineId,
     viewabilityConfig,
     viewabilityConfigCallbackPairs,
@@ -4838,9 +4708,11 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     ...rest
   } = props;
   const animatedPropsInternal = props.animatedPropsInternal;
+  const positionComponentInternal = props.positionComponentInternal;
   const stickyPositionComponentInternal = props.stickyPositionComponentInternal;
   const {
     childrenMode,
+    positionComponentInternal: _positionComponentInternal,
     stickyPositionComponentInternal: _stickyPositionComponentInternal,
     ...restProps
   } = rest;
@@ -4861,7 +4733,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   const maintainVisibleContentPositionConfig = normalizeMaintainVisibleContentPosition(
     maintainVisibleContentPositionProp
   );
-  const [renderNum, setRenderNum] = useState(0);
+  const [renderNum, setRenderNum] = React2.useState(0);
   const initialScrollProp = initialScrollAtEnd ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? {
     index: initialScrollIndexProp.index || 0,
     viewOffset: initialScrollIndexProp.viewOffset || (initialScrollIndexProp.viewPosition === 1 ? -stylePaddingBottomState : 0),
@@ -4870,14 +4742,14 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     index: initialScrollIndexProp || 0,
     viewOffset: initialScrollOffsetProp || 0
   } : void 0;
-  const [canRender, setCanRender] = React3.useState(!IsNewArchitecture);
+  const [canRender, setCanRender] = React2__namespace.useState(!IsNewArchitecture);
   const ctx = useStateContext();
   ctx.columnWrapperStyle = columnWrapperStyle || (contentContainerStyle ? createColumnWrapperStyle(contentContainerStyle) : void 0);
-  const refScroller = useRef(null);
+  const refScroller = React2.useRef(null);
   const combinedRef = useCombinedRef(refScroller, refScrollView);
   const keyExtractor = keyExtractorProp != null ? keyExtractorProp : (_item, index) => index.toString();
   const stickyHeaderIndices = stickyHeaderIndicesProp != null ? stickyHeaderIndicesProp : stickyIndicesDeprecated;
-  const alwaysRenderIndices = useMemo(() => {
+  const alwaysRenderIndices = React2.useMemo(() => {
     const indices = getAlwaysRenderIndices(alwaysRender, dataProp, keyExtractor);
     return { arr: indices, set: new Set(indices) };
   }, [
@@ -4895,20 +4767,28 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       "stickyIndices has been renamed to stickyHeaderIndices. Please update your props to use stickyHeaderIndices."
     );
   }
-  const refState = useRef();
+  if (IS_DEV && useWindowScroll && renderScrollComponent) {
+    warnDevOnce(
+      "useWindowScrollRenderScrollComponent",
+      "useWindowScroll is not supported when renderScrollComponent is provided."
+    );
+  }
+  const useWindowScrollResolved = Platform2.OS === "web" && !!useWindowScroll && !renderScrollComponent;
+  const refState = React2.useRef();
   const hasOverrideItemLayout = !!overrideItemLayout;
-  const prevHasOverrideItemLayout = useRef(hasOverrideItemLayout);
+  const prevHasOverrideItemLayout = React2.useRef(hasOverrideItemLayout);
   if (!refState.current) {
     if (!ctx.state) {
-      const initialScrollLength = (estimatedListSize != null ? estimatedListSize : { height: 0, width: 0 } )[horizontal ? "width" : "height"];
+      const initialScrollLength = (estimatedListSize != null ? estimatedListSize : IsNewArchitecture ? { height: 0, width: 0 } : getWindowSize())[horizontal ? "width" : "height"];
       ctx.state = {
         activeStickyIndex: -1,
         averageSizes: {},
-        columnSpans: /* @__PURE__ */ new Map(),
-        columns: /* @__PURE__ */ new Map(),
+        columnSpans: [],
+        columns: [],
         containerItemKeys: /* @__PURE__ */ new Map(),
         containerItemTypes: /* @__PURE__ */ new Map(),
         contentInsetOverride: void 0,
+        dataChangeEpoch: 0,
         dataChangeNeedsScrollUpdate: false,
         dataRefWhenMeasured: /* @__PURE__ */ new Map(),
         didColumnsChange: false,
@@ -4948,10 +4828,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         nativeMarginTop: 0,
         pendingEndRequest: false,
         pendingStartRequest: false,
-        positions: /* @__PURE__ */ new Map(),
+        positions: [],
         props: {},
         queuedCalculateItemsInView: 0,
-        refScroller: void 0,
+        refScroller: { current: null },
         scroll: 0,
         scrollAdjustHandler: new ScrollAdjustHandler(ctx),
         scrollForNextCalculateItemsInView: void 0,
@@ -4968,6 +4848,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         startBuffered: -1,
         startNoBuffer: -1,
         startReachedSnapshot: void 0,
+        startReachedSnapshotDataChangeEpoch: void 0,
         stickyContainerPool: /* @__PURE__ */ new Set(),
         stickyContainers: /* @__PURE__ */ new Map(),
         timeoutSizeMessage: 0,
@@ -4987,6 +4868,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   state.didColumnsChange = numColumnsProp !== state.props.numColumns;
   const didDataChangeLocal = state.props.dataVersion !== dataVersion || state.props.data !== dataProp && checkActualChange(state, dataProp, state.props.data);
   if (didDataChangeLocal) {
+    state.dataChangeEpoch += 1;
     state.dataChangeNeedsScrollUpdate = true;
     state.didDataChange = true;
     state.previousData = state.props.data;
@@ -5025,20 +4907,22 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     onStartReachedThreshold,
     onStickyHeaderChange,
     overrideItemLayout,
+    positionComponentInternal,
     recycleItems: !!recycleItems,
     renderItem,
     snapToIndices,
     stabilizationAnchorId,
     stickyIndicesArr: stickyHeaderIndices != null ? stickyHeaderIndices : [],
-    stickyIndicesSet: useMemo(() => new Set(stickyHeaderIndices != null ? stickyHeaderIndices : []), [stickyHeaderIndices == null ? void 0 : stickyHeaderIndices.join(",")]),
+    stickyIndicesSet: React2.useMemo(() => new Set(stickyHeaderIndices != null ? stickyHeaderIndices : []), [stickyHeaderIndices == null ? void 0 : stickyHeaderIndices.join(",")]),
     stickyPositionComponentInternal,
     stylePaddingBottom: stylePaddingBottomState,
     stylePaddingTop: stylePaddingTopState,
     suggestEstimatedItemSize: !!suggestEstimatedItemSize,
+    useWindowScroll: useWindowScrollResolved,
     timelineId
   };
   state.refScroller = refScroller;
-  const memoizedLastItemKeys = useMemo(() => {
+  const memoizedLastItemKeys = React2.useMemo(() => {
     if (!dataProp.length) return [];
     return Array.from(
       { length: Math.min(numColumnsProp, dataProp.length) },
@@ -5052,7 +4936,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     setPaddingTop(ctx, { stylePaddingTop: stylePaddingTopState });
     refState.current.props.stylePaddingBottom = stylePaddingBottomState;
     let paddingDiff = stylePaddingTopState - prevPaddingTop;
-    if (shouldAdjustPadding && maintainVisibleContentPositionConfig.size && paddingDiff && prevPaddingTop !== void 0 && Platform.OS === "ios") {
+    if (shouldAdjustPadding && maintainVisibleContentPositionConfig.size && paddingDiff && prevPaddingTop !== void 0 && Platform2.OS === "ios") {
       if (state.scroll < 0) {
         paddingDiff += state.scroll;
       }
@@ -5173,10 +5057,20 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     }
     state.lastStabilizationAnchorId = stabilizationAnchorId;
   }
-  const initialContentOffset = useMemo(() => {
+  const initialContentOffset = React2.useMemo(() => {
+    var _a4;
     let value;
     const { initialScroll, initialAnchor } = refState.current;
     if (initialScroll) {
+      if (!IsNewArchitecture && initialScroll.index !== void 0 && (!initialAnchor || (initialAnchor == null ? void 0 : initialAnchor.index) !== initialScroll.index)) {
+        refState.current.initialAnchor = {
+          attempts: 0,
+          index: initialScroll.index,
+          settledTicks: 0,
+          viewOffset: (_a4 = initialScroll.viewOffset) != null ? _a4 : 0,
+          viewPosition: initialScroll.viewPosition
+        };
+      }
       if (initialScroll.contentOffset !== void 0) {
         value = initialScroll.contentOffset;
       } else {
@@ -5205,24 +5099,26 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         "Changing data without a keyExtractor can cause slow performance and resetting scroll. If your list data can change you should use a keyExtractor with a unique id for best performance and behavior."
       );
       refState.current.sizes.clear();
-      refState.current.positions.clear();
+      refState.current.positions.length = 0;
       refState.current.totalSize = 0;
       set$(ctx, "totalSize", 0);
     }
   }
-  const onLayoutHeader = useCallback((rect, fromLayoutEffect) => {
+  const onLayoutHeader = React2.useCallback((rect, fromLayoutEffect) => {
     const { initialScroll } = refState.current;
     const size = rect[horizontal ? "width" : "height"];
     set$(ctx, "headerSize", size);
     if ((initialScroll == null ? void 0 : initialScroll.index) !== void 0) {
-      {
+      if (IsNewArchitecture && Platform2.OS !== "android") {
         if (fromLayoutEffect) {
           setRenderNum((v) => v + 1);
         }
+      } else {
+        setTimeout(doInitialScroll, 17);
       }
     }
   }, []);
-  const doInitialScroll = useCallback(() => {
+  const doInitialScroll = React2.useCallback(() => {
     const {
       initialScroll,
       didFinishInitialScroll,
@@ -5241,7 +5137,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       });
     }
   }, [initialContentOffset]);
-  const onLayoutChange = useCallback((layout) => {
+  const onLayoutChange = React2.useCallback((layout) => {
     doInitialScroll();
     handleLayout(ctx, layout, setCanRender);
   }, []);
@@ -5251,12 +5147,12 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     ref: refScroller
     // the type of ScrollView doesn't include measure?
   });
-  useLayoutEffect(() => {
+  React2.useLayoutEffect(() => {
     if (snapToIndices) {
       updateSnapToOffsets(ctx);
     }
   }, [snapToIndices]);
-  useLayoutEffect(() => {
+  React2.useLayoutEffect(() => {
     var _a4;
     if (debugInitialization) {
       console.log("[DATA DEBUG] useLayoutEffect fired - data changed", {
@@ -5283,7 +5179,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     state.didDataChange = false;
     state.isFirst = false;
   }, [dataProp, dataVersion, numColumnsProp]);
-  useLayoutEffect(() => {
+  React2.useLayoutEffect(() => {
     var _a4;
     set$(ctx, "extraData", extraData);
     const didToggleOverride = prevHasOverrideItemLayout.current !== hasOverrideItemLayout;
@@ -5292,11 +5188,11 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       (_a4 = state.triggerCalculateItemsInView) == null ? void 0 : _a4.call(state, { forceFullItemPositions: true });
     }
   }, [extraData, hasOverrideItemLayout, numColumnsProp]);
-  useLayoutEffect(
+  React2.useLayoutEffect(
     () => initializeStateVars(true),
     [dataVersion, memoizedLastItemKeys.join(","), numColumnsProp, stylePaddingBottomState, stylePaddingTopState]
   );
-  useEffect(() => {
+  React2.useEffect(() => {
     if (!onMetricsChange) {
       return;
     }
@@ -5319,7 +5215,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       }
     };
   }, [ctx, onMetricsChange]);
-  useEffect(() => {
+  React2.useEffect(() => {
     const viewability = setupViewability({
       onViewableItemsChanged,
       viewabilityConfig,
@@ -5328,11 +5224,16 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     state.viewabilityConfigCallbackPairs = viewability;
     state.enableScrollForNextCalculateItemsInView = !viewability;
   }, [viewabilityConfig, viewabilityConfigCallbackPairs, onViewableItemsChanged]);
-  useImperativeHandle(forwardedRef, () => createImperativeHandle(ctx), []);
-  {
-    useEffect(doInitialScroll, []);
+  if (!IsNewArchitecture) {
+    useInit(() => {
+      doInitialAllocateContainers(ctx);
+    });
   }
-  const fns = useMemo(
+  React2.useImperativeHandle(forwardedRef, () => createImperativeHandle(ctx), []);
+  if (Platform2.OS === "web") {
+    React2.useEffect(doInitialScroll, []);
+  }
+  const fns = React2.useMemo(
     () => ({
       getRenderedItem: (key) => getRenderedItem(ctx, key),
       onMomentumScrollEnd: (event) => {
@@ -5347,7 +5248,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     []
   );
   const onScrollHandler = useStickyScrollHandler(stickyHeaderIndices, horizontal, ctx, fns.onScroll);
-  return /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React2__namespace.createElement(React2__namespace.Fragment, null, /* @__PURE__ */ React2__namespace.createElement(
     ListComponent,
     {
       ...restProps,
@@ -5365,10 +5266,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       onMomentumScrollEnd: fns.onMomentumScrollEnd,
       onScroll: onScrollHandler,
       recycleItems,
-      refreshControl: refreshControl ? stylePaddingTopState > 0 ? React3.cloneElement(refreshControl, {
+      refreshControl: refreshControl ? stylePaddingTopState > 0 ? React2__namespace.cloneElement(refreshControl, {
         progressViewOffset: (refreshControl.props.progressViewOffset || 0) + stylePaddingTopState
-      }) : refreshControl : onRefresh && /* @__PURE__ */ React3.createElement(
-        RefreshControl,
+      }) : refreshControl : onRefresh && /* @__PURE__ */ React2__namespace.createElement(
+        reactNative.RefreshControl,
         {
           onRefresh,
           progressViewOffset: (progressViewOffset || 0) + stylePaddingTopState,
@@ -5376,18 +5277,32 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         }
       ),
       refScrollView: combinedRef,
+      renderScrollComponent,
       scrollAdjustHandler: (_g = refState.current) == null ? void 0 : _g.scrollAdjustHandler,
       scrollEventThrottle: 0,
       snapToIndices,
       stickyHeaderIndices,
       style,
       updateItemSize: fns.updateItemSize,
+      useWindowScroll: useWindowScrollResolved,
       waitForInitialLayout
     }
-  ), IS_DEV && ENABLE_DEBUG_VIEW && /* @__PURE__ */ React3.createElement(DebugView, { state: refState.current }));
+  ), IS_DEV && ENABLE_DEBUG_VIEW && /* @__PURE__ */ React2__namespace.createElement(DebugView, { state: refState.current }));
 });
 
-// src/react.ts
+// src/react-native.ts
 var LegendList3 = LegendList;
 
-export { InitializationCompletionType, InitializationMode, InitializationPhase, LegendList3 as LegendList, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };
+exports.InitializationCompletionType = InitializationCompletionType;
+exports.InitializationMode = InitializationMode;
+exports.InitializationPhase = InitializationPhase;
+exports.LegendList = LegendList3;
+exports.typedForwardRef = typedForwardRef;
+exports.typedMemo = typedMemo2;
+exports.useIsLastItem = useIsLastItem;
+exports.useListScrollSize = useListScrollSize;
+exports.useRecyclingEffect = useRecyclingEffect;
+exports.useRecyclingState = useRecyclingState;
+exports.useSyncLayout = useSyncLayout;
+exports.useViewability = useViewability;
+exports.useViewabilityAmount = useViewabilityAmount;

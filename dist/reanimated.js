@@ -171,10 +171,19 @@ var ReanimatedPositionViewSticky = typedMemo(function ReanimatedPositionViewStic
   );
   return /* @__PURE__ */ React3__namespace.createElement(Reanimated__default.default.View, { ref: refView, style: viewStyle, ...rest }, /* @__PURE__ */ React3__namespace.createElement(StickyOverlay, { stickyHeaderConfig }), children);
 });
+var ReanimatedPositionView = typedMemo(function ReanimatedPositionViewComponent(props) {
+  const { id, horizontal, style, refView, children, layoutTransition, ...rest } = props;
+  const [positionValue = POSITION_OUT_OF_VIEW] = useArr$([`containerPosition${id}`]);
+  const viewStyle = React3__namespace.useMemo(
+    () => [style, horizontal ? { left: positionValue } : { top: positionValue }],
+    [horizontal, positionValue, style]
+  );
+  return /* @__PURE__ */ React3__namespace.createElement(Reanimated__default.default.View, { layout: layoutTransition, ref: refView, style: viewStyle, ...rest }, children);
+});
 var LegendListForwardedRef = typedMemo(
   // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
   React3__namespace.forwardRef(function LegendListForwardedRef2(props, ref) {
-    const { refLegendList, ...rest } = props;
+    const { itemLayoutAnimation, refLegendList, ...rest } = props;
     const refFn = React3.useCallback(
       (r) => {
         refLegendList(r);
@@ -203,11 +212,25 @@ var LegendListForwardedRef = typedMemo(
       },
       [stickyScrollOffset]
     );
-    const legendListProps = shouldUseReanimatedScrollView ? {
+    const itemLayoutAnimationRef = React3__namespace.useRef(itemLayoutAnimation);
+    itemLayoutAnimationRef.current = itemLayoutAnimation;
+    const hasItemLayoutAnimation = !!itemLayoutAnimation;
+    const positionComponentInternal = React3__namespace.useMemo(() => {
+      if (!hasItemLayoutAnimation) {
+        return void 0;
+      }
+      return function PositionComponent(positionProps) {
+        return /* @__PURE__ */ React3__namespace.createElement(ReanimatedPositionView, { ...positionProps, layoutTransition: itemLayoutAnimationRef.current });
+      };
+    }, [hasItemLayoutAnimation]);
+    const legendListProps = {
       ...rest,
-      renderScrollComponent: renderReanimatedScrollComponent,
-      stickyPositionComponentInternal
-    } : rest;
+      positionComponentInternal,
+      ...shouldUseReanimatedScrollView ? {
+        renderScrollComponent: renderReanimatedScrollComponent,
+        stickyPositionComponentInternal
+      } : {}
+    };
     return /* @__PURE__ */ React3__namespace.createElement(reactNative$1.LegendList, { ref: refFn, refScrollView: ref, ...legendListProps });
   })
 );
