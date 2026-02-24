@@ -93,27 +93,27 @@ EOF
 
 # Platform-specific exports (new in beta.33)
 cat > react-native.js << 'EOF'
-module.exports = require('./dist/list-react-native.js');
+module.exports = require('./dist/react-native.js');
 EOF
 
 cat > react-native.mjs << 'EOF'
-export * from './dist/list-react-native.mjs';
+export * from './dist/react-native.mjs';
 EOF
 
 cat > react-native.d.ts << 'EOF'
-export * from './dist/list-react-native';
+export * from './dist/react-native';
 EOF
 
 cat > react.js << 'EOF'
-module.exports = require('./dist/list-react.js');
+module.exports = require('./dist/react.js');
 EOF
 
 cat > react.mjs << 'EOF'
-export * from './dist/list-react.mjs';
+export * from './dist/react.mjs';
 EOF
 
 cat > react.d.ts << 'EOF'
-export * from './dist/list-react';
+export * from './dist/react';
 EOF
 
 echo "Build complete!"

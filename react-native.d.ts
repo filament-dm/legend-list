@@ -1,1 +1,1 @@
-export * from './dist/list-react-native';
+export * from './dist/react-native';

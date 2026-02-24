@@ -1,1 +1,1 @@
-module.exports = require('./dist/list-react-native.js');
+module.exports = require('./dist/react-native.js');
