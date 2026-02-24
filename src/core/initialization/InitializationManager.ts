@@ -494,7 +494,7 @@ export class InitializationManager {
 
         // Check if anchor is ready (exists in data and has position)
         const anchorIndex = this.ctx.state.indexByKey.get(this.state.anchorId);
-        const hasPosition = this.ctx.state.positions.has(this.state.anchorId);
+        const hasPosition = anchorIndex !== undefined && this.ctx.state.positions[anchorIndex] !== undefined;
 
         // Detect anchor loss - exit initialization gracefully if anchor was removed
         if (anchorIndex === undefined) {
@@ -549,7 +549,7 @@ export class InitializationManager {
 
         // Verify anchor is ready
         const anchorIndex = this.ctx.state.indexByKey.get(this.state.anchorId);
-        const hasPosition = this.ctx.state.positions.has(this.state.anchorId);
+        const hasPosition = anchorIndex !== undefined && this.ctx.state.positions[anchorIndex] !== undefined;
 
         return anchorIndex !== undefined && hasPosition;
     }
