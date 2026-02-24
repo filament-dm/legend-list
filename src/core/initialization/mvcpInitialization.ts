@@ -43,7 +43,7 @@ export function prepareInitializationMVCP(ctx: StateContext): (() => void) | und
         return undefined;
     }
 
-    const prevPosition = state.positions.get(anchorId);
+    const prevPosition = state.positions[anchorIndex];
     if (prevPosition === undefined) {
         return undefined;
     }
@@ -52,7 +52,8 @@ export function prepareInitializationMVCP(ctx: StateContext): (() => void) | und
 
     // Return closure that applies adjustment after positions recalculate
     return () => {
-        const newPosition = state.positions.get(anchorId);
+        const anchorIndex = state.indexByKey.get(anchorId);
+        const newPosition = anchorIndex !== undefined ? state.positions[anchorIndex] : undefined;
         if (newPosition === undefined) {
             return;
         }

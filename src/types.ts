@@ -494,11 +494,32 @@ export interface ScrollTarget {
     animated?: boolean;
     index?: number;
     isInitialScroll?: boolean;
+    /**
+     * The item key (ID) for the target item. This allows looking up the current index
+     * after data changes (insertions, deletions, reordering), preventing stale index bugs.
+     */
+    itemKey?: string;
+    /**
+     * If true, this scroll operation is a "scroll to end" operation.
+     * During scroll, the target will always resolve to the current last index (data.length - 1),
+     * not a specific item. MVCP adjustments are also disabled to prevent interference.
+     */
+    isScrollToEnd?: boolean;
     itemSize?: number;
     offset: number;
+    /**
+     * Optional callback invoked when the scroll operation completes.
+     * This fires after scroll animations complete, or after layout settles (via double RAF) when no scroll is needed.
+     */
+    onSettled?: () => void;
     precomputedWithViewOffset?: boolean;
     viewOffset?: number;
     viewPosition?: number;
+    /**
+     * Number of retry attempts for scroll-to-end operations.
+     * Used to prevent infinite retry loops when data keeps changing.
+     */
+    retryCount?: number;
 }
 
 export interface InternalState {
@@ -727,24 +748,54 @@ export type LegendListRef = {
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.index - The index to scroll to.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes.
      */
-    scrollIndexIntoView(params: { animated?: boolean | undefined; index: number }): Promise<void>;
+    scrollIndexIntoView(params: { animated?: boolean | undefined; index: number; onSettled?: () => void }): void;
 
     /**
-     * Scrolls a specific index into view.
+     * Scrolls a specific item into view.
      * @param params - Parameters for scrolling.
      * @param params.animated - If true, animates the scroll. Default: true.
      * @param params.item - The item to scroll to.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes.
      */
-    scrollItemIntoView(params: { animated?: boolean | undefined; item: any }): Promise<void>;
+    scrollItemIntoView(params: { animated?: boolean | undefined; item: any; onSettled?: () => void }): void;
 
     /**
      * Scrolls to the end of the list.
      * @param options - Options for scrolling.
      * @param options.animated - If true, animates the scroll. Default: true.
      * @param options.viewOffset - Offset from the target position.
+     * @param options.onSettled - Optional callback invoked when the scroll operation completes.
      */
-    scrollToEnd(options?: { animated?: boolean | undefined; viewOffset?: number | undefined }): Promise<void>;
+    scrollToEnd(options?: {
+        animated?: boolean | undefined;
+        viewOffset?: number | undefined;
+        onSettled?: () => void;
+    }): void;
+
+    /**
+     * Jumps to the most recent item (bottom of list) with stabilization.
+     * Unlike scrollToEnd, this method enters initialization mode to keep the
+     * most recent item locked at the bottom of the viewport while items may resize
+     * (e.g., links unfurling, images loading, estimated sizes adjusting).
+     *
+     * Use case: "Jump to latest" button in chat interfaces when switching to live timeline.
+     * The method will:
+     * 1. Enter initialization mode (disables pagination)
+     * 2. Scroll to the last item
+     * 3. Lock it at the bottom while items stabilize
+     * 4. Exit automatically after 3 stable frames
+     *
+     * This is unlike other scrollTo methods in that it explicitly enters initialization.
+     * Intended for user-initiated jumps to the live timeline.
+     * Instead of an onSettled callback, use the onInitializationComplete prop and set it
+     * to respond to "stabilized-chat" completions.
+     * @param options - Options for jumping.
+     * @param options.animated - If true, animates the scroll. Default: true.
+     * @param options.viewOffset - Offset from the target position.
+     */
+    jumpToLatest(options?: { animated?: boolean | undefined; viewOffset?: number | undefined }): void;
 
     /**
      * Scrolls to a specific index in the list.
@@ -753,13 +804,16 @@ export type LegendListRef = {
      * @param params.index - The index to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes.
      */
     scrollToIndex(params: {
         animated?: boolean | undefined;
         index: number;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
-    }): Promise<void>;
+        onSettled?: () => void;
+        isScrollToEnd?: boolean;
+    }): void;
 
     /**
      * Scrolls to a specific item in the list.
@@ -768,21 +822,24 @@ export type LegendListRef = {
      * @param params.item - The item to scroll to.
      * @param params.viewOffset - Offset from the target position.
      * @param params.viewPosition - Position of the item in the viewport (0 to 1).
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes.
      */
     scrollToItem(params: {
         animated?: boolean | undefined;
         item: any;
         viewOffset?: number | undefined;
         viewPosition?: number | undefined;
-    }): Promise<void>;
+        onSettled?: () => void;
+    }): void;
 
     /**
      * Scrolls to a specific offset in pixels.
      * @param params - Parameters for scrolling.
      * @param params.offset - The pixel offset to scroll to.
      * @param params.animated - If true, animates the scroll. Default: true.
+     * @param params.onSettled - Optional callback invoked when the scroll operation completes.
      */
-    scrollToOffset(params: { offset: number; animated?: boolean | undefined }): Promise<void>;
+    scrollToOffset(params: { offset: number; animated?: boolean | undefined; onSettled?: () => void }): void;
 
     /**
      * Sets or adds to the offset of the visible content anchor.
