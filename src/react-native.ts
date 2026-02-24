@@ -18,6 +18,12 @@ export const internal = {
     useCombinedRef,
 } as const;
 
+export type { InitializationCompletionInfo } from "@/core/initialization/types";
+export {
+    InitializationCompletionType,
+    InitializationMode,
+    InitializationPhase,
+} from "@/core/initialization/types";
 export {
     useIsLastItem,
     useListScrollSize,

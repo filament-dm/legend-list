@@ -5,6 +5,12 @@ import { IS_DEV } from "@/utils/devEnvironment";
 /** @deprecated Use `@legendapp/list/react-native` or `@legendapp/list/react` for strict typing */
 export const LegendList = LegendListImpl as LegendListComponent;
 
+export type { InitializationCompletionInfo } from "@/core/initialization/types";
+export {
+    InitializationCompletionType,
+    InitializationMode,
+    InitializationPhase,
+} from "@/core/initialization/types";
 export {
     useIsLastItem,
     useListScrollSize,
