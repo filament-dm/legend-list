@@ -1,1 +1,1 @@
-export * from './dist/list-react';
+export * from './dist/react';
