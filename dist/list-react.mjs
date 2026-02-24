@@ -1567,14 +1567,14 @@ var ListComponentScrollView = forwardRef(function ListComponentScrollView2({
   useLayoutEffect(() => {
     const styleId = "legendlist-hide-scrollbar";
     if (!document.getElementById(styleId)) {
-      const style2 = document.createElement("style");
-      style2.id = styleId;
-      style2.textContent = `
+      const styleElement = document.createElement("style");
+      styleElement.id = styleId;
+      styleElement.textContent = `
             .legendlist-hide-scrollbar::-webkit-scrollbar {
                 display: none;
             }
         `;
-      document.head.appendChild(style2);
+      document.head.appendChild(styleElement);
     }
   }, []);
   useImperativeHandle(ref, () => {
@@ -1967,7 +1967,6 @@ function getItemSize(ctx, key, index, data, _useAverageSize, _preferCachedSize) 
   const state = ctx.state;
   const {
     sizesKnown,
-    sizes,
     dataRefWhenMeasured,
     props: { estimatedItemSize, getEstimatedItemSize, getItemType }
   } = state;
@@ -2172,7 +2171,7 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b, _c, _d;
+  var _a3, _b, _c, _d, _e, _f;
   const state = ctx.state;
   if (state == null ? void 0 : state.scrollingTo) {
     const scrollingTo = state.scrollingTo;
@@ -2216,7 +2215,7 @@ function finishScrollTo(ctx) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
     if ((_c = state.props) == null ? void 0 : _c.data) {
-      (_d = state.triggerCalculateItemsInView) == null ? void 0 : _d.call(state, { forceFullItemPositions: true });
+      (_d = state.triggerCalculateItemsInView) == null ? void 0 : _d.call(state, { doMVCP: true, forceFullItemPositions: true });
     }
     {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
@@ -2224,11 +2223,24 @@ function finishScrollTo(ctx) {
     setInitialRenderState(ctx, { didInitialScroll: true });
     checkThresholds(ctx);
     if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+      if (state.props.debugInitialization) {
+        console.log("[finishScrollTo] Initial scroll complete, transitioning to STABILIZING", {
+          mode: ctx.initializationManager.getMode(),
+          phase: ctx.initializationManager.getCurrentPhase()
+        });
+      }
       ctx.initializationManager.markInitialScrollComplete();
       ctx.initializationManager.transitionToStabilizingPhase();
     }
     if (callback) {
       callback();
+    }
+  } else {
+    if (((_e = state == null ? void 0 : state.props) == null ? void 0 : _e.debugInitialization) && (state == null ? void 0 : state.isInitializing)) {
+      console.log("[finishScrollTo] Called but scrollingTo is undefined during initialization", {
+        isInitializing: state.isInitializing,
+        phase: (_f = ctx.initializationManager) == null ? void 0 : _f.getCurrentPhase()
+      });
     }
   }
 }
@@ -2343,7 +2355,19 @@ function scrollTo(ctx, params) {
   if (forceScroll || !isInitialScroll || Platform.OS === "android") {
     doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
   } else {
+    if (state.props.debugInitialization) {
+      console.log("[scrollTo] Using web optimization path for initial scroll", {
+        animated,
+        isInitialScroll,
+        offset
+      });
+    }
     state.scroll = offset;
+    const scroller = state.refScroller.current;
+    const node = typeof (scroller == null ? void 0 : scroller.getScrollableNode) === "function" ? scroller.getScrollableNode() : scroller;
+    if (node) {
+      node[horizontal ? "scrollLeft" : "scrollTop"] = offset;
+    }
     setTimeout(() => finishScrollTo(ctx), 100);
   }
 }
@@ -3767,14 +3791,15 @@ function calculateItemsInView(ctx, params = {}) {
           if (positionValue === void 0) {
             set$(ctx, `containerPosition${i}`, POSITION_OUT_OF_VIEW);
           } else {
-            const position = (positionValue || 0) - scrollAdjustPending;
+            const shouldApplyAdjust = queuedInitialLayout || !initialScroll;
+            const position = (positionValue || 0) - (shouldApplyAdjust ? scrollAdjustPending : 0);
             const column = columns.get(id) || 1;
             const span = columnSpans.get(id) || 1;
             const prevPos = peek$(ctx, `containerPosition${i}`);
             const prevColumn = peek$(ctx, `containerColumn${i}`);
             const prevSpan = peek$(ctx, `containerSpan${i}`);
             const prevData = peek$(ctx, `containerItemData${i}`);
-            if (position > POSITION_OUT_OF_VIEW && position !== prevPos) {
+            if (position !== prevPos) {
               set$(ctx, `containerPosition${i}`, position);
               didChangePositions = true;
             }
@@ -5044,60 +5069,80 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   }
   const timelineChanged = timelineId !== state.lastTimelineId;
   const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
-  console.log("[TIMELINE DEBUG] LegendList render", {
-    timelineChanged,
-    anchorChanged,
-    timelineId,
-    lastTimelineId: state.lastTimelineId,
-    stabilizationAnchorId,
-    lastStabilizationAnchorId: state.lastStabilizationAnchorId,
-    dataLength: (_d = dataProp == null ? void 0 : dataProp.length) != null ? _d : 0,
-    hasInitialScrollProp: !!initialScrollProp,
-    isInitializing: ctx.initializationManager.isInitializing(),
-    initPhase: ctx.initializationManager.getCurrentPhase()
-  });
+  if (debugInitialization) {
+    console.log("[TIMELINE DEBUG] LegendList render", {
+      anchorChanged,
+      dataLength: (_d = dataProp == null ? void 0 : dataProp.length) != null ? _d : 0,
+      hasInitialScrollProp: !!initialScrollProp,
+      initPhase: ctx.initializationManager.getCurrentPhase(),
+      isInitializing: ctx.initializationManager.isInitializing(),
+      lastStabilizationAnchorId: state.lastStabilizationAnchorId,
+      lastTimelineId: state.lastTimelineId,
+      stabilizationAnchorId,
+      timelineChanged,
+      timelineId
+    });
+  }
   if (timelineChanged) {
-    console.log("[TIMELINE DEBUG] Timeline changed detected!");
+    if (debugInitialization) {
+      console.log("[TIMELINE DEBUG] Timeline changed detected!");
+    }
     if (ctx.initializationManager.isImperativeInit()) {
-      console.log("[TIMELINE DEBUG] Skipping - imperative init in progress");
+      if (debugInitialization) {
+        console.log("[TIMELINE DEBUG] Skipping - imperative init in progress");
+      }
       return;
     }
     const isSwitchingFromFocused = (_e = state.lastTimelineId) == null ? void 0 : _e.includes("focused-timeline");
     const isSwitchingToLive = timelineId == null ? void 0 : timelineId.includes("live-timeline");
     const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
-    console.log("[TIMELINE DEBUG] Switch analysis:", {
-      isSwitchingFromFocused,
-      isSwitchingToLive,
-      shouldExitEarly
-    });
+    if (debugInitialization) {
+      console.log("[TIMELINE DEBUG] Switch analysis:", {
+        isSwitchingFromFocused,
+        isSwitchingToLive,
+        shouldExitEarly
+      });
+    }
     state.lastTimelineId = timelineId;
     state.lastStabilizationAnchorId = stabilizationAnchorId;
-    console.log("[TIMELINE DEBUG] Updated tracking, entering initialization");
+    if (debugInitialization) {
+      console.log("[TIMELINE DEBUG] Updated tracking, entering initialization");
+    }
     ctx.initializationManager.enterInitialization({
       anchorId: stabilizationAnchorId,
       timelineId: timelineId || ""
     });
     if (shouldExitEarly) {
-      console.log("[TIMELINE DEBUG] Early exit path - focused\u2192live without anchor");
+      if (debugInitialization) {
+        console.log("[TIMELINE DEBUG] Early exit path - focused\u2192live without anchor");
+      }
       ctx.initializationManager.exitInitialization({
         mode: ctx.initializationManager.getMode(),
         timelineId: timelineId || "",
         type: "early-exit" /* EARLY_EXIT */
       });
     } else {
-      console.log("[TIMELINE DEBUG] Normal init flow - checking data availability");
+      if (debugInitialization) {
+        console.log("[TIMELINE DEBUG] Normal init flow - checking data availability");
+      }
       if (!initialScrollProp && dataProp && dataProp.length > 0) {
-        console.log("[TIMELINE DEBUG] Data available, preparing scroll");
+        if (debugInitialization) {
+          console.log("[TIMELINE DEBUG] Data available, preparing scroll");
+        }
         const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
           dataProp,
           keyExtractor
         );
         if (scrollPrepared) {
-          console.log("[TIMELINE DEBUG] \u2705 Scroll prepared successfully, entering SCROLLING phase");
+          if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] \u2705 Scroll prepared successfully, entering SCROLLING phase");
+          }
           ctx.initializationManager.enterScrollingPhase();
           setRenderNum((v) => v + 1);
         } else {
-          console.log("[TIMELINE DEBUG] \u274C Scroll prep failed - anchor not found in data");
+          if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] \u274C Scroll prep failed - anchor not found in data");
+          }
           ctx.initializationManager.exitInitialization({
             mode: ctx.initializationManager.getMode(),
             reason: "Scroll preparation failed - anchor not found in data",
@@ -5106,12 +5151,14 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
           });
         }
       } else {
-        console.log("[TIMELINE DEBUG] \u274C NO DATA OR HAS INITIAL SCROLL PROP - exiting initialization", {
-          hasInitialScrollProp: !!initialScrollProp,
-          initialScrollPropValue: initialScrollProp,
-          hasDataProp: !!dataProp,
-          dataLength: (_f = dataProp == null ? void 0 : dataProp.length) != null ? _f : 0
-        });
+        if (debugInitialization) {
+          console.log("[TIMELINE DEBUG] \u274C NO DATA OR HAS INITIAL SCROLL PROP - exiting initialization", {
+            dataLength: (_f = dataProp == null ? void 0 : dataProp.length) != null ? _f : 0,
+            hasDataProp: !!dataProp,
+            hasInitialScrollProp: !!initialScrollProp,
+            initialScrollPropValue: initialScrollProp
+          });
+        }
         ctx.initializationManager.exitInitialization({
           mode: ctx.initializationManager.getMode(),
           reason: "No data or has initialScroll prop",
@@ -5121,7 +5168,9 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       }
     }
   } else if (anchorChanged) {
-    console.log("[TIMELINE DEBUG] Only anchor changed (no timeline change)");
+    if (debugInitialization) {
+      console.log("[TIMELINE DEBUG] Only anchor changed (no timeline change)");
+    }
     state.lastStabilizationAnchorId = stabilizationAnchorId;
   }
   const initialContentOffset = useMemo(() => {
@@ -5209,15 +5258,17 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   }, [snapToIndices]);
   useLayoutEffect(() => {
     var _a4;
-    console.log("[DATA DEBUG] useLayoutEffect fired - data changed", {
-      dataLength: (_a4 = dataProp == null ? void 0 : dataProp.length) != null ? _a4 : 0,
-      dataVersion,
-      numColumns: numColumnsProp,
-      isInitializing: ctx.initializationManager.isInitializing(),
-      initPhase: ctx.initializationManager.getCurrentPhase(),
-      timelineId,
-      lastTimelineId: state.lastTimelineId
-    });
+    if (debugInitialization) {
+      console.log("[DATA DEBUG] useLayoutEffect fired - data changed", {
+        dataLength: (_a4 = dataProp == null ? void 0 : dataProp.length) != null ? _a4 : 0,
+        dataVersion,
+        initPhase: ctx.initializationManager.getCurrentPhase(),
+        isInitializing: ctx.initializationManager.isInitializing(),
+        lastTimelineId: state.lastTimelineId,
+        numColumns: numColumnsProp,
+        timelineId
+      });
+    }
     const {
       didColumnsChange,
       didDataChange,
