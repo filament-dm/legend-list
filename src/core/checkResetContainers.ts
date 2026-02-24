@@ -12,7 +12,18 @@ export function checkResetContainers(ctx: StateContext, dataProp: readonly unkno
     if (previousData) {
         updateAveragesOnDataChange(state, previousData, dataProp);
     }
-    const { maintainScrollAtEnd } = state.props;
+    const { maintainScrollAtEnd, debugSizing } = state.props;
+
+    if (debugSizing) {
+        console.log("[DRIFT DEBUG] Data changed, calling calculateItemsInView:", {
+            dataChangeNeedsScrollUpdate: state.dataChangeNeedsScrollUpdate,
+            mvcpAnchorLock: state.mvcpAnchorLock ? "ACTIVE" : "none",
+            mvcpAnchorLockExpires: state.mvcpAnchorLock?.expiresAt,
+            newLength: dataProp.length,
+            prevLength: previousData?.length,
+            timestamp: Date.now(),
+        });
+    }
 
     calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
 

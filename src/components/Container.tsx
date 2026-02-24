@@ -166,7 +166,19 @@ export const Container = typedMemo(function Container<ItemT>({
         // During active MVCP we need immediate size updates so anchor math stays in sync.
         const shouldDeferWebShrinkLayoutUpdate =
             Platform.OS === "web" && !isInMVCPActiveMode(ctx.state) && prevSize !== undefined && size + 1 < prevSize;
+
+        const debugSizing = ctx.state.props.debugSizing;
+
         if (shouldDeferWebShrinkLayoutUpdate) {
+            if (debugSizing) {
+                console.log("[DRIFT DEBUG] Deferring shrink update:", {
+                    isInMVCPMode: isInMVCPActiveMode(ctx.state),
+                    itemKey: currentItemKey,
+                    newSize: size,
+                    prevSize,
+                    timestamp: Date.now(),
+                });
+            }
             const token = pendingShrinkToken + 1;
             itemLayoutRef.current.pendingShrinkToken = token;
             requestAnimationFrame(() => {
@@ -180,9 +192,30 @@ export const Container = typedMemo(function Container<ItemT>({
                     layout = { height: rect.height, width: rect.width };
                 }
 
+                if (debugSizing) {
+                    const confirmedSize = currentHorizontal ? layout.width : layout.height;
+                    console.log("[DRIFT DEBUG] Shrink confirmed after RAF:", {
+                        confirmedSize: roundSize(confirmedSize),
+                        itemKey: currentItemKey,
+                        originalSize: size,
+                        timestamp: Date.now(),
+                    });
+                }
+
                 doUpdate();
             });
             return;
+        }
+
+        if (debugSizing) {
+            console.log("[DRIFT DEBUG] Size update (immediate):", {
+                deferred: false,
+                itemKey: currentItemKey,
+                mvcpActive: isInMVCPActiveMode(ctx.state),
+                newSize: size,
+                prevSize,
+                timestamp: Date.now(),
+            });
         }
 
         if (IsNewArchitecture || size > 0) {

@@ -337,13 +337,15 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         ...StyleSheet.flatten(contentContainerStyle),
     };
 
+    // biome-ignore lint/correctness/noUnusedVariables: Spreading out invalid DOM props
     const {
-        contentInset: _contentInset,
-        scrollEventThrottle: _scrollEventThrottle,
-        ScrollComponent: _ScrollComponent,
+        contentInset,
+        scrollEventThrottle,
+        ScrollComponent,
         useWindowScroll: _useWindowScroll,
+        debugSizing,
         ...webProps
-    } = props as ListComponentScrollViewProps & ExtraPropsFromRN;
+    } = props as ListComponentScrollViewProps & ExtraPropsFromRN & { debugSizing?: boolean };
 
     return (
         <div

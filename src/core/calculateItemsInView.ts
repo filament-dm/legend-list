@@ -677,7 +677,20 @@ export function calculateItemsInView(
         }
 
         if (Platform.OS === "web" && didChangePositions) {
-            set$(ctx, "lastPositionUpdate", Date.now());
+            const timestamp = Date.now();
+            set$(ctx, "lastPositionUpdate", timestamp);
+            if (state.props.debugSizing) {
+                const contentSize = getContentSize(ctx);
+                console.log("[DRIFT DEBUG] Container positions updated:", {
+                    dataLength: state.props.data.length,
+                    measuredCount: state.sizesKnown.size,
+                    mvcpActive: isInMVCPActiveMode(state),
+                    numContainers,
+                    pendingTotalSize: state.pendingTotalSize,
+                    timestamp,
+                    totalSize: contentSize,
+                });
+            }
         }
 
         if (!queuedInitialLayout && endBuffered !== null) {

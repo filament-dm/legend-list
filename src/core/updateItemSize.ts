@@ -9,26 +9,54 @@ import { IS_DEV } from "@/utils/devEnvironment";
 import { getItemSize } from "@/utils/getItemSize";
 import { roundSize } from "@/utils/helpers";
 
-function runOrScheduleMVCPRecalculate(ctx: StateContext) {
+function runOrScheduleMVCPRecalculate(ctx: StateContext, itemKey?: string) {
     // Runs the MVCP recalculation pass after item-size changes.
     // On web, an active anchor lock coalesces recalculations to one RAF to reduce oscillating adjustments.
     const state = ctx.state;
+    const debugSizing = state.props.debugSizing;
+
     if (Platform.OS === "web") {
         if (!state.mvcpAnchorLock) {
             if (state.queuedMVCPRecalculate !== undefined) {
                 cancelAnimationFrame(state.queuedMVCPRecalculate);
                 state.queuedMVCPRecalculate = undefined;
             }
+            if (debugSizing) {
+                console.log("[DRIFT DEBUG] MVCP recalc (immediate, no anchor lock):", {
+                    itemKey,
+                    timestamp: Date.now(),
+                });
+            }
             calculateItemsInView(ctx, { doMVCP: true });
             return;
         }
 
         if (state.queuedMVCPRecalculate !== undefined) {
+            if (debugSizing) {
+                console.log("[DRIFT DEBUG] MVCP recalc (already queued):", {
+                    itemKey,
+                    timestamp: Date.now(),
+                });
+            }
             return;
+        }
+
+        if (debugSizing) {
+            console.log("[DRIFT DEBUG] MVCP recalc (queued in RAF):", {
+                anchorLockActive: !!state.mvcpAnchorLock,
+                anchorLockExpires: state.mvcpAnchorLock?.expiresAt,
+                itemKey,
+                timestamp: Date.now(),
+            });
         }
 
         state.queuedMVCPRecalculate = requestAnimationFrame(() => {
             state.queuedMVCPRecalculate = undefined;
+            if (debugSizing) {
+                console.log("[DRIFT DEBUG] MVCP recalc (RAF executing):", {
+                    timestamp: Date.now(),
+                });
+            }
             calculateItemsInView(ctx, { doMVCP: true });
         });
     } else {
@@ -141,7 +169,7 @@ export function updateItemSize(ctx: StateContext, itemKey: string, sizeObj: { wi
     if (didContainersLayout || checkAllSizesKnown(state)) {
         if (needsRecalculate) {
             state.scrollForNextCalculateItemsInView = undefined;
-            runOrScheduleMVCPRecalculate(ctx);
+            runOrScheduleMVCPRecalculate(ctx, itemKey);
         }
         if (shouldMaintainScrollAtEnd) {
             if (maintainScrollAtEnd === true || (maintainScrollAtEnd as MaintainScrollAtEndOptions).onItemLayout) {

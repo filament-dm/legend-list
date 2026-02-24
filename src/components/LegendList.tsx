@@ -118,6 +118,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         data: dataProp = [],
         dataVersion,
         debugInitialization,
+        debugSizing,
         drawDistance = 250,
         estimatedItemSize = 100,
         estimatedListSize,
@@ -208,6 +209,18 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     const maintainVisibleContentPositionConfig = normalizeMaintainVisibleContentPosition(
         maintainVisibleContentPositionProp,
     );
+
+    // Debug startup log
+    useEffect(() => {
+        if (debugSizing) {
+            console.log("[DRIFT DEBUG] debugSizing enabled for LegendList", {
+                dataLength: dataProp.length,
+                estimatedItemSize,
+                maintainVisibleContentPosition: !!maintainVisibleContentPositionConfig,
+                timestamp: Date.now(),
+            });
+        }
+    }, [debugSizing]);
 
     const initialScrollProp: ScrollIndexWithOffset | undefined = initialScrollAtEnd
         ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 }
@@ -392,6 +405,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         data: dataProp,
         dataVersion,
         debugInitialization: !!debugInitialization,
+        debugSizing: !!debugSizing,
         drawDistance,
         estimatedItemSize,
         getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),
