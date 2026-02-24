@@ -6,9 +6,15 @@ export function doMaintainScrollAtEnd(ctx: StateContext, animated: boolean) {
     const {
         didContainersLayout,
         isAtEnd,
+        maintainingScrollAtEnd,
         refScroller,
         props: { maintainScrollAtEnd },
     } = state;
+
+    // Early return if already maintaining scroll position to prevent concurrent operations
+    if (maintainingScrollAtEnd) {
+        return false;
+    }
 
     // Run this only if scroll is at the bottom and after initial layout
     if (isAtEnd && maintainScrollAtEnd && didContainersLayout) {
