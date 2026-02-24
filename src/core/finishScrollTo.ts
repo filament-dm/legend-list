@@ -66,7 +66,7 @@ export function finishScrollTo(ctx: StateContext) {
         }
 
         if (state.props?.data) {
-            state.triggerCalculateItemsInView?.({ forceFullItemPositions: true });
+            state.triggerCalculateItemsInView?.({ doMVCP: true, forceFullItemPositions: true });
         }
 
         if (PlatformAdjustBreaksScroll) {
@@ -79,6 +79,12 @@ export function finishScrollTo(ctx: StateContext) {
 
         // Notify initialization manager that initial scroll completed
         if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
+            if (state.props.debugInitialization) {
+                console.log("[finishScrollTo] Initial scroll complete, transitioning to STABILIZING", {
+                    mode: ctx.initializationManager.getMode(),
+                    phase: ctx.initializationManager.getCurrentPhase(),
+                });
+            }
             ctx.initializationManager.markInitialScrollComplete();
             ctx.initializationManager.transitionToStabilizingPhase();
         }
@@ -86,6 +92,14 @@ export function finishScrollTo(ctx: StateContext) {
         // Invoke callback after all state cleanup and updates are complete
         if (callback) {
             callback();
+        }
+    } else {
+        // Defensive check: log if finishScrollTo is called without scrollingTo during initialization
+        if (state?.props?.debugInitialization && state?.isInitializing) {
+            console.log("[finishScrollTo] Called but scrollingTo is undefined during initialization", {
+                isInitializing: state.isInitializing,
+                phase: ctx.initializationManager?.getCurrentPhase(),
+            });
         }
     }
 }

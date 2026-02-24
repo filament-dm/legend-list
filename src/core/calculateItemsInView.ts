@@ -642,7 +642,11 @@ export function calculateItemsInView(
                         // so we need to set it to out of view
                         set$(ctx, `containerPosition${i}`, POSITION_OUT_OF_VIEW);
                     } else {
-                        const position = (positionValue || 0) - scrollAdjustPending;
+                        // During initialization with initialScroll, don't apply scrollAdjustPending
+                        // because scrollState is already overridden with the target position
+                        // Applying it here would cause a coordinate mismatch (double-adjustment)
+                        const shouldApplyAdjust = queuedInitialLayout || !initialScroll;
+                        const position = (positionValue || 0) - (shouldApplyAdjust ? scrollAdjustPending : 0);
                         const column = columns.get(id) || 1;
                         const span = columnSpans.get(id) || 1;
 
@@ -651,7 +655,9 @@ export function calculateItemsInView(
                         const prevSpan = peek$(ctx, `containerSpan${i}`);
                         const prevData = peek$(ctx, `containerItemData${i}`);
 
-                        if (position > POSITION_OUT_OF_VIEW && position !== prevPos) {
+                        // Update position if it changed, regardless of whether it's at POSITION_OUT_OF_VIEW
+                        // This fixes an issue where items with boundary positions weren't being updated
+                        if (position !== prevPos) {
                             set$(ctx, `containerPosition${i}`, position);
                             didChangePositions = true;
                         }
