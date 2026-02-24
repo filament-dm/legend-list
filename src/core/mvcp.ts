@@ -69,9 +69,20 @@ function updateAnchorLock(
                 : 0;
 
         if (!dataChanged && quietPasses >= MVCP_ANCHOR_LOCK_QUIET_PASSES_TO_RELEASE) {
+            if (state.props.debugSizing) {
+                console.log("[DRIFT DEBUG] Anchor lock RELEASED (quiet passes met):", {
+                    anchorId,
+                    positionDiff,
+                    quietPasses,
+                    timestamp: now,
+                });
+            }
             state.mvcpAnchorLock = undefined;
             return;
         }
+
+        const wasCreated = !existingLock;
+        const wasExtended = existingLock && Math.abs(positionDiff) > MVCP_POSITION_EPSILON;
 
         state.mvcpAnchorLock = {
             expiresAt: now + MVCP_ANCHOR_LOCK_TTL_MS,
@@ -79,6 +90,20 @@ function updateAnchorLock(
             position: anchorPosition,
             quietPasses,
         };
+
+        if (state.props.debugSizing) {
+            console.log("[DRIFT DEBUG] Anchor lock updated:", {
+                action: wasCreated ? "CREATED" : wasExtended ? "EXTENDED" : "MAINTAINED",
+                anchorId,
+                anchorPosition,
+                dataChanged,
+                expiresAt: now + MVCP_ANCHOR_LOCK_TTL_MS,
+                now,
+                positionDiff,
+                quietPasses,
+                timestamp: now,
+            });
+        }
     }
 }
 
