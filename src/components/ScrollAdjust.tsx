@@ -56,6 +56,15 @@ export function ScrollAdjust() {
                 } else {
                     scrollView.scrollBy(0, scrollDelta);
                 }
+
+                // Detect scroll clamping: if the browser couldn't scroll as far as requested,
+                // correct state.scroll to match the actual DOM position to prevent divergence.
+                const actualScroll = el.scrollTop;
+                const expectedScroll = prevScroll + scrollDelta;
+                const drift = actualScroll - expectedScroll;
+                if (Math.abs(drift) > 1) {
+                    ctx.state.scroll += drift;
+                }
             }
 
             lastScrollOffsetRef.current = scrollOffset;

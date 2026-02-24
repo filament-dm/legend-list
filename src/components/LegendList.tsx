@@ -23,6 +23,7 @@ import { checkResetContainers } from "@/core/checkResetContainers";
 import { clampScrollOffset } from "@/core/clampScrollOffset";
 import { doInitialAllocateContainers } from "@/core/doInitialAllocateContainers";
 import { handleLayout } from "@/core/handleLayout";
+import { InitializationCompletionType } from "@/core/initialization/types";
 import { onScroll } from "@/core/onScroll";
 import { ScrollAdjustHandler } from "@/core/ScrollAdjustHandler";
 import { scrollTo } from "@/core/scrollTo";
@@ -117,6 +118,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         contentInset,
         data: dataProp = [],
         dataVersion,
+        debugInitialization,
         drawDistance = 250,
         estimatedItemSize = 100,
         estimatedListSize,
@@ -140,6 +142,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         overrideItemLayout,
         onEndReached,
         onEndReachedThreshold = 0.5,
+        onInitializationComplete,
         onItemSizeChanged,
         onMetricsChange,
         onLayout: onLayoutProp,
@@ -160,11 +163,13 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         renderItem,
         scrollEventThrottle,
         snapToIndices,
+        stabilizationAnchorId,
         stickyHeaderIndices: stickyHeaderIndicesProp,
         stickyIndices: stickyIndicesDeprecated, // TODOV3: Remove from v3 release
         style: styleProp,
         suggestEstimatedItemSize,
         useWindowScroll = false,
+        timelineId,
         viewabilityConfig,
         viewabilityConfigCallbackPairs,
         waitForInitialLayout = true,
@@ -283,6 +288,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 contentInsetOverride: undefined,
                 dataChangeEpoch: 0,
                 dataChangeNeedsScrollUpdate: false,
+                dataRefWhenMeasured: new Map(),
                 didColumnsChange: false,
                 didDataChange: false,
                 enableScrollForNextCalculateItemsInView: true,
@@ -306,16 +312,23 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 initialScroll: initialScrollProp,
                 isAtEnd: false,
                 isAtStart: false,
+                isEndBufferSufficient: false,
                 isEndReached: null,
                 isFirst: true,
+                isInitializing: false,
+                isStartBufferSufficient: false,
                 isStartReached: null,
                 lastBatchingAction: Date.now(),
                 lastLayout: undefined,
                 lastScrollDelta: 0,
+                lastStabilizationAnchorId: undefined,
+                lastTimelineId: undefined,
                 loadStartTime: Date.now(),
                 minIndexSizeChanged: 0,
                 nativeContentInset: undefined,
                 nativeMarginTop: 0,
+                pendingEndRequest: false,
+                pendingStartRequest: false,
                 positions: [],
                 props: {} as any,
                 queuedCalculateItemsInView: 0,
@@ -332,6 +345,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 scrollTime: 0,
                 sizes: new Map(),
                 sizesKnown: new Map(),
+                stabilizationStableFrames: 0,
                 startBuffered: -1,
                 startNoBuffer: -1,
                 startReachedSnapshot: undefined,
@@ -379,6 +393,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         contentInset,
         data: dataProp,
         dataVersion,
+        debugInitialization: !!debugInitialization,
         drawDistance,
         estimatedItemSize,
         getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),
@@ -394,6 +409,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         numColumns: numColumnsProp,
         onEndReached,
         onEndReachedThreshold,
+        onInitializationComplete,
         onItemSizeChanged,
         onLoad,
         onScroll: throttleScrollFn,
@@ -405,6 +421,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         recycleItems: !!recycleItems,
         renderItem: renderItem!,
         snapToIndices,
+        stabilizationAnchorId,
         stickyIndicesArr: stickyHeaderIndices ?? [],
         stickyIndicesSet: useMemo(() => new Set(stickyHeaderIndices ?? []), [stickyHeaderIndices?.join(",")]),
         stickyPositionComponentInternal,
@@ -412,6 +429,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         stylePaddingTop: stylePaddingTopState,
         suggestEstimatedItemSize: !!suggestEstimatedItemSize,
         useWindowScroll: useWindowScrollResolved,
+        timelineId,
     };
 
     state.refScroller = refScroller as unknown as React.RefObject<LegendListScrollerRef | null>;
@@ -457,6 +475,136 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         initializeStateVars(false);
         updateItemPositions(ctx, /*dataChanged*/ true);
     }
+
+    // Timeline change detection for initialization system
+    const timelineChanged = timelineId !== state.lastTimelineId;
+    const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+
+    if (debugInitialization) {
+        console.log("[TIMELINE DEBUG] LegendList render", {
+            anchorChanged,
+            dataLength: dataProp?.length ?? 0,
+            hasInitialScrollProp: !!initialScrollProp,
+            initPhase: ctx.initializationManager.getCurrentPhase(),
+            isInitializing: ctx.initializationManager.isInitializing(),
+            lastStabilizationAnchorId: state.lastStabilizationAnchorId,
+            lastTimelineId: state.lastTimelineId,
+            stabilizationAnchorId,
+            timelineChanged,
+            timelineId,
+        });
+    }
+
+    if (timelineChanged) {
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Timeline changed detected!");
+        }
+
+        // Skip timeline detection if imperative initialization is running (e.g., jumpToLatest)
+        if (ctx.initializationManager.isImperativeInit()) {
+            if (debugInitialization) {
+                console.log("[TIMELINE DEBUG] Skipping - imperative init in progress");
+            }
+            return;
+        }
+
+        // Detect early exit case: focused → live timeline without anchor
+        const isSwitchingFromFocused = state.lastTimelineId?.includes("focused-timeline");
+        const isSwitchingToLive = timelineId?.includes("live-timeline");
+        const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
+
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Switch analysis:", {
+                isSwitchingFromFocused,
+                isSwitchingToLive,
+                shouldExitEarly,
+            });
+        }
+
+        // Update tracking before entering initialization
+        state.lastTimelineId = timelineId;
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
+
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Updated tracking, entering initialization");
+        }
+
+        // Enter initialization via the InitializationManager
+        ctx.initializationManager.enterInitialization({
+            anchorId: stabilizationAnchorId,
+            timelineId: timelineId || "",
+        });
+
+        if (shouldExitEarly) {
+            if (debugInitialization) {
+                console.log("[TIMELINE DEBUG] Early exit path - focused→live without anchor");
+            }
+            // Exit early for natural timeline switches
+            ctx.initializationManager.exitInitialization({
+                mode: ctx.initializationManager.getMode(),
+                timelineId: timelineId || "",
+                type: InitializationCompletionType.EARLY_EXIT,
+            });
+        } else {
+            if (debugInitialization) {
+                console.log("[TIMELINE DEBUG] Normal init flow - checking data availability");
+            }
+            // Normal initialization flow: prepare scroll if we have data
+            if (!initialScrollProp && dataProp && dataProp.length > 0) {
+                if (debugInitialization) {
+                    console.log("[TIMELINE DEBUG] Data available, preparing scroll");
+                }
+                const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+                    dataProp as readonly unknown[],
+                    keyExtractor as (item: unknown, index: number) => string,
+                );
+
+                if (scrollPrepared) {
+                    if (debugInitialization) {
+                        console.log("[TIMELINE DEBUG] ✅ Scroll prepared successfully, entering SCROLLING phase");
+                    }
+                    ctx.initializationManager.enterScrollingPhase();
+                    // Force re-render to trigger initialContentOffset memo recalculation
+                    setRenderNum((v) => v + 1);
+                } else {
+                    if (debugInitialization) {
+                        console.log("[TIMELINE DEBUG] ❌ Scroll prep failed - anchor not found in data");
+                    }
+                    // Scroll preparation failed
+                    ctx.initializationManager.exitInitialization({
+                        mode: ctx.initializationManager.getMode(),
+                        reason: "Scroll preparation failed - anchor not found in data",
+                        timelineId: timelineId || "",
+                        type: InitializationCompletionType.FAILED,
+                    });
+                }
+            } else {
+                if (debugInitialization) {
+                    console.log("[TIMELINE DEBUG] ❌ NO DATA OR HAS INITIAL SCROLL PROP - exiting initialization", {
+                        dataLength: dataProp?.length ?? 0,
+                        hasDataProp: !!dataProp,
+                        hasInitialScrollProp: !!initialScrollProp,
+                        initialScrollPropValue: initialScrollProp,
+                    });
+                }
+                // No data yet or has explicit initialScroll prop
+                ctx.initializationManager.exitInitialization({
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "No data or has initialScroll prop",
+                    timelineId: timelineId || "",
+                    type: InitializationCompletionType.FAILED,
+                });
+            }
+        }
+    } else if (anchorChanged) {
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Only anchor changed (no timeline change)");
+        }
+
+        // Just anchor changed, update tracking without triggering initialization
+        state.lastStabilizationAnchorId = stabilizationAnchorId;
+    }
+
     const initialContentOffset = useMemo(() => {
         let value: number;
         const { initialScroll, initialAnchor } = refState.current!;
@@ -535,8 +683,22 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     }, []);
 
     const doInitialScroll = useCallback(() => {
-        const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
-        if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+        const {
+            initialScroll,
+            didFinishInitialScroll,
+            queuedInitialLayout,
+            scrollingTo,
+            didContainersLayout,
+            scrollLength,
+        } = state;
+        if (
+            initialScroll &&
+            !queuedInitialLayout &&
+            !didFinishInitialScroll &&
+            !scrollingTo &&
+            didContainersLayout &&
+            scrollLength > 0
+        ) {
             scrollTo(ctx, {
                 animated: false,
                 index: initialScroll?.index,
@@ -565,6 +727,18 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         }
     }, [snapToIndices]);
     useLayoutEffect(() => {
+        if (debugInitialization) {
+            console.log("[DATA DEBUG] useLayoutEffect fired - data changed", {
+                dataLength: dataProp?.length ?? 0,
+                dataVersion,
+                initPhase: ctx.initializationManager.getCurrentPhase(),
+                isInitializing: ctx.initializationManager.isInitializing(),
+                lastTimelineId: state.lastTimelineId,
+                numColumns: numColumnsProp,
+                timelineId,
+            });
+        }
+
         // Get these out of state because react-dom's double render can cause issues when
         // accessing local variables
         const {
