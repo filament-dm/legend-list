@@ -461,25 +461,31 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     const timelineChanged = timelineId !== state.lastTimelineId;
     const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
 
-    console.log('[TIMELINE DEBUG] LegendList render', {
-        timelineChanged,
-        anchorChanged,
-        timelineId,
-        lastTimelineId: state.lastTimelineId,
-        stabilizationAnchorId,
-        lastStabilizationAnchorId: state.lastStabilizationAnchorId,
-        dataLength: dataProp?.length ?? 0,
-        hasInitialScrollProp: !!initialScrollProp,
-        isInitializing: ctx.initializationManager.isInitializing(),
-        initPhase: ctx.initializationManager.getCurrentPhase(),
-    });
+    if (debugInitialization) {
+        console.log("[TIMELINE DEBUG] LegendList render", {
+            anchorChanged,
+            dataLength: dataProp?.length ?? 0,
+            hasInitialScrollProp: !!initialScrollProp,
+            initPhase: ctx.initializationManager.getCurrentPhase(),
+            isInitializing: ctx.initializationManager.isInitializing(),
+            lastStabilizationAnchorId: state.lastStabilizationAnchorId,
+            lastTimelineId: state.lastTimelineId,
+            stabilizationAnchorId,
+            timelineChanged,
+            timelineId,
+        });
+    }
 
     if (timelineChanged) {
-        console.log('[TIMELINE DEBUG] Timeline changed detected!');
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Timeline changed detected!");
+        }
 
         // Skip timeline detection if imperative initialization is running (e.g., jumpToLatest)
         if (ctx.initializationManager.isImperativeInit()) {
-            console.log('[TIMELINE DEBUG] Skipping - imperative init in progress');
+            if (debugInitialization) {
+                console.log("[TIMELINE DEBUG] Skipping - imperative init in progress");
+            }
             return;
         }
 
@@ -488,17 +494,21 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         const isSwitchingToLive = timelineId?.includes("live-timeline");
         const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
 
-        console.log('[TIMELINE DEBUG] Switch analysis:', {
-            isSwitchingFromFocused,
-            isSwitchingToLive,
-            shouldExitEarly,
-        });
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Switch analysis:", {
+                isSwitchingFromFocused,
+                isSwitchingToLive,
+                shouldExitEarly,
+            });
+        }
 
         // Update tracking before entering initialization
         state.lastTimelineId = timelineId;
         state.lastStabilizationAnchorId = stabilizationAnchorId;
 
-        console.log('[TIMELINE DEBUG] Updated tracking, entering initialization');
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Updated tracking, entering initialization");
+        }
 
         // Enter initialization via the InitializationManager
         ctx.initializationManager.enterInitialization({
@@ -507,7 +517,9 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         });
 
         if (shouldExitEarly) {
-            console.log('[TIMELINE DEBUG] Early exit path - focused→live without anchor');
+            if (debugInitialization) {
+                console.log("[TIMELINE DEBUG] Early exit path - focused→live without anchor");
+            }
             // Exit early for natural timeline switches
             ctx.initializationManager.exitInitialization({
                 mode: ctx.initializationManager.getMode(),
@@ -515,22 +527,30 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 type: InitializationCompletionType.EARLY_EXIT,
             });
         } else {
-            console.log('[TIMELINE DEBUG] Normal init flow - checking data availability');
+            if (debugInitialization) {
+                console.log("[TIMELINE DEBUG] Normal init flow - checking data availability");
+            }
             // Normal initialization flow: prepare scroll if we have data
             if (!initialScrollProp && dataProp && dataProp.length > 0) {
-                console.log('[TIMELINE DEBUG] Data available, preparing scroll');
+                if (debugInitialization) {
+                    console.log("[TIMELINE DEBUG] Data available, preparing scroll");
+                }
                 const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
                     dataProp as readonly unknown[],
                     keyExtractor as (item: unknown, index: number) => string,
                 );
 
                 if (scrollPrepared) {
-                    console.log('[TIMELINE DEBUG] ✅ Scroll prepared successfully, entering SCROLLING phase');
+                    if (debugInitialization) {
+                        console.log("[TIMELINE DEBUG] ✅ Scroll prepared successfully, entering SCROLLING phase");
+                    }
                     ctx.initializationManager.enterScrollingPhase();
                     // Force re-render to trigger initialContentOffset memo recalculation
                     setRenderNum((v) => v + 1);
                 } else {
-                    console.log('[TIMELINE DEBUG] ❌ Scroll prep failed - anchor not found in data');
+                    if (debugInitialization) {
+                        console.log("[TIMELINE DEBUG] ❌ Scroll prep failed - anchor not found in data");
+                    }
                     // Scroll preparation failed
                     ctx.initializationManager.exitInitialization({
                         mode: ctx.initializationManager.getMode(),
@@ -540,12 +560,14 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                     });
                 }
             } else {
-                console.log('[TIMELINE DEBUG] ❌ NO DATA OR HAS INITIAL SCROLL PROP - exiting initialization', {
-                    hasInitialScrollProp: !!initialScrollProp,
-                    initialScrollPropValue: initialScrollProp,
-                    hasDataProp: !!dataProp,
-                    dataLength: dataProp?.length ?? 0,
-                });
+                if (debugInitialization) {
+                    console.log("[TIMELINE DEBUG] ❌ NO DATA OR HAS INITIAL SCROLL PROP - exiting initialization", {
+                        dataLength: dataProp?.length ?? 0,
+                        hasDataProp: !!dataProp,
+                        hasInitialScrollProp: !!initialScrollProp,
+                        initialScrollPropValue: initialScrollProp,
+                    });
+                }
                 // No data yet or has explicit initialScroll prop
                 ctx.initializationManager.exitInitialization({
                     mode: ctx.initializationManager.getMode(),
@@ -556,7 +578,9 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
             }
         }
     } else if (anchorChanged) {
-        console.log('[TIMELINE DEBUG] Only anchor changed (no timeline change)');
+        if (debugInitialization) {
+            console.log("[TIMELINE DEBUG] Only anchor changed (no timeline change)");
+        }
 
         // Just anchor changed, update tracking without triggering initialization
         state.lastStabilizationAnchorId = stabilizationAnchorId;
@@ -684,15 +708,17 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         }
     }, [snapToIndices]);
     useLayoutEffect(() => {
-        console.log('[DATA DEBUG] useLayoutEffect fired - data changed', {
-            dataLength: dataProp?.length ?? 0,
-            dataVersion,
-            numColumns: numColumnsProp,
-            isInitializing: ctx.initializationManager.isInitializing(),
-            initPhase: ctx.initializationManager.getCurrentPhase(),
-            timelineId,
-            lastTimelineId: state.lastTimelineId,
-        });
+        if (debugInitialization) {
+            console.log("[DATA DEBUG] useLayoutEffect fired - data changed", {
+                dataLength: dataProp?.length ?? 0,
+                dataVersion,
+                initPhase: ctx.initializationManager.getCurrentPhase(),
+                isInitializing: ctx.initializationManager.isInitializing(),
+                lastTimelineId: state.lastTimelineId,
+                numColumns: numColumnsProp,
+                timelineId,
+            });
+        }
 
         // Get these out of state because react-dom's double render can cause issues when
         // accessing local variables

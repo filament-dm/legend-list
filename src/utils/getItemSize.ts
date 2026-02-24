@@ -12,7 +12,6 @@ export function getItemSize(
     const state = ctx.state;
     const {
         sizesKnown,
-        sizes,
         dataRefWhenMeasured,
         props: { estimatedItemSize, getEstimatedItemSize, getItemType },
     } = state;

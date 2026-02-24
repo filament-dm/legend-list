@@ -85,14 +85,14 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
     useLayoutEffect(() => {
         const styleId = "legendlist-hide-scrollbar";
         if (!document.getElementById(styleId)) {
-            const style = document.createElement("style");
-            style.id = styleId;
-            style.textContent = `
+            const styleElement = document.createElement("style");
+            styleElement.id = styleId;
+            styleElement.textContent = `
             .legendlist-hide-scrollbar::-webkit-scrollbar {
                 display: none;
             }
         `;
-            document.head.appendChild(style);
+            document.head.appendChild(styleElement);
         }
     }, []); // Empty deps - only run once
 

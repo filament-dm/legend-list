@@ -54,7 +54,24 @@ export function scrollTo(ctx: StateContext, params: ScrollTarget & { noScrolling
         // For initial scroll on web (not android), we set scroll directly without animation
         // to avoid janky initial positioning. However, we still need to call finishScrollTo
         // to trigger phase transitions and callbacks.
+        if (state.props.debugInitialization) {
+            console.log("[scrollTo] Using web optimization path for initial scroll", {
+                animated,
+                isInitialScroll,
+                offset,
+            });
+        }
+
         state.scroll = offset;
+
+        // CRITICAL: Also update the actual DOM scroll position to match internal state
+        // This prevents state/DOM mismatch that causes MVCP to calculate wrong adjustments
+        const scroller = state.refScroller.current;
+        const node = typeof scroller?.getScrollableNode === "function" ? scroller.getScrollableNode() : scroller;
+        if (node) {
+            node[horizontal ? "scrollLeft" : "scrollTop"] = offset;
+        }
+
         // Use setTimeout to ensure scroll state is updated before finishing
         // This matches the pattern in doScrollTo.ts for non-animated scrolls
         setTimeout(() => finishScrollTo(ctx), 100);
