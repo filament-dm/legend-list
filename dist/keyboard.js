@@ -49,6 +49,7 @@ var useCombinedRef = (...refs) => {
   }, refs);
   return callback;
 };
+var typedForwardRef = React.forwardRef;
 
 // src/integrations/keyboard.tsx
 var clampProgress = (progress) => {
@@ -74,7 +75,7 @@ var calculateKeyboardTargetOffset = (startOffset, keyboardHeight, isOpening, pro
   const delta = (isOpening ? keyboardHeight : -keyboardHeight) * normalizedProgress;
   return Math.max(0, startOffset + delta);
 };
-var KeyboardAvoidingLegendList = React.forwardRef(function KeyboardAvoidingLegendList2(props, forwardedRef) {
+var KeyboardAvoidingLegendList = typedForwardRef(function KeyboardAvoidingLegendList2(props, forwardedRef) {
   const {
     contentContainerStyle: contentContainerStyleProp,
     contentInset: contentInsetProp,

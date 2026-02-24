@@ -147,10 +147,19 @@ var ReanimatedPositionViewSticky = typedMemo(function ReanimatedPositionViewStic
   );
   return /* @__PURE__ */ React3.createElement(Reanimated.View, { ref: refView, style: viewStyle, ...rest }, /* @__PURE__ */ React3.createElement(StickyOverlay, { stickyHeaderConfig }), children);
 });
+var ReanimatedPositionView = typedMemo(function ReanimatedPositionViewComponent(props) {
+  const { id, horizontal, style, refView, children, layoutTransition, ...rest } = props;
+  const [positionValue = POSITION_OUT_OF_VIEW] = useArr$([`containerPosition${id}`]);
+  const viewStyle = React3.useMemo(
+    () => [style, horizontal ? { left: positionValue } : { top: positionValue }],
+    [horizontal, positionValue, style]
+  );
+  return /* @__PURE__ */ React3.createElement(Reanimated.View, { layout: layoutTransition, ref: refView, style: viewStyle, ...rest }, children);
+});
 var LegendListForwardedRef = typedMemo(
   // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
   React3.forwardRef(function LegendListForwardedRef2(props, ref) {
-    const { refLegendList, ...rest } = props;
+    const { itemLayoutAnimation, refLegendList, ...rest } = props;
     const refFn = useCallback(
       (r) => {
         refLegendList(r);
@@ -179,11 +188,25 @@ var LegendListForwardedRef = typedMemo(
       },
       [stickyScrollOffset]
     );
-    const legendListProps = shouldUseReanimatedScrollView ? {
+    const itemLayoutAnimationRef = React3.useRef(itemLayoutAnimation);
+    itemLayoutAnimationRef.current = itemLayoutAnimation;
+    const hasItemLayoutAnimation = !!itemLayoutAnimation;
+    const positionComponentInternal = React3.useMemo(() => {
+      if (!hasItemLayoutAnimation) {
+        return void 0;
+      }
+      return function PositionComponent(positionProps) {
+        return /* @__PURE__ */ React3.createElement(ReanimatedPositionView, { ...positionProps, layoutTransition: itemLayoutAnimationRef.current });
+      };
+    }, [hasItemLayoutAnimation]);
+    const legendListProps = {
       ...rest,
-      renderScrollComponent: renderReanimatedScrollComponent,
-      stickyPositionComponentInternal
-    } : rest;
+      positionComponentInternal,
+      ...shouldUseReanimatedScrollView ? {
+        renderScrollComponent: renderReanimatedScrollComponent,
+        stickyPositionComponentInternal
+      } : {}
+    };
     return /* @__PURE__ */ React3.createElement(LegendList, { ref: refFn, refScrollView: ref, ...legendListProps });
   })
 );

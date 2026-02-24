@@ -1,6 +1,30 @@
 import * as React$1 from 'react';
-import { Key, ReactNode, ReactElement, Dispatch, SetStateAction } from 'react';
-import { ScrollViewComponent, ScrollResponderMixin, Insets as Insets$1, View, ScrollViewProps, NativeSyntheticEvent as NativeSyntheticEvent$1, NativeScrollEvent as NativeScrollEvent$1, ScrollView, StyleProp as StyleProp$1, ViewStyle as ViewStyle$1 } from 'react-native';
+import { Key, ReactNode, ReactElement, RefAttributes, Ref, CSSProperties, HTMLAttributes, Dispatch, SetStateAction } from 'react';
+
+type ScrollEventTarget = Window | HTMLElement;
+
+interface ScrollViewMethods {
+    getBoundingClientRect(): DOMRect | null | undefined;
+    getContentNode(): HTMLElement | null;
+    getCurrentScrollOffset(): number;
+    getScrollableNode(): HTMLElement;
+    getScrollEventTarget(): ScrollEventTarget | null;
+    getScrollResponder(): HTMLElement | null;
+    isWindowScroll?(): boolean;
+    scrollBy(x: number, y: number): void;
+    scrollTo(options: {
+        x?: number;
+        y?: number;
+        animated?: boolean;
+    }): void;
+    scrollToEnd(options?: {
+        animated?: boolean;
+    }): void;
+    scrollToOffset(params: {
+        offset: number;
+        animated?: boolean;
+    }): void;
+}
 
 /**
  * Initialization system type definitions
@@ -246,11 +270,6 @@ declare class InitializationManager {
 
 type AnimatedValue = number;
 
-type LooseMeasureCallback = (x: number, y: number, width: number, height: number, pageX: number, pageY: number) => void;
-interface LooseView {
-    measure?: (callback: LooseMeasureCallback) => void;
-}
-
 declare enum MvcpMode {
     NONE = "none",
     REGULAR = "regular",
@@ -371,6 +390,29 @@ interface NativeSyntheticEvent<T> {
 }
 type ViewStyle = Record<string, unknown>;
 type StyleProp<T> = T | T[] | null | undefined | false;
+interface ScrollEventTargetLike {
+    addEventListener(type: string, listener: (...args: any[]) => void): void;
+    removeEventListener(type: string, listener: (...args: any[]) => void): void;
+}
+interface ScrollableNodeLike {
+    scrollLeft?: number;
+    scrollTop?: number;
+}
+interface LegendListScrollerRef {
+    flashScrollIndicators(): void;
+    getCurrentScrollOffset?(): number;
+    getScrollEventTarget(): ScrollEventTargetLike | null;
+    getScrollableNode(): ScrollableNodeLike | null;
+    getScrollResponder(): unknown;
+    scrollTo(options: {
+        animated?: boolean;
+        x?: number;
+        y?: number;
+    }): void;
+    scrollToEnd(options?: {
+        animated?: boolean;
+    }): void;
+}
 type BaseScrollViewProps<TScrollView> = Omit<TScrollView, "contentOffset" | "maintainVisibleContentPosition" | "stickyHeaderIndices" | "removeClippedSubviews" | "children" | "onScroll">;
 interface DataModeProps<ItemT, TItemType extends string | undefined> {
     /**
@@ -527,6 +569,11 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      * - true enables both behaviors; false disables both.
      */
     maintainVisibleContentPosition?: boolean | MaintainVisibleContentPositionConfig<ItemT>;
+    /**
+     * Web only: when true, listens to window/body scrolling instead of rendering a scrollable list container.
+     * @default false
+     */
+    useWindowScroll?: boolean;
     /**
      * Timeline identifier that signals when the list is in initialization mode.
      * When this value changes, the list enters initialization mode and will
@@ -786,10 +833,11 @@ interface InternalState {
         num: number;
         avg: number;
     }>;
-    columns: Map<string, number>;
-    columnSpans: Map<string, number>;
+    columns: Array<number | undefined>;
+    columnSpans: Array<number | undefined>;
     containerItemKeys: Map<string, number>;
     containerItemTypes: Map<number, string>;
+    dataChangeEpoch: number;
     dataChangeNeedsScrollUpdate: boolean;
     didColumnsChange?: boolean;
     didDataChange?: boolean;
@@ -844,12 +892,13 @@ interface InternalState {
     needsOtherAxisSize?: boolean;
     otherAxisSize?: number;
     pendingTotalSize?: number;
-    positions: Map<string, number>;
+    pendingScrollResolve?: (() => void) | undefined;
+    positions: Array<number | undefined>;
     previousData?: readonly unknown[];
     queuedCalculateItemsInView: number | undefined;
     queuedMVCPRecalculate?: number;
     queuedInitialLayout?: boolean | undefined;
-    refScroller: React.RefObject<any>;
+    refScroller: React.RefObject<LegendListScrollerRef | null>;
     scroll: number;
     scrollAdjustHandler: ScrollAdjustHandler;
     scrollForNextCalculateItemsInView: {
@@ -874,6 +923,7 @@ interface InternalState {
     startBuffered: number;
     startBufferedId?: string;
     startNoBuffer: number;
+    startReachedSnapshotDataChangeEpoch: number | undefined;
     startReachedSnapshot: ThresholdSnapshot | undefined;
     stickyContainerPool: Set<number>;
     stickyContainers: Map<number, number>;
@@ -924,6 +974,7 @@ interface InternalState {
         renderItem: LegendListPropsInternal["renderItem"];
         scrollBuffer?: number;
         snapToIndices: number[] | undefined;
+        positionComponentInternal: React.ComponentType<any> | undefined;
         stabilizationAnchorId: LegendListPropsInternal["stabilizationAnchorId"];
         stickyPositionComponentInternal: React.ComponentType<any> | undefined;
         stickyIndicesArr: number[];
@@ -931,6 +982,7 @@ interface InternalState {
         stylePaddingBottom: number | undefined;
         stylePaddingTop: number | undefined;
         suggestEstimatedItemSize: boolean;
+        useWindowScroll: boolean;
         debugInitialization: boolean;
         timelineId: LegendListPropsInternal["timelineId"];
     };
@@ -962,7 +1014,7 @@ type LegendListState$1 = {
     listen: <T extends LegendListListenerType>(listenerType: T, callback: (value: ListenerTypeValueMap[T]) => void) => () => void;
     listenToPosition: (key: string, callback: (value: number) => void) => () => void;
     positionAtIndex: (index: number) => number;
-    positions: Map<string, number>;
+    positionByKey: (key: string) => number | undefined;
     scroll: number;
     scrollLength: number;
     scrollVelocity: number;
@@ -1212,23 +1264,61 @@ type GetRenderedItemResult<ItemT> = {
 };
 type GetRenderedItem = (key: string) => GetRenderedItemResult<any> | null;
 
-type LegendListPropsOverrides<ItemT, TItemType extends string | undefined> = Omit<LegendListPropsBase<ItemT, ScrollViewProps, TItemType>, "onScroll" | "refScrollView" | "renderScrollComponent" | "ListHeaderComponentStyle" | "ListFooterComponentStyle"> & {
-    onScroll?: (event: NativeSyntheticEvent$1<NativeScrollEvent$1>) => void;
-    refScrollView?: React.Ref<ScrollView>;
-    renderScrollComponent?: (props: ScrollViewProps) => ReactElement<ScrollViewProps>;
-    ListHeaderComponentStyle?: StyleProp$1<ViewStyle$1> | undefined;
-    ListFooterComponentStyle?: StyleProp$1<ViewStyle$1> | undefined;
+type LooseLayoutChangeEvent = {
+    nativeEvent: {
+        layout: LayoutRectangle;
+    };
+};
+type LooseMeasureCallback = (x: number, y: number, width: number, height: number, pageX: number, pageY: number) => void;
+interface LooseView {
+    measure?: (callback: LooseMeasureCallback) => void;
+}
+interface LooseScrollViewProps {
+    contentContainerStyle?: StyleProp<ViewStyle>;
+    contentInset?: Insets;
+    contentOffset?: {
+        x: number;
+        y: number;
+    };
+    horizontal?: boolean;
+    maintainVisibleContentPosition?: {
+        autoscrollToTopThreshold?: number;
+        minIndexForVisible: number;
+    };
+    onLayout?: (event: LooseLayoutChangeEvent) => void;
+    onMomentumScrollBegin?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+    onMomentumScrollEnd?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+    onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+    refreshControl?: ReactElement | null;
+    removeClippedSubviews?: boolean;
+    scrollEventThrottle?: number;
+    showsHorizontalScrollIndicator?: boolean;
+    showsVerticalScrollIndicator?: boolean;
+    stickyHeaderIndices?: number[];
+    style?: StyleProp<ViewStyle>;
+}
+
+type ScrollViewPropsWeb = Omit<LooseScrollViewProps, "style" | "contentContainerStyle" | "onScroll" | "onLayout" | "pagingEnabled" | "snapToInterval"> & Omit<HTMLAttributes<HTMLDivElement>, "onScroll" | "onLayout" | "style"> & {
+    style?: CSSProperties;
+    contentContainerStyle?: CSSProperties;
+    onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+    onLayout?: (event: LooseLayoutChangeEvent) => void;
+};
+type LegendListPropsOverrides<ItemT, TItemType extends string | undefined> = Omit<LegendListPropsBase<ItemT, ScrollViewPropsWeb, TItemType>, "refScrollView" | "renderScrollComponent" | "ListHeaderComponentStyle" | "ListFooterComponentStyle"> & {
+    refScrollView?: Ref<HTMLElement | ScrollViewMethods>;
+    ListHeaderComponentStyle?: CSSProperties | undefined;
+    ListFooterComponentStyle?: CSSProperties | undefined;
 };
 type LegendListProps<ItemT = any, TItemType extends string | undefined = string | undefined> = LegendListPropsOverrides<ItemT, TItemType>;
-type LegendListRef = Omit<LegendListRef$1, "getNativeScrollRef" | "getScrollResponder" | "reportContentInset"> & {
-    getNativeScrollRef(): React.ElementRef<typeof ScrollViewComponent>;
-    getScrollResponder(): ScrollResponderMixin;
-    reportContentInset(inset?: Partial<Insets$1> | null): void;
+type LegendListRef = Omit<LegendListRef$1, "getNativeScrollRef" | "getScrollableNode" | "getScrollResponder"> & {
+    getNativeScrollRef(): HTMLElement | ScrollViewMethods;
+    getScrollableNode(): HTMLElement;
+    getScrollResponder(): HTMLElement | null;
 };
 type LegendListState = Omit<LegendListState$1, "elementAtIndex"> & {
-    elementAtIndex: (index: number) => View | null | undefined;
+    elementAtIndex: (index: number) => HTMLElement | null | undefined;
 };
-type LegendListComponent = <ItemT = any>(props: LegendListProps<ItemT> & React.RefAttributes<LegendListRef>) => React.ReactElement | null;
+type LegendListComponent = <ItemT = any>(props: LegendListProps<ItemT> & RefAttributes<LegendListRef>) => ReactElement | null;
 
 declare function useViewability<ItemT = any>(callback: ViewabilityCallback<ItemT>, configId?: string): void;
 declare function useViewabilityAmount<ItemT = any>(callback: ViewabilityAmountCallback<ItemT>): void;
@@ -1243,4 +1333,4 @@ declare function useSyncLayout(): () => void;
 
 declare const LegendList: LegendListComponent;
 
-export { type AlwaysRenderConfig, type BaseScrollViewProps, type ColumnWrapperStyle, type GetRenderedItem, type GetRenderedItemResult, type InitialScrollAnchor, type InitializationCompletionInfo, InitializationCompletionType, type InitializationConfig, InitializationMode, InitializationPhase, type Insets, type InternalState, type LayoutRectangle, LegendList, type LegendListComponent, type LegendListMetrics, type LegendListProps, type LegendListPropsBase, type LegendListRecyclingState, type LegendListRef, type LegendListRenderItemProps, type LegendListState, type MaintainScrollAtEndOptions, type MaintainVisibleContentPositionConfig, type MaintainVisibleContentPositionNormalized, type NativeScrollEvent, type NativeSyntheticEvent, type OnViewableItemsChanged, type ScrollIndexWithOffset, type ScrollIndexWithOffsetAndContentOffset, type ScrollIndexWithOffsetPosition, type ScrollTarget, type StickyHeaderConfig, type StyleProp, type ThresholdSnapshot, type TypedForwardRef, type TypedMemo, type ViewAmountToken, type ViewStyle, type ViewToken, type ViewabilityAmountCallback, type ViewabilityCallback, type ViewabilityConfig, type ViewabilityConfigCallbackPair, type ViewabilityConfigCallbackPairs, type ViewableRange, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };
+export { type AlwaysRenderConfig, type BaseScrollViewProps, type ColumnWrapperStyle, type GetRenderedItem, type GetRenderedItemResult, type InitialScrollAnchor, type InitializationCompletionInfo, InitializationCompletionType, type InitializationConfig, InitializationMode, InitializationPhase, type Insets, type InternalState, type LayoutRectangle, LegendList, type LegendListComponent, type LegendListMetrics, type LegendListProps, type LegendListPropsBase, type LegendListRecyclingState, type LegendListRef, type LegendListRenderItemProps, type LegendListScrollerRef, type LegendListState, type MaintainScrollAtEndOptions, type MaintainVisibleContentPositionConfig, type MaintainVisibleContentPositionNormalized, type NativeScrollEvent, type NativeSyntheticEvent, type OnViewableItemsChanged, type ScrollEventTargetLike, type ScrollIndexWithOffset, type ScrollIndexWithOffsetAndContentOffset, type ScrollIndexWithOffsetPosition, type ScrollTarget, type ScrollableNodeLike, type StickyHeaderConfig, type StyleProp, type ThresholdSnapshot, type TypedForwardRef, type TypedMemo, type ViewAmountToken, type ViewStyle, type ViewToken, type ViewabilityAmountCallback, type ViewabilityCallback, type ViewabilityConfig, type ViewabilityConfigCallbackPair, type ViewabilityConfigCallbackPairs, type ViewableRange, typedForwardRef, typedMemo, useIsLastItem, useListScrollSize, useRecyclingEffect, useRecyclingState, useSyncLayout, useViewability, useViewabilityAmount };

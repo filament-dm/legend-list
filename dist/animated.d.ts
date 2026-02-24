@@ -285,6 +285,11 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      */
     maintainVisibleContentPosition?: boolean | MaintainVisibleContentPositionConfig<ItemT>;
     /**
+     * Web only: when true, listens to window/body scrolling instead of rendering a scrollable list container.
+     * @default false
+     */
+    useWindowScroll?: boolean;
+    /**
      * Timeline identifier that signals when the list is in initialization mode.
      * When this value changes, the list enters initialization mode and will
      * absolutely lock MVCP to the stabilizationAnchorId (if provided) until
@@ -517,7 +522,7 @@ type LegendListState = {
     listen: <T extends LegendListListenerType>(listenerType: T, callback: (value: ListenerTypeValueMap[T]) => void) => () => void;
     listenToPosition: (key: string, callback: (value: number) => void) => () => void;
     positionAtIndex: (index: number) => number;
-    positions: Map<string, number>;
+    positionByKey: (key: string) => number | undefined;
     scroll: number;
     scrollLength: number;
     scrollVelocity: number;
