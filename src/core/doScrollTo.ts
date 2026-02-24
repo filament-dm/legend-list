@@ -79,6 +79,7 @@ function listenForScrollEnd(
         const isNearTarget = Math.abs(currentOffset - targetOffset) <= SCROLL_END_TARGET_EPSILON;
         // Some browsers emit scrollend before smooth scrolling actually settles.
         // Ignore early scrollend and rely on subsequent scroll/idle events.
+        // However, always accept idle and max timeout reasons to ensure completion.
         if (reason === "scrollend" && !isNearTarget) {
             return;
         }

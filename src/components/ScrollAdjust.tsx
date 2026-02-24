@@ -24,11 +24,7 @@ export function ScrollAdjust() {
                 const prevScroll = el.scrollTop;
                 const nextScroll = prevScroll + scrollDelta;
                 const totalSize = el.scrollHeight;
-                if (
-                    scrollDelta > 0 &&
-                    !ctx.state.adjustingFromInitialMount &&
-                    totalSize < nextScroll + el.clientHeight
-                ) {
+                if (scrollDelta > 0 && totalSize < nextScroll + el.clientHeight) {
                     // If trying to scroll out of bounds of the scroll element's current size
                     // it would clamp the scroll and not do the full adjustment. So we need to
                     // add padding to the scroll element to allow the scroll to complete.
@@ -52,6 +48,15 @@ export function ScrollAdjust() {
                     });
                 } else {
                     scrollView.scrollBy(0, scrollDelta);
+                }
+
+                // Detect scroll clamping: if the browser couldn't scroll as far as requested,
+                // correct state.scroll to match the actual DOM position to prevent divergence.
+                const actualScroll = el.scrollTop;
+                const expectedScroll = prevScroll + scrollDelta;
+                const drift = actualScroll - expectedScroll;
+                if (Math.abs(drift) > 1) {
+                    ctx.state.scroll += drift;
                 }
             }
 
