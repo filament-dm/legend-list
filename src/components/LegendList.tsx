@@ -470,6 +470,7 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
                 return state
                     ? {
                           activeStickyIndex: state.activeStickyIndex,
+                          alignItemsPaddingTop: peek$(ctx, "alignItemsPaddingTop") || 0,
                           contentLength: state.totalSize,
                           data: state.props.data,
                           end: state.endNoBuffer,
