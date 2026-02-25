@@ -442,8 +442,8 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         stylePaddingBottom: stylePaddingBottomState,
         stylePaddingTop: stylePaddingTopState,
         suggestEstimatedItemSize: !!suggestEstimatedItemSize,
-        useWindowScroll: useWindowScrollResolved,
         timelineId,
+        useWindowScroll: useWindowScrollResolved,
     };
 
     state.refScroller = refScroller as unknown as React.RefObject<LegendListScrollerRef | null>;
@@ -697,22 +697,28 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     }, []);
 
     const doInitialScroll = useCallback(() => {
-        const {
-            initialScroll,
-            didFinishInitialScroll,
-            queuedInitialLayout,
-            scrollingTo,
-            didContainersLayout,
-            scrollLength,
-        } = state;
-        if (
-            initialScroll &&
-            !queuedInitialLayout &&
-            !didFinishInitialScroll &&
-            !scrollingTo &&
-            didContainersLayout &&
-            scrollLength > 0
-        ) {
+        const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
+
+        if (state.props.debugInitialization) {
+            console.log("[doInitialScroll] Checking conditions", {
+                allConditionsMet: !!(initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo),
+                didFinishInitialScroll,
+                hasInitialScroll: !!initialScroll,
+                hasScrollingTo: !!scrollingTo,
+                initialContentOffset,
+                queuedInitialLayout,
+            });
+        }
+
+        if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+            if (state.props.debugInitialization) {
+                console.log("[doInitialScroll] ✅ All conditions met, calling scrollTo", {
+                    index: initialScroll?.index,
+                    offset: initialContentOffset,
+                    scrollLength: state.scrollLength,
+                });
+            }
+
             scrollTo(ctx, {
                 animated: false,
                 index: initialScroll?.index,

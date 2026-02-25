@@ -52,8 +52,8 @@ export function prepareInitializationMVCP(ctx: StateContext): (() => void) | und
 
     // Return closure that applies adjustment after positions recalculate
     return () => {
-        const anchorIndex = state.indexByKey.get(anchorId);
-        const newPosition = anchorIndex !== undefined ? state.positions[anchorIndex] : undefined;
+        const currentAnchorIndex = state.indexByKey.get(anchorId);
+        const newPosition = currentAnchorIndex !== undefined ? state.positions[currentAnchorIndex] : undefined;
         if (newPosition === undefined) {
             return;
         }
