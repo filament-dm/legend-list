@@ -143,8 +143,8 @@ export function createMockState(
             stylePaddingBottom: undefined,
             stylePaddingTop: 0,
             suggestEstimatedItemSize: false,
-            useWindowScroll: false,
             timelineId: undefined,
+            useWindowScroll: false,
             ...(overrides.props ?? {}),
         },
     } as unknown as InternalState & Record<string, unknown>;

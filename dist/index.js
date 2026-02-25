@@ -1920,11 +1920,11 @@ var ListComponentScrollView = React3.forwardRef(function ListComponentScrollView
     ...StyleSheet.flatten(contentContainerStyle)
   };
   const {
-    contentInset,
-    scrollEventThrottle,
-    ScrollComponent,
+    contentInset: _contentInset,
+    scrollEventThrottle: _scrollEventThrottle,
+    ScrollComponent: _ScrollComponent,
     useWindowScroll: _useWindowScroll,
-    debugSizing,
+    debugSizing: _debugSizing,
     ...webProps
   } = props;
   return /* @__PURE__ */ React3__namespace.createElement(
@@ -2201,9 +2201,8 @@ function getItemSize(ctx, key, index, data, _useAverageSize, _preferCachedSize) 
       return sizeKnown;
     }
   }
-  let size;
   const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
-  size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
+  const size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
   setSize(ctx, key, size);
   return size;
 }
@@ -2410,8 +2409,16 @@ function setInitialRenderState(ctx, {
 
 // src/core/finishScrollTo.ts
 function finishScrollTo(ctx) {
-  var _a3, _b, _c, _d, _e, _f;
+  var _a3, _b, _c, _d, _e, _f, _g;
   const state = ctx.state;
+  if (state.props.debugInitialization && state.isInitializing) {
+    console.log("[finishScrollTo] Called", {
+      hasScrollingTo: !!state.scrollingTo,
+      isInitializing: state.isInitializing,
+      isInitialScroll: (_a3 = state.scrollingTo) == null ? void 0 : _a3.isInitialScroll,
+      phase: ctx.initializationManager.getCurrentPhase()
+    });
+  }
   if (state == null ? void 0 : state.scrollingTo) {
     const resolvePendingScroll = state.pendingScrollResolve;
     state.pendingScrollResolve = void 0;
@@ -2420,7 +2427,7 @@ function finishScrollTo(ctx) {
     if (scrollingTo.isScrollToEnd) {
       const currentLastIndex = state.props.data.length - 1;
       const isAtEnd = state.isAtEnd;
-      const retryCount = (_a3 = scrollingTo.retryCount) != null ? _a3 : 0;
+      const retryCount = (_b = scrollingTo.retryCount) != null ? _b : 0;
       const MAX_RETRIES = 3;
       const dataChanged = scrollingTo.index !== currentLastIndex;
       const notAtBottom = !isAtEnd;
@@ -2443,7 +2450,7 @@ function finishScrollTo(ctx) {
           onSettled: callback,
           retryCount: retryCount + 1,
           viewOffset: scrollingTo.viewOffset,
-          viewPosition: (_b = scrollingTo.viewPosition) != null ? _b : 1
+          viewPosition: (_c = scrollingTo.viewPosition) != null ? _c : 1
         });
         return;
       }
@@ -2455,8 +2462,8 @@ function finishScrollTo(ctx) {
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
-    if ((_c = state.props) == null ? void 0 : _c.data) {
-      (_d = state.triggerCalculateItemsInView) == null ? void 0 : _d.call(state, { doMVCP: true, forceFullItemPositions: true });
+    if ((_d = state.props) == null ? void 0 : _d.data) {
+      (_e = state.triggerCalculateItemsInView) == null ? void 0 : _e.call(state, { doMVCP: true, forceFullItemPositions: true });
     }
     {
       state.scrollAdjustHandler.commitPendingAdjust(scrollingTo);
@@ -2466,22 +2473,29 @@ function finishScrollTo(ctx) {
     resolvePendingScroll == null ? void 0 : resolvePendingScroll();
     if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
       if (state.props.debugInitialization) {
-        console.log("[finishScrollTo] Initial scroll complete, transitioning to STABILIZING", {
+        console.log("[finishScrollTo] \u2705 Initial scroll complete, transitioning to STABILIZING", {
           mode: ctx.initializationManager.getMode(),
           phase: ctx.initializationManager.getCurrentPhase()
         });
       }
       ctx.initializationManager.markInitialScrollComplete();
       ctx.initializationManager.transitionToStabilizingPhase();
+    } else if (scrollingTo.isInitialScroll && state.props.debugInitialization) {
+      console.log("[finishScrollTo] \u26A0\uFE0F Initial scroll but NOT transitioning", {
+        isInitializing: ctx.initializationManager.isInitializing(),
+        isInitialScroll: scrollingTo.isInitialScroll,
+        mode: ctx.initializationManager.getMode(),
+        phase: ctx.initializationManager.getCurrentPhase()
+      });
     }
     if (callback) {
       callback();
     }
   } else {
-    if (((_e = state == null ? void 0 : state.props) == null ? void 0 : _e.debugInitialization) && (state == null ? void 0 : state.isInitializing)) {
+    if (((_f = state == null ? void 0 : state.props) == null ? void 0 : _f.debugInitialization) && (state == null ? void 0 : state.isInitializing)) {
       console.log("[finishScrollTo] Called but scrollingTo is undefined during initialization", {
         isInitializing: state.isInitializing,
-        phase: (_f = ctx.initializationManager) == null ? void 0 : _f.getCurrentPhase()
+        phase: (_g = ctx.initializationManager) == null ? void 0 : _g.getCurrentPhase()
       });
     }
   }
@@ -2573,12 +2587,24 @@ function listenForScrollEnd(ctx, params) {
 
 // src/core/scrollTo.ts
 function scrollTo(ctx, params) {
+  var _a3;
   const state = ctx.state;
   const { noScrollingTo, forceScroll, ...scrollTarget } = params;
   const { animated, isInitialScroll, offset: scrollTargetOffset, precomputedWithViewOffset } = scrollTarget;
   const {
     props: { horizontal }
   } = state;
+  if (state.props.debugInitialization && isInitialScroll) {
+    console.log("[scrollTo] Called for initial scroll", {
+      animated,
+      currentScroll: state.scroll,
+      forceScroll,
+      isInitialScroll,
+      noScrollingTo,
+      precomputedWithViewOffset,
+      scrollTargetOffset
+    });
+  }
   if (state.animFrameCheckFinishedScroll) {
     cancelAnimationFrame(ctx.state.animFrameCheckFinishedScroll);
   }
@@ -2587,8 +2613,21 @@ function scrollTo(ctx, params) {
   }
   let offset = precomputedWithViewOffset ? scrollTargetOffset : calculateOffsetWithOffsetPosition(ctx, scrollTargetOffset, scrollTarget);
   offset = clampScrollOffset(ctx, offset, scrollTarget);
+  if (state.props.debugInitialization && isInitialScroll) {
+    console.log("[scrollTo] Calculated offset", {
+      currentScroll: state.scroll,
+      difference: Math.abs(offset - state.scroll),
+      offset,
+      withinTolerance: Math.abs(offset - state.scroll) < 1
+    });
+  }
   state.scrollHistory.length = 0;
   if (!forceScroll && Math.abs(offset - state.scroll) < 1) {
+    if (state.props.debugInitialization && isInitialScroll) {
+      console.log("[scrollTo] Already at target, finishing immediately", {
+        settingScrollingTo: !noScrollingTo
+      });
+    }
     if (!noScrollingTo) {
       state.scrollingTo = scrollTarget;
     }
@@ -2597,6 +2636,12 @@ function scrollTo(ctx, params) {
   }
   if (!noScrollingTo) {
     state.scrollingTo = scrollTarget;
+    if (state.props.debugInitialization && isInitialScroll) {
+      console.log("[scrollTo] Set state.scrollingTo", {
+        isInitialScroll: (_a3 = state.scrollingTo) == null ? void 0 : _a3.isInitialScroll,
+        scrollingTo: state.scrollingTo
+      });
+    }
   }
   state.scrollPending = offset;
   if (forceScroll || !isInitialScroll || Platform.OS === "android") {
@@ -2611,9 +2656,11 @@ function scrollTo(ctx, params) {
     }
     state.scroll = offset;
     const scroller = state.refScroller.current;
-    const node = typeof (scroller == null ? void 0 : scroller.getScrollableNode) === "function" ? scroller.getScrollableNode() : scroller;
-    if (node) {
-      node[horizontal ? "scrollLeft" : "scrollTop"] = offset;
+    if (scroller) {
+      const scrollableNode = typeof scroller.getScrollableNode === "function" ? scroller.getScrollableNode() : null;
+      if (scrollableNode) {
+        scrollableNode[horizontal ? "scrollLeft" : "scrollTop"] = offset;
+      }
     }
     setTimeout(() => finishScrollTo(ctx), 100);
   }
@@ -2720,8 +2767,8 @@ function prepareInitializationMVCP(ctx) {
   }
   const targetViewPosition = (_a3 = manager.getTargetViewPosition()) != null ? _a3 : 0.5;
   return () => {
-    const anchorIndex2 = state.indexByKey.get(anchorId);
-    const newPosition = anchorIndex2 !== void 0 ? state.positions[anchorIndex2] : void 0;
+    const currentAnchorIndex = state.indexByKey.get(anchorId);
+    const newPosition = currentAnchorIndex !== void 0 ? state.positions[currentAnchorIndex] : void 0;
     if (newPosition === void 0) {
       return;
     }
@@ -5487,8 +5534,8 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     stylePaddingBottom: stylePaddingBottomState,
     stylePaddingTop: stylePaddingTopState,
     suggestEstimatedItemSize: !!suggestEstimatedItemSize,
-    useWindowScroll: useWindowScrollResolved,
-    timelineId
+    timelineId,
+    useWindowScroll: useWindowScrollResolved
   };
   state.refScroller = refScroller;
   const memoizedLastItemKeys = React3.useMemo(() => {
@@ -5676,15 +5723,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     }
   }, []);
   const doInitialScroll = React3.useCallback(() => {
-    const {
-      initialScroll,
-      didFinishInitialScroll,
-      queuedInitialLayout,
-      scrollingTo,
-      didContainersLayout,
-      scrollLength
-    } = state;
-    if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo && didContainersLayout && scrollLength > 0) {
+    const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
+    if (state.props.debugInitialization) {
+      console.log("[doInitialScroll] Checking conditions", {
+        allConditionsMet: !!(initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo),
+        didFinishInitialScroll,
+        hasInitialScroll: !!initialScroll,
+        hasScrollingTo: !!scrollingTo,
+        initialContentOffset,
+        queuedInitialLayout
+      });
+    }
+    if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+      if (state.props.debugInitialization) {
+        console.log("[doInitialScroll] \u2705 All conditions met, calling scrollTo", {
+          index: initialScroll == null ? void 0 : initialScroll.index,
+          offset: initialContentOffset,
+          scrollLength: state.scrollLength
+        });
+      }
       scrollTo(ctx, {
         animated: false,
         index: initialScroll == null ? void 0 : initialScroll.index,
