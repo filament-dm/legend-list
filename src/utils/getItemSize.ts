@@ -32,11 +32,9 @@ export function getItemSize(
         // Data reference changed - fall through to re-estimate
     }
 
-    let size: number | undefined;
-
     // Get estimated size since we don't have a valid measured size for this data version
     const itemType = getItemType ? (getItemType(data, index) ?? "") : "";
-    size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize!;
+    const size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize!;
 
     setSize(ctx, key, size);
 

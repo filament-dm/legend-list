@@ -10,6 +10,16 @@ import { setInitialRenderState } from "@/utils/setInitialRenderState";
 
 export function finishScrollTo(ctx: StateContext) {
     const state = ctx.state;
+
+    if (state.props.debugInitialization && state.isInitializing) {
+        console.log("[finishScrollTo] Called", {
+            hasScrollingTo: !!state.scrollingTo,
+            isInitializing: state.isInitializing,
+            isInitialScroll: state.scrollingTo?.isInitialScroll,
+            phase: ctx.initializationManager.getCurrentPhase(),
+        });
+    }
+
     if (state?.scrollingTo) {
         const resolvePendingScroll = state.pendingScrollResolve;
         state.pendingScrollResolve = undefined;
@@ -86,13 +96,20 @@ export function finishScrollTo(ctx: StateContext) {
         // Notify initialization manager that initial scroll completed
         if (scrollingTo.isInitialScroll && ctx.initializationManager.isInitializing()) {
             if (state.props.debugInitialization) {
-                console.log("[finishScrollTo] Initial scroll complete, transitioning to STABILIZING", {
+                console.log("[finishScrollTo] ✅ Initial scroll complete, transitioning to STABILIZING", {
                     mode: ctx.initializationManager.getMode(),
                     phase: ctx.initializationManager.getCurrentPhase(),
                 });
             }
             ctx.initializationManager.markInitialScrollComplete();
             ctx.initializationManager.transitionToStabilizingPhase();
+        } else if (scrollingTo.isInitialScroll && state.props.debugInitialization) {
+            console.log("[finishScrollTo] ⚠️ Initial scroll but NOT transitioning", {
+                isInitializing: ctx.initializationManager.isInitializing(),
+                isInitialScroll: scrollingTo.isInitialScroll,
+                mode: ctx.initializationManager.getMode(),
+                phase: ctx.initializationManager.getCurrentPhase(),
+            });
         }
 
         // Invoke callback after all state cleanup and updates are complete
