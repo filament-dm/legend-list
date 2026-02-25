@@ -30,6 +30,7 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
     forwardedRef: ForwardedRef<LegendListRef>,
 ) {
     const {
+        alignItemsAtEnd,
         contentInset: contentInsetProp,
         horizontal,
         onScroll: onScrollProp,
@@ -73,6 +74,26 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
         },
         [refLegendList],
     );
+
+    // After the keyboard animation completes, the scroll position may be past the valid
+    // range because alignItemsPaddingTop decreased (absorbing the space change).
+    // Unpin contentOffset and scroll to the correct position.
+    const correctScrollAfterKeyboard = useCallback(() => {
+        // Wait for layout changes (alignItemsPaddingTop update) to settle
+        requestAnimationFrame(() => {
+            const state = refLegendList.current?.getState();
+            if (!state) return;
+            const padding = state.alignItemsPaddingTop;
+            if (padding > 0) {
+                // Content doesn't fill the screen - scroll should be 0
+                animatedOffsetY.set(0);
+                scrollOffsetY.set(0);
+            } else {
+                // Content fills the screen - unpin and let native scroll handle it
+                animatedOffsetY.set(null);
+            }
+        });
+    }, []);
 
     useKeyboardHandler(
         // biome-ignore assist/source/useSortedKeys: prefer start/move/end
@@ -178,10 +199,17 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
                             animatedOffsetY.set(scrollOffsetY.get());
                         }
                     }
+
+                    // After the keyboard animation, correct scroll position for
+                    // alignItemsAtEnd lists where the padding reduction already
+                    // accounts for the space change.
+                    if (alignItemsAtEnd) {
+                        runOnJS(correctScrollAfterKeyboard)();
+                    }
                 }
             },
         },
-        [scrollViewRef, safeAreaInsetBottom],
+        [scrollViewRef, safeAreaInsetBottom, alignItemsAtEnd],
     );
 
     const animatedProps = useAnimatedProps<ScrollViewProps>(() => {
@@ -227,6 +255,7 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
     return (
         <AnimatedLegendList
             {...rest}
+            alignItemsAtEnd={alignItemsAtEnd}
             animatedProps={animatedProps}
             keyboardDismissMode="interactive"
             onScroll={scrollHandler as unknown as AnimatedLegendListProps<ItemT>["onScroll"]}

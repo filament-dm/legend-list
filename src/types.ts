@@ -502,6 +502,7 @@ export interface LegendListRenderItemProps<
 
 export type ScrollState = {
     activeStickyIndex: number | undefined;
+    alignItemsPaddingTop: number;
     contentLength: number;
     data: readonly any[];
     end: number;
