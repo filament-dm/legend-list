@@ -32,7 +32,7 @@ export function updateTotalSize(ctx: StateContext) {
                     let maxSize = 0;
                     for (let i = rowStart; i < data.length; i++) {
                         const rowId = state.idCache[i] ?? getId(state, i);
-                        const size = getItemSize(ctx, rowId, i, data[i]);
+                        const size = state.sizesKnown.get(rowId) ?? getItemSize(ctx, rowId, i, data[i]);
                         if (size > maxSize) {
                             maxSize = size;
                         }
@@ -40,7 +40,12 @@ export function updateTotalSize(ctx: StateContext) {
 
                     addTotalSize(ctx, null, lastPosition + maxSize);
                 } else {
-                    const lastSize = getItemSize(ctx, lastId, data.length - 1, data[data.length - 1]);
+                    // Prefer the measured size (sizesKnown) directly, consistent with
+                    // updateItemPositions which also checks sizesKnown before getItemSize.
+                    // This avoids getItemSize's data-ref check discarding a valid measurement
+                    // when the data object was replaced without changing the rendered size
+                    // (e.g. read receipt updates, pending→confirmed transitions).
+                    const lastSize = state.sizesKnown.get(lastId) ?? getItemSize(ctx, lastId, data.length - 1, data[data.length - 1]);
                     if (lastSize !== undefined) {
                         const totalSize = lastPosition + lastSize;
                         addTotalSize(ctx, null, totalSize);
