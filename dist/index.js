@@ -42,7 +42,7 @@ function getContentInsetEnd(state) {
   const baseInset = contentInset != null ? contentInset : state.nativeContentInset;
   const overrideInset = (_a3 = state.contentInsetOverride) != null ? _a3 : void 0;
   if (overrideInset) {
-    const mergedInset = { bottom: 0, left: 0, right: 0, top: 0, ...baseInset, ...overrideInset };
+    const mergedInset = { bottom: 0, right: 0, ...baseInset, ...overrideInset };
     return (horizontal ? mergedInset.right : mergedInset.bottom) || 0;
   }
   if (baseInset) {
@@ -763,7 +763,7 @@ function useSelector$(signalName, selector) {
 var DebugRow = ({ children }) => {
   return /* @__PURE__ */ React3__namespace.createElement(View, { style: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" } }, children);
 };
-var DebugView = React3__namespace.memo(function DebugView2({ state }) {
+React3__namespace.memo(function DebugView2({ state }) {
   const ctx = useStateContext();
   const [totalSize = 0, scrollAdjust = 0, rawScroll = 0, scroll = 0, _numContainers = 0, _numContainersPooled = 0] = useArr$([
     "totalSize",
@@ -928,9 +928,6 @@ var PositionViewSticky = typedMemo(function PositionViewSticky2({
   return /* @__PURE__ */ React3__namespace.createElement("div", { ref: refView, style: viewStyle, ...rest }, children);
 });
 var PositionView = PositionViewState;
-
-// src/constants-platform.ts
-var IsNewArchitecture = true;
 function useInit(cb) {
   React3.useState(() => cb());
 }
@@ -1514,25 +1511,6 @@ var Containers = typedMemo(function Containers2({
   }
   return /* @__PURE__ */ React3__namespace.createElement(ContainersInner, { horizontal, numColumns, waitForInitialLayout }, containers);
 });
-function DevNumbers() {
-  return IS_DEV && // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
-  React3__namespace.memo(function DevNumbers2() {
-    return Array.from({ length: 100 }).map((_, index) => /* @__PURE__ */ React3__namespace.createElement(
-      "div",
-      {
-        key: index,
-        style: {
-          height: 100,
-          pointerEvents: "none",
-          position: "absolute",
-          top: index * 100,
-          width: "100%"
-        }
-      },
-      /* @__PURE__ */ React3__namespace.createElement("div", { style: { color: "red" } }, index * 100)
-    ));
-  });
-}
 
 // src/platform/StyleSheet.tsx
 function flattenStyles(styles) {
@@ -1751,7 +1729,7 @@ function ScrollAdjust() {
         const prevScroll = el.scrollTop;
         const nextScroll = prevScroll + scrollDelta;
         const totalSize = el.scrollHeight;
-        if (scrollDelta > 0 && !ctx.state.adjustingFromInitialMount && totalSize < nextScroll + el.clientHeight) {
+        if (scrollDelta > 0 && totalSize < nextScroll + el.clientHeight) {
           const child = el.firstElementChild;
           const pad = (nextScroll + el.clientHeight - totalSize) * 2;
           child.style.paddingBottom = `${pad}px`;
@@ -1763,6 +1741,12 @@ function ScrollAdjust() {
           });
         } else {
           scrollView.scrollBy(0, scrollDelta);
+        }
+        const actualScroll = el.scrollTop;
+        const expectedScroll = prevScroll + scrollDelta;
+        const drift = actualScroll - expectedScroll;
+        if (Math.abs(drift) > 1) {
+          ctx.state.scroll += drift;
         }
       }
       lastScrollOffsetRef.current = scrollOffset;
@@ -1880,7 +1864,7 @@ var ListComponent = typedMemo(function ListComponent2({
       },
       getComponent(ListFooterComponent)
     ),
-    IS_DEV && ENABLE_DEVMODE && /* @__PURE__ */ React3__namespace.createElement(DevNumbers, null)
+    IS_DEV && ENABLE_DEVMODE
   );
 });
 
@@ -1956,13 +1940,19 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
   const {
     sizesKnown,
     sizes,
-    averageSizes,
-    props: { estimatedItemSize, getEstimatedItemSize, getFixedItemSize, getItemType },
-    scrollingTo
+    dataRefWhenMeasured,
+    props: { estimatedItemSize, getEstimatedItemSize, getItemType }
   } = state;
+  const sizeKnown = sizesKnown.get(key);
+  if (sizeKnown !== void 0) {
+    const measuredDataRef = dataRefWhenMeasured.get(key);
+    if (measuredDataRef === data) {
+      return sizeKnown;
+    }
+  }
   let size;
-  const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
   if (size === void 0) {
+    const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
     size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
   }
   setSize(ctx, key, size);
@@ -2231,7 +2221,7 @@ function scrollTo(ctx, params) {
     return;
   }
   if (forceScroll || !isInitialScroll || Platform.OS === "android") {
-    doScrollTo(ctx, { animated, horizontal, isInitialScroll, offset });
+    doScrollTo(ctx, { animated, horizontal, offset });
   } else {
     state.scroll = offset;
     setTimeout(() => finishScrollTo(ctx), 100);
@@ -2279,7 +2269,7 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
   if (within) {
     const changed = !snapshot || snapshot.atThreshold !== atThreshold || snapshot.contentSize !== context.contentSize || snapshot.dataLength !== context.dataLength;
     if (changed) {
-      if (allowReentryOnChange) {
+      {
         onReached(distance);
       }
       updateSnapshot();
@@ -2327,9 +2317,7 @@ function checkAtBottom(ctx) {
       },
       (snapshot) => {
         state.endReachedSnapshot = snapshot;
-      },
-      true
-    );
+      });
   }
 }
 
@@ -2346,10 +2334,11 @@ function checkAtTop(state) {
   } = state;
   const distanceFromTop = scroll;
   state.isAtStart = distanceFromTop <= 0;
+  const threshold = onStartReachedThreshold * scrollLength;
   state.isStartReached = checkThreshold(
     distanceFromTop,
     false,
-    onStartReachedThreshold * scrollLength,
+    threshold,
     state.isStartReached,
     state.startReachedSnapshot,
     {
@@ -2366,9 +2355,7 @@ function checkAtTop(state) {
     },
     (snapshot) => {
       state.startReachedSnapshot = snapshot;
-    },
-    false
-  );
+    });
 }
 
 // src/core/updateScroll.ts
@@ -2545,6 +2532,7 @@ function prepareMVCP(ctx, dataChanged) {
       prevPosition = positions.get(targetId);
     }
     return () => {
+      var _a3, _b;
       let positionDiff = 0;
       if (dataChanged && targetId === void 0 && mvcpData) {
         const data = state.props.data;
@@ -2569,11 +2557,10 @@ function prepareMVCP(ctx, dataChanged) {
         if (newPosition !== void 0) {
           const totalSize = getContentSize(ctx);
           let diff = newPosition - prevPosition;
-          if (diff !== 0 && state.scroll + state.scrollLength > totalSize) {
+          const allMeasured = state.sizesKnown.size >= ((_b = (_a3 = state.props.data) == null ? void 0 : _a3.length) != null ? _b : 0);
+          if (allMeasured && diff !== 0 && state.scroll + state.scrollLength > totalSize) {
             if (diff > 0) {
               diff = Math.max(0, totalSize - state.scroll - state.scrollLength);
-            } else {
-              diff = 0;
             }
           }
           positionDiff = diff;
@@ -2663,7 +2650,7 @@ function calculateRowMaxSize(ctx, startIndex, endIndex, useAverageSize) {
 
 // src/core/updateTotalSize.ts
 function updateTotalSize(ctx) {
-  var _a3, _b, _c;
+  var _a3, _b, _c, _d, _e;
   const state = ctx.state;
   const {
     positions,
@@ -2690,14 +2677,14 @@ function updateTotalSize(ctx) {
           let maxSize = 0;
           for (let i = rowStart; i < data.length; i++) {
             const rowId = (_c = state.idCache[i]) != null ? _c : getId(state, i);
-            const size = getItemSize(ctx, rowId, i, data[i]);
+            const size = (_d = state.sizesKnown.get(rowId)) != null ? _d : getItemSize(ctx, rowId, i, data[i]);
             if (size > maxSize) {
               maxSize = size;
             }
           }
           addTotalSize(ctx, null, lastPosition + maxSize);
         } else {
-          const lastSize = getItemSize(ctx, lastId, data.length - 1, data[data.length - 1]);
+          const lastSize = (_e = state.sizesKnown.get(lastId)) != null ? _e : getItemSize(ctx, lastId, data.length - 1, data[data.length - 1]);
           if (lastSize !== void 0) {
             const totalSize = lastPosition + lastSize;
             addTotalSize(ctx, null, totalSize);
@@ -3422,10 +3409,6 @@ function calculateItemsInView(ctx, params = {}) {
     if (scroll + scrollLength > totalSize) {
       scroll = Math.max(0, totalSize - scrollLength);
     }
-    if (ENABLE_DEBUG_VIEW) {
-      set$(ctx, "debugRawScroll", scrollState);
-      set$(ctx, "debugComputedScroll", scroll);
-    }
     const previousStickyIndex = peek$(ctx, "activeStickyIndex");
     const currentStickyIdx = stickyIndicesArr.length > 0 ? findCurrentStickyIndex(stickyIndicesArr, scroll, state) : -1;
     const nextActiveStickyIndex = currentStickyIdx >= 0 ? stickyIndicesArr[currentStickyIdx] : -1;
@@ -3470,6 +3453,14 @@ function calculateItemsInView(ctx, params = {}) {
       scrollBottomBuffered,
       startIndex
     });
+    if (dataChanged) {
+      const { dataRefWhenMeasured } = state;
+      for (const key of dataRefWhenMeasured.keys()) {
+        if (!indexByKey.has(key)) {
+          dataRefWhenMeasured.delete(key);
+        }
+      }
+    }
     if (minIndexSizeChanged !== void 0) {
       state.minIndexSizeChanged = void 0;
     }
@@ -3552,7 +3543,8 @@ function calculateItemsInView(ctx, params = {}) {
       }
     }
     const idsInView = [];
-    for (let i = firstFullyOnScreenIndex; i <= endNoBuffer; i++) {
+    const firstVisibleIndex = startNoBuffer != null ? startNoBuffer : firstFullyOnScreenIndex;
+    for (let i = firstVisibleIndex; i <= endNoBuffer; i++) {
       const id = (_h = idCache[i]) != null ? _h : getId(state, i);
       idsInView.push(id);
     }
@@ -4216,6 +4208,9 @@ function updateOneItemSize(ctx, itemKey, sizeObj) {
   const size = Math.round(rawSize) ;
   const prevSizeKnown = sizesKnown.get(itemKey);
   sizesKnown.set(itemKey, size);
+  if (data[index] !== void 0) {
+    state.dataRefWhenMeasured.set(itemKey, data[index]);
+  }
   if (!getEstimatedItemSize && !getFixedItemSize && size > 0) {
     const itemType = getItemType ? (_a3 = getItemType(data[index], index)) != null ? _a3 : "" : "";
     let averages = averageSizes[itemType];
@@ -4723,14 +4718,14 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     index: initialScrollIndexProp || 0,
     viewOffset: initialScrollOffsetProp || 0
   } : void 0;
-  const [canRender, setCanRender] = React3__namespace.useState(!IsNewArchitecture);
+  const [canRender, setCanRender] = React3__namespace.useState(false);
   const ctx = useStateContext();
   ctx.columnWrapperStyle = columnWrapperStyle || (contentContainerStyle ? createColumnWrapperStyle(contentContainerStyle) : void 0);
   const refScroller = React3.useRef(null);
   const combinedRef = useCombinedRef(refScroller, refScrollView);
   const estimatedItemSize = estimatedItemSizeProp != null ? estimatedItemSizeProp : DEFAULT_ITEM_SIZE;
   const scrollBuffer = (drawDistance != null ? drawDistance : DEFAULT_DRAW_DISTANCE) || 1;
-  const keyExtractor = keyExtractorProp != null ? keyExtractorProp : (_item, index) => index.toString();
+  const keyExtractor = keyExtractorProp != null ? keyExtractorProp : ((_item, index) => index.toString());
   const stickyHeaderIndices = stickyHeaderIndicesProp != null ? stickyHeaderIndicesProp : stickyIndicesDeprecated;
   const alwaysRenderIndices = React3.useMemo(() => {
     const indices = getAlwaysRenderIndices(alwaysRender, dataProp, keyExtractor);
@@ -4818,6 +4813,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         scrollTime: 0,
         sizes: /* @__PURE__ */ new Map(),
         sizesKnown: /* @__PURE__ */ new Map(),
+        dataRefWhenMeasured: /* @__PURE__ */ new Map(),
         stabilizationStableFrames: 0,
         startBuffered: -1,
         startNoBuffer: -1,
@@ -4955,12 +4951,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     setPaddingTop(ctx, { stylePaddingTop: stylePaddingTopState });
     refState.current.props.stylePaddingBottom = stylePaddingBottomState;
     let paddingDiff = stylePaddingTopState - prevPaddingTop;
-    if (shouldAdjustPadding && maintainVisibleContentPositionConfig.size && paddingDiff && prevPaddingTop !== void 0 && Platform.OS === "ios") {
-      if (state.scroll < 0) {
-        paddingDiff += state.scroll;
-      }
-      requestAdjust(ctx, paddingDiff);
-    }
+    if (shouldAdjustPadding && maintainVisibleContentPositionConfig.size && paddingDiff && prevPaddingTop !== void 0 && Platform.OS === "ios") ;
   };
   if (isFirstLocal) {
     initializeStateVars(false);
@@ -5169,7 +5160,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       updateItemSize: fns.updateItemSize,
       waitForInitialLayout
     }
-  ), IS_DEV && ENABLE_DEBUG_VIEW && /* @__PURE__ */ React3__namespace.createElement(DebugView, { state: refState.current }));
+  ), IS_DEV && ENABLE_DEBUG_VIEW);
 });
 
 exports.InitializationCompletionType = InitializationCompletionType;
