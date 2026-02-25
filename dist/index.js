@@ -2,7 +2,7 @@
 
 var React3 = require('react');
 var shim = require('use-sync-external-store/shim');
-var reactDom = require('react-dom');
+var ReactDOM = require('react-dom');
 
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
@@ -23,6 +23,7 @@ function _interopNamespace(e) {
 }
 
 var React3__namespace = /*#__PURE__*/_interopNamespace(React3);
+var ReactDOM__namespace = /*#__PURE__*/_interopNamespace(ReactDOM);
 
 // src/components/LegendList.tsx
 React3.forwardRef(function AnimatedView2(props, ref) {
@@ -2045,8 +2046,8 @@ var ListComponent = typedMemo(function ListComponent2({
   updateItemSize: updateItemSize2,
   refScrollView,
   renderScrollComponent,
+  onLayoutFooter,
   scrollAdjustHandler,
-  onLayoutHeader,
   snapToIndices,
   stickyHeaderConfig,
   stickyHeaderIndices,
@@ -2070,6 +2071,21 @@ var ListComponent = typedMemo(function ListComponent2({
       set$(ctx, "footerSize", 0);
     }
   }, [ListHeaderComponent, ListFooterComponent, ctx]);
+  const onLayoutHeader = React3.useCallback(
+    (rect) => {
+      const size = rect[horizontal ? "width" : "height"];
+      set$(ctx, "headerSize", size);
+    },
+    [ctx, horizontal]
+  );
+  const onLayoutFooterInternal = React3.useCallback(
+    (rect, fromLayoutEffect) => {
+      const size = rect[horizontal ? "width" : "height"];
+      set$(ctx, "footerSize", size);
+      onLayoutFooter == null ? void 0 : onLayoutFooter(rect, fromLayoutEffect);
+    },
+    [ctx, horizontal, onLayoutFooter]
+  );
   return /* @__PURE__ */ React3__namespace.createElement(
     SnapOrScroll,
     {
@@ -2105,17 +2121,7 @@ var ListComponent = typedMemo(function ListComponent2({
         waitForInitialLayout
       }
     ),
-    ListFooterComponent && /* @__PURE__ */ React3__namespace.createElement(
-      LayoutView,
-      {
-        onLayoutChange: (layout) => {
-          const size = layout[horizontal ? "width" : "height"];
-          set$(ctx, "footerSize", size);
-        },
-        style: ListFooterComponentStyle
-      },
-      getComponent(ListFooterComponent)
-    ),
+    ListFooterComponent && /* @__PURE__ */ React3__namespace.createElement(LayoutView, { onLayoutChange: onLayoutFooterInternal, style: ListFooterComponentStyle }, getComponent(ListFooterComponent)),
     IS_DEV && ENABLE_DEVMODE && /* @__PURE__ */ React3__namespace.createElement(DevNumbers, null)
   );
 });
@@ -2123,19 +2129,12 @@ var ListComponent = typedMemo(function ListComponent2({
 // src/core/calculateOffsetForIndex.ts
 function calculateOffsetForIndex(ctx, index) {
   const state = ctx.state;
-  let position = 0;
-  if (index !== void 0) {
-    position = state.positions[index] || 0;
-    const paddingTop = peek$(ctx, "stylePaddingTop");
-    if (paddingTop) {
-      position += paddingTop;
-    }
-    const headerSize = peek$(ctx, "headerSize");
-    if (headerSize) {
-      position += headerSize;
-    }
-  }
-  return position;
+  return index !== void 0 ? state.positions[index] || 0 : 0;
+}
+
+// src/core/getTopOffsetAdjustment.ts
+function getTopOffsetAdjustment(ctx) {
+  return (peek$(ctx, "stylePaddingTop") || 0) + (peek$(ctx, "headerSize") || 0);
 }
 
 // src/utils/getId.ts
@@ -2215,10 +2214,20 @@ function calculateOffsetWithOffsetPosition(ctx, offsetParam, params) {
   if (viewOffset) {
     offset -= viewOffset;
   }
+  if (index !== void 0) {
+    const topOffsetAdjustment = getTopOffsetAdjustment(ctx);
+    if (topOffsetAdjustment) {
+      offset += topOffsetAdjustment;
+    }
+  }
   if (viewPosition !== void 0 && index !== void 0) {
     const itemSize = getItemSize(ctx, getId(state, index), index, state.props.data[index]);
     const trailingInset = getContentInsetEnd(state);
     offset -= viewPosition * (state.scrollLength - trailingInset - itemSize);
+    if (index === state.props.data.length - 1) {
+      const footerSize = peek$(ctx, "footerSize") || 0;
+      offset += footerSize;
+    }
   }
   return offset;
 }
@@ -2459,6 +2468,7 @@ function finishScrollTo(ctx) {
     state.initialScroll = void 0;
     state.initialAnchor = void 0;
     state.scrollingTo = void 0;
+    state.stableTarget = void 0;
     if (state.pendingTotalSize !== void 0) {
       addTotalSize(ctx, null, state.pendingTotalSize);
     }
@@ -2622,6 +2632,7 @@ function scrollTo(ctx, params) {
     });
   }
   state.scrollHistory.length = 0;
+  state.stableTarget = void 0;
   if (!forceScroll && Math.abs(offset - state.scroll) < 1) {
     if (state.props.debugInitialization && isInitialScroll) {
       console.log("[scrollTo] Already at target, finishing immediately", {
@@ -2635,10 +2646,11 @@ function scrollTo(ctx, params) {
     return;
   }
   if (!noScrollingTo) {
-    state.scrollingTo = scrollTarget;
+    state.scrollingTo = { ...scrollTarget, offset };
     if (state.props.debugInitialization && isInitialScroll) {
       console.log("[scrollTo] Set state.scrollingTo", {
         isInitialScroll: (_a3 = state.scrollingTo) == null ? void 0 : _a3.isInitialScroll,
+        offset,
         scrollingTo: state.scrollingTo
       });
     }
@@ -2714,7 +2726,7 @@ function updateScroll(ctx, newScroll, forceUpdate) {
       checkThresholds(ctx);
     };
     if (scrollLength > 0 && scrollingTo === void 0 && scrollDelta > scrollLength) {
-      reactDom.flushSync(runCalculateItems);
+      ReactDOM.flushSync(runCalculateItems);
     } else {
       runCalculateItems();
     }
@@ -3542,6 +3554,8 @@ function maybeUpdateViewabilityCallback(ctx, configId, containerId, viewToken) {
   const cb = ctx.mapViewabilityCallbacks.get(key);
   cb == null ? void 0 : cb(viewToken);
 }
+var unstableBatchedUpdates = ReactDOM__namespace.unstable_batchedUpdates;
+var batchedUpdates = typeof unstableBatchedUpdates === "function" ? unstableBatchedUpdates : (fn) => fn();
 
 // src/utils/checkAllSizesKnown.ts
 function isNullOrUndefined2(value) {
@@ -3818,7 +3832,7 @@ function getMvcpHandler(ctx, mode, dataChanged) {
 }
 function calculateItemsInView(ctx, params = {}) {
   const state = ctx.state;
-  reactDom.unstable_batchedUpdates(() => {
+  batchedUpdates(() => {
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const {
       columns,
@@ -4265,6 +4279,14 @@ function checkActualChange(state, dataProp, previousData) {
 }
 
 // src/core/checkFinishedScroll.ts
+function getCurrentTargetOffset(ctx, scrollingTo) {
+  if (scrollingTo.index !== void 0) {
+    const baseOffset = calculateOffsetForIndex(ctx, scrollingTo.index);
+    const resolvedOffset = calculateOffsetWithOffsetPosition(ctx, baseOffset, scrollingTo);
+    return clampScrollOffset(ctx, resolvedOffset, scrollingTo);
+  }
+  return clampScrollOffset(ctx, scrollingTo.offset, scrollingTo);
+}
 function checkFinishedScroll(ctx) {
   ctx.state.animFrameCheckFinishedScroll = requestAnimationFrame(() => checkFinishedScrollFrame(ctx));
 }
@@ -4274,20 +4296,30 @@ function checkFinishedScrollFrame(ctx) {
     const { state } = ctx;
     state.animFrameCheckFinishedScroll = void 0;
     const scroll = state.scrollPending;
-    const adjust = state.scrollAdjustHandler.getAdjust();
-    const clampedTargetOffset = clampScrollOffset(
-      ctx,
-      scrollingTo.offset - (scrollingTo.viewOffset || 0),
-      scrollingTo
-    );
+    const clampedTargetOffset = getCurrentTargetOffset(ctx, scrollingTo);
+    if (Math.abs(scrollingTo.offset - clampedTargetOffset) >= 1) {
+      state.scrollingTo = { ...scrollingTo, offset: clampedTargetOffset };
+    }
     const maxOffset = clampScrollOffset(ctx, scroll, scrollingTo);
     const diff1 = Math.abs(scroll - clampedTargetOffset);
-    const diff2 = Math.abs(diff1 - adjust);
     const isNotOverscrolled = Math.abs(scroll - maxOffset) < 1;
-    const isAtTarget = diff1 < 1 || !scrollingTo.animated && diff2 < 1;
+    const isAtTarget = diff1 < 1;
+    const previousStableTarget = state.stableTarget;
+    const hasStableTargetFrame = !!previousStableTarget && Math.abs(previousStableTarget.target - clampedTargetOffset) < 1 && Math.abs(previousStableTarget.scroll - scroll) < 1;
+    if (isAtTarget && !hasStableTargetFrame) {
+      state.stableTarget = { scroll, target: clampedTargetOffset };
+      state.animFrameCheckFinishedScroll = requestAnimationFrame(() => checkFinishedScrollFrame(ctx));
+      return;
+    }
+    if (!isAtTarget) {
+      state.stableTarget = void 0;
+    }
     if (isNotOverscrolled && isAtTarget) {
+      state.stableTarget = void 0;
       finishScrollTo(ctx);
     }
+  } else {
+    ctx.state.stableTarget = void 0;
   }
 }
 function checkFinishedScrollFallback(ctx) {
@@ -5348,7 +5380,6 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       });
     }
   }, [debugSizing]);
-  const [renderNum, setRenderNum] = React3.useState(0);
   const initialScrollProp = initialScrollAtEnd ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? {
     index: initialScrollIndexProp.index || 0,
     viewOffset: initialScrollIndexProp.viewOffset || (initialScrollIndexProp.viewPosition === 1 ? -stylePaddingBottomState : 0),
@@ -5567,6 +5598,11 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       true
     );
   }
+  const resolveInitialScrollOffset = React3.useCallback((initialScroll) => {
+    const baseOffset = initialScroll.index !== void 0 ? calculateOffsetForIndex(ctx, initialScroll.index) : 0;
+    const resolvedOffset = calculateOffsetWithOffsetPosition(ctx, baseOffset, initialScroll);
+    return clampScrollOffset(ctx, resolvedOffset, initialScroll);
+  }, []);
   const timelineChanged = timelineId !== state.lastTimelineId;
   const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
   if (debugInitialization) {
@@ -5638,7 +5674,6 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
             console.log("[TIMELINE DEBUG] \u2705 Scroll prepared successfully, entering SCROLLING phase");
           }
           ctx.initializationManager.enterScrollingPhase();
-          setRenderNum((v) => v + 1);
         } else {
           if (debugInitialization) {
             console.log("[TIMELINE DEBUG] \u274C Scroll prep failed - anchor not found in data");
@@ -5680,9 +5715,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       if (initialScroll.contentOffset !== void 0) {
         value = initialScroll.contentOffset;
       } else {
-        const baseOffset = initialScroll.index !== void 0 ? calculateOffsetForIndex(ctx, initialScroll.index) : 0;
-        const resolvedOffset = calculateOffsetWithOffsetPosition(ctx, baseOffset, initialScroll);
-        const clampedOffset = clampScrollOffset(ctx, resolvedOffset, initialScroll);
+        const clampedOffset = resolveInitialScrollOffset(initialScroll);
         const updatedInitialScroll = { ...initialScroll, contentOffset: clampedOffset };
         refState.current.initialScroll = updatedInitialScroll;
         state.initialScroll = updatedInitialScroll;
@@ -5696,7 +5729,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       setInitialRenderState(ctx, { didInitialScroll: true });
     }
     return value;
-  }, [renderNum]);
+  }, []);
   if (isFirstLocal || didDataChangeLocal || numColumnsProp !== peek$(ctx, "numColumns")) {
     refState.current.lastBatchingAction = Date.now();
     if (!keyExtractorProp && !isFirstLocal && didDataChangeLocal) {
@@ -5710,18 +5743,6 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       set$(ctx, "totalSize", 0);
     }
   }
-  const onLayoutHeader = React3.useCallback((rect, fromLayoutEffect) => {
-    const { initialScroll } = refState.current;
-    const size = rect[horizontal ? "width" : "height"];
-    set$(ctx, "headerSize", size);
-    if ((initialScroll == null ? void 0 : initialScroll.index) !== void 0) {
-      {
-        if (fromLayoutEffect) {
-          setRenderNum((v) => v + 1);
-        }
-      }
-    }
-  }, []);
   const doInitialScroll = React3.useCallback(() => {
     const { initialScroll, didFinishInitialScroll, queuedInitialLayout, scrollingTo } = state;
     if (state.props.debugInitialization) {
@@ -5735,22 +5756,49 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       });
     }
     if (initialScroll && !queuedInitialLayout && !didFinishInitialScroll && !scrollingTo) {
+      const offset = resolveInitialScrollOffset(initialScroll);
+      const updatedInitialScroll = { ...initialScroll, contentOffset: offset };
+      refState.current.initialScroll = updatedInitialScroll;
+      state.initialScroll = updatedInitialScroll;
       if (state.props.debugInitialization) {
         console.log("[doInitialScroll] \u2705 All conditions met, calling scrollTo", {
           index: initialScroll == null ? void 0 : initialScroll.index,
-          offset: initialContentOffset,
+          offset,
           scrollLength: state.scrollLength
         });
       }
       scrollTo(ctx, {
         animated: false,
-        index: initialScroll == null ? void 0 : initialScroll.index,
+        index: initialScroll.index,
         isInitialScroll: true,
-        offset: initialContentOffset,
+        offset,
         precomputedWithViewOffset: true
       });
     }
-  }, [initialContentOffset]);
+  }, []);
+  const onLayoutFooter = React3.useCallback(
+    (layout) => {
+      if (!initialScrollAtEnd) {
+        return;
+      }
+      const { initialScroll } = state;
+      if (!initialScroll) {
+        return;
+      }
+      const lastIndex = Math.max(0, dataProp.length - 1);
+      if (initialScroll.index !== lastIndex || initialScroll.viewPosition !== 1) {
+        return;
+      }
+      const footerSize = layout[horizontal ? "width" : "height"];
+      const viewOffset = -stylePaddingBottomState - footerSize;
+      if (initialScroll.viewOffset !== viewOffset) {
+        const updatedInitialScroll = { ...initialScroll, viewOffset };
+        refState.current.initialScroll = updatedInitialScroll;
+        state.initialScroll = updatedInitialScroll;
+      }
+    },
+    [dataProp.length, horizontal, initialScrollAtEnd, stylePaddingBottomState]
+  );
   const onLayoutChange = React3.useCallback((layout) => {
     doInitialScroll();
     handleLayout(ctx, layout, setCanRender);
@@ -5871,7 +5919,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
       ListEmptyComponent: dataProp.length === 0 ? ListEmptyComponent : void 0,
       ListHeaderComponent,
       onLayout,
-      onLayoutHeader,
+      onLayoutFooter,
       onMomentumScrollEnd: fns.onMomentumScrollEnd,
       onScroll: onScrollHandler,
       recycleItems,

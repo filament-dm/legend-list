@@ -1,105 +1,11 @@
-import * as React3 from 'react';
+import * as React from 'react';
 import { useCallback, memo } from 'react';
 import { View } from 'react-native';
 import Reanimated, { useAnimatedRef, useScrollViewOffset, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list/react-native';
-import { useSyncExternalStore } from 'use-sync-external-store/shim';
+import { LegendList, internal } from '@legendapp/list/react-native';
 
 // src/integrations/reanimated.tsx
-
-// src/constants.ts
-var POSITION_OUT_OF_VIEW = -1e7;
-
-// src/constants-platform.native.ts
-var f = global.nativeFabricUIManager;
-var IsNewArchitecture = f !== void 0 && f != null;
-var ContextState = React3.createContext(null);
-function createSelectorFunctionsArr(ctx, signalNames) {
-  let lastValues = [];
-  let lastSignalValues = [];
-  return {
-    get: () => {
-      const currentValues = [];
-      let hasChanged = false;
-      for (let i = 0; i < signalNames.length; i++) {
-        const value = peek$(ctx, signalNames[i]);
-        currentValues.push(value);
-        if (value !== lastSignalValues[i]) {
-          hasChanged = true;
-        }
-      }
-      lastSignalValues = currentValues;
-      if (hasChanged) {
-        lastValues = currentValues;
-      }
-      return lastValues;
-    },
-    subscribe: (cb) => {
-      const listeners = [];
-      for (const signalName of signalNames) {
-        listeners.push(listen$(ctx, signalName, cb));
-      }
-      return () => {
-        for (const listener of listeners) {
-          listener();
-        }
-      };
-    }
-  };
-}
-function listen$(ctx, signalName, cb) {
-  const { listeners } = ctx;
-  let setListeners = listeners.get(signalName);
-  if (!setListeners) {
-    setListeners = /* @__PURE__ */ new Set();
-    listeners.set(signalName, setListeners);
-  }
-  setListeners.add(cb);
-  return () => setListeners.delete(cb);
-}
-function peek$(ctx, signalName) {
-  const { values } = ctx;
-  return values.get(signalName);
-}
-function useArr$(signalNames) {
-  const ctx = React3.useContext(ContextState);
-  const { subscribe, get } = React3.useMemo(() => createSelectorFunctionsArr(ctx, signalNames), [ctx, signalNames]);
-  const value = useSyncExternalStore(subscribe, get);
-  return value;
-}
-
-// src/utils/helpers.ts
-function isFunction(obj) {
-  return typeof obj === "function";
-}
-
-// src/hooks/useCombinedRef.ts
-var useCombinedRef = (...refs) => {
-  const callback = useCallback((element) => {
-    for (const ref of refs) {
-      if (!ref) {
-        continue;
-      }
-      if (isFunction(ref)) {
-        ref(element);
-      } else {
-        ref.current = element;
-      }
-    }
-  }, refs);
-  return callback;
-};
-var getComponent = (Component) => {
-  if (React3.isValidElement(Component)) {
-    return Component;
-  }
-  if (Component) {
-    return /* @__PURE__ */ React3.createElement(Component, null);
-  }
-  return null;
-};
-
-// src/integrations/reanimated.tsx
+var { POSITION_OUT_OF_VIEW, IsNewArchitecture, useArr$, useCombinedRef, getComponent } = internal;
 var typedMemo = memo;
 var ReanimatedScrollBridge = typedMemo(function ReanimatedScrollBridgeComponent({
   forwardedRef,
@@ -109,13 +15,13 @@ var ReanimatedScrollBridge = typedMemo(function ReanimatedScrollBridgeComponent(
   const animatedScrollRef = useAnimatedRef();
   useScrollViewOffset(animatedScrollRef, scrollOffset);
   const combinedRef = useCombinedRef(animatedScrollRef, forwardedRef);
-  return /* @__PURE__ */ React3.createElement(Reanimated.ScrollView, { ...props, ref: combinedRef });
+  return /* @__PURE__ */ React.createElement(Reanimated.ScrollView, { ...props, ref: combinedRef });
 });
 var StickyOverlay = typedMemo(function StickyOverlayComponent({ stickyHeaderConfig }) {
   if (!(stickyHeaderConfig == null ? void 0 : stickyHeaderConfig.backdropComponent)) {
     return null;
   }
-  return /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React.createElement(
     View,
     {
       style: {
@@ -141,25 +47,44 @@ var ReanimatedPositionViewSticky = typedMemo(function ReanimatedPositionViewStic
     const delta = Math.max(0, stickyScrollOffset.value - stickyStart);
     return horizontal ? { transform: [{ translateX: position + delta }] } : { transform: [{ translateY: position + delta }] };
   }, [horizontal, position, stickyStart]);
-  const viewStyle = React3.useMemo(
+  const viewStyle = React.useMemo(
     () => [style, { zIndex: index + 1e3 }, transformStyle],
     [index, style, transformStyle]
   );
-  return /* @__PURE__ */ React3.createElement(Reanimated.View, { ref: refView, style: viewStyle, ...rest }, /* @__PURE__ */ React3.createElement(StickyOverlay, { stickyHeaderConfig }), children);
+  return /* @__PURE__ */ React.createElement(Reanimated.View, { ref: refView, style: viewStyle, ...rest }, /* @__PURE__ */ React.createElement(StickyOverlay, { stickyHeaderConfig }), children);
 });
 var ReanimatedPositionView = typedMemo(function ReanimatedPositionViewComponent(props) {
-  const { id, horizontal, style, refView, children, layoutTransition, ...rest } = props;
-  const [positionValue = POSITION_OUT_OF_VIEW] = useArr$([`containerPosition${id}`]);
-  const viewStyle = React3.useMemo(
+  const { id, horizontal, style, refView, children, recycleItems, layoutTransition, ...rest } = props;
+  const [positionValue = POSITION_OUT_OF_VIEW, itemKey] = useArr$([
+    `containerPosition${id}`,
+    `containerItemKey${id}`
+  ]);
+  const prevItemKeyRef = React.useRef(void 0);
+  const shouldSkipTransitionForRecycleReuse = !!recycleItems && itemKey !== void 0 && prevItemKeyRef.current !== void 0 && prevItemKeyRef.current !== itemKey;
+  React.useEffect(() => {
+    if (itemKey !== void 0) {
+      prevItemKeyRef.current = itemKey;
+    }
+  }, [itemKey]);
+  const viewStyle = React.useMemo(
     () => [style, horizontal ? { left: positionValue } : { top: positionValue }],
     [horizontal, positionValue, style]
   );
-  return /* @__PURE__ */ React3.createElement(Reanimated.View, { layout: layoutTransition, ref: refView, style: viewStyle, ...rest }, children);
+  return /* @__PURE__ */ React.createElement(
+    Reanimated.View,
+    {
+      layout: shouldSkipTransitionForRecycleReuse ? void 0 : layoutTransition,
+      ref: refView,
+      style: viewStyle,
+      ...rest
+    },
+    children
+  );
 });
 var LegendListForwardedRef = typedMemo(
   // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
-  React3.forwardRef(function LegendListForwardedRef2(props, ref) {
-    const { itemLayoutAnimation, refLegendList, ...rest } = props;
+  React.forwardRef(function LegendListForwardedRef2(props, ref) {
+    const { itemLayoutAnimation, recycleItems, refLegendList, ...rest } = props;
     const refFn = useCallback(
       (r) => {
         refLegendList(r);
@@ -171,7 +96,7 @@ var LegendListForwardedRef = typedMemo(
     const renderReanimatedScrollComponent = useCallback(
       (scrollViewProps) => {
         const { ref: forwardedRef, ...restScrollViewProps } = scrollViewProps;
-        return /* @__PURE__ */ React3.createElement(
+        return /* @__PURE__ */ React.createElement(
           ReanimatedScrollBridge,
           {
             ...restScrollViewProps,
@@ -182,23 +107,30 @@ var LegendListForwardedRef = typedMemo(
       },
       [stickyScrollOffset]
     );
-    const stickyPositionComponentInternal = React3.useMemo(
+    const stickyPositionComponentInternal = React.useMemo(
       () => function StickyPositionComponent(stickyProps) {
-        return /* @__PURE__ */ React3.createElement(ReanimatedPositionViewSticky, { ...stickyProps, stickyScrollOffset });
+        return /* @__PURE__ */ React.createElement(ReanimatedPositionViewSticky, { ...stickyProps, stickyScrollOffset });
       },
       [stickyScrollOffset]
     );
-    const itemLayoutAnimationRef = React3.useRef(itemLayoutAnimation);
+    const itemLayoutAnimationRef = React.useRef(itemLayoutAnimation);
     itemLayoutAnimationRef.current = itemLayoutAnimation;
     const hasItemLayoutAnimation = !!itemLayoutAnimation;
-    const positionComponentInternal = React3.useMemo(() => {
+    const positionComponentInternal = React.useMemo(() => {
       if (!hasItemLayoutAnimation) {
         return void 0;
       }
       return function PositionComponent(positionProps) {
-        return /* @__PURE__ */ React3.createElement(ReanimatedPositionView, { ...positionProps, layoutTransition: itemLayoutAnimationRef.current });
+        return /* @__PURE__ */ React.createElement(
+          ReanimatedPositionView,
+          {
+            ...positionProps,
+            layoutTransition: itemLayoutAnimationRef.current,
+            recycleItems
+          }
+        );
       };
-    }, [hasItemLayoutAnimation]);
+    }, [hasItemLayoutAnimation, recycleItems]);
     const legendListProps = {
       ...rest,
       positionComponentInternal,
@@ -207,18 +139,18 @@ var LegendListForwardedRef = typedMemo(
         stickyPositionComponentInternal
       } : {}
     };
-    return /* @__PURE__ */ React3.createElement(LegendList, { ref: refFn, refScrollView: ref, ...legendListProps });
+    return /* @__PURE__ */ React.createElement(LegendList, { ref: refFn, refScrollView: ref, ...legendListProps });
   })
 );
 var AnimatedLegendListComponent = Reanimated.createAnimatedComponent(LegendListForwardedRef);
 var AnimatedLegendList = typedMemo(
   // biome-ignore lint/nursery/noShadow: const function name shadowing is intentional
-  React3.forwardRef(function AnimatedLegendList2(props, ref) {
+  React.forwardRef(function AnimatedLegendList2(props, ref) {
     const { refScrollView, ...rest } = props;
     const { animatedProps } = props;
-    const refLegendList = React3.useRef(null);
+    const refLegendList = React.useRef(null);
     const combinedRef = useCombinedRef(refLegendList, ref);
-    return /* @__PURE__ */ React3.createElement(
+    return /* @__PURE__ */ React.createElement(
       AnimatedLegendListComponent,
       {
         animatedPropsInternal: animatedProps,

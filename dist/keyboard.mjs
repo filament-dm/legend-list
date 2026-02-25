@@ -1,36 +1,13 @@
 import * as React from 'react';
-import { useRef, useState, useMemo, useCallback, useEffect, forwardRef } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
 import { useAnimatedRef, useSharedValue, isWorkletFunction, useAnimatedScrollHandler, runOnJS, useComposedEventHandler, useAnimatedProps, useAnimatedStyle } from 'react-native-reanimated';
+import { typedForwardRef, internal } from '@legendapp/list/react-native';
 import { AnimatedLegendList } from '@legendapp/list/reanimated';
 
 // src/integrations/keyboard.tsx
-
-// src/utils/helpers.ts
-function isFunction(obj) {
-  return typeof obj === "function";
-}
-
-// src/hooks/useCombinedRef.ts
-var useCombinedRef = (...refs) => {
-  const callback = useCallback((element) => {
-    for (const ref of refs) {
-      if (!ref) {
-        continue;
-      }
-      if (isFunction(ref)) {
-        ref(element);
-      } else {
-        ref.current = element;
-      }
-    }
-  }, refs);
-  return callback;
-};
-var typedForwardRef = forwardRef;
-
-// src/integrations/keyboard.tsx
+var { useCombinedRef } = internal;
 var clampProgress = (progress) => {
   "worklet";
   return Math.min(1, Math.max(0, progress));
@@ -60,6 +37,8 @@ var KeyboardAvoidingLegendList = typedForwardRef(function KeyboardAvoidingLegend
     contentInset: contentInsetProp,
     horizontal,
     onMetricsChange: onMetricsChangeProp,
+    onContentSizeChange: onContentSizeChangeProp,
+    onLayout: onLayoutProp,
     onScroll: onScrollProp,
     safeAreaInsetBottom = 0,
     style: styleProp,
@@ -92,6 +71,26 @@ var KeyboardAvoidingLegendList = typedForwardRef(function KeyboardAvoidingLegend
   const onScrollCallbackIsWorklet = useMemo(
     () => onScrollCallback ? isWorkletFunction(onScrollCallback) : false,
     [onScrollCallback]
+  );
+  const handleContentSizeChange = useCallback(
+    (width, height) => {
+      const nextContentLength = horizontal ? width : height;
+      if (Number.isFinite(nextContentLength) && nextContentLength > 0) {
+        contentLength.set(nextContentLength);
+      }
+      onContentSizeChangeProp == null ? void 0 : onContentSizeChangeProp(width, height);
+    },
+    [contentLength, horizontal, onContentSizeChangeProp]
+  );
+  const handleLayout = useCallback(
+    (event) => {
+      const nextScrollLength = event.nativeEvent.layout[horizontal ? "width" : "height"];
+      if (Number.isFinite(nextScrollLength) && nextScrollLength > 0) {
+        scrollLength.set(nextScrollLength);
+      }
+      onLayoutProp == null ? void 0 : onLayoutProp(event);
+    },
+    [horizontal, onLayoutProp, scrollLength]
   );
   const scrollHandler = useAnimatedScrollHandler(
     (event) => {
@@ -205,11 +204,14 @@ var KeyboardAvoidingLegendList = typedForwardRef(function KeyboardAvoidingLegend
     {
       onStart: (event) => {
         "worklet";
-        animationMode.set("running");
         const progress = clampProgress(event.progress);
         if (isKeyboardOpen.get() && progress >= 1 && event.height > 0) {
+          didInteractive.set(false);
+          animationMode.set("idle");
+          runOnJS(setScrollProcessingEnabled)(true);
           return;
         }
+        animationMode.set("running");
         if (!didInteractive.get()) {
           if (event.height > 0) {
             keyboardHeight.set(calculateKeyboardInset(event.height, safeAreaInsetBottom));
@@ -380,6 +382,8 @@ var KeyboardAvoidingLegendList = typedForwardRef(function KeyboardAvoidingLegend
       automaticallyAdjustContentInsets: false,
       contentContainerStyle,
       keyboardDismissMode: "interactive",
+      onContentSizeChange: handleContentSizeChange,
+      onLayout: handleLayout,
       onMetricsChange: handleMetricsChange,
       onScroll: finalScrollHandler,
       ref: combinedRef,

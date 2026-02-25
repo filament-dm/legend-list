@@ -1,7 +1,7 @@
 import * as React$1 from 'react';
-import { ReactNode, Key, ComponentProps } from 'react';
+import { ReactNode, Key, ReactElement, ComponentProps } from 'react';
 import Reanimated from 'react-native-reanimated';
-import { ScrollViewComponent, ScrollResponderMixin, Insets as Insets$1 } from 'react-native';
+import { ScrollViewComponent, ScrollResponderMixin, Insets as Insets$1, ScrollViewProps, NativeSyntheticEvent as NativeSyntheticEvent$1, NativeScrollEvent as NativeScrollEvent$1, ScrollView, StyleProp as StyleProp$1, ViewStyle as ViewStyle$1 } from 'react-native';
 
 /**
  * Initialization mode - determines positioning behavior
@@ -737,21 +737,31 @@ interface ViewabilityConfig {
     waitForInteraction?: boolean | undefined;
 }
 
+type LegendListPropsOverrides<ItemT, TItemType extends string | undefined> = Omit<LegendListPropsBase<ItemT, ScrollViewProps, TItemType>, "onScroll" | "refScrollView" | "renderScrollComponent" | "ListHeaderComponentStyle" | "ListFooterComponentStyle"> & {
+    onScroll?: (event: NativeSyntheticEvent$1<NativeScrollEvent$1>) => void;
+    refScrollView?: React.Ref<ScrollView>;
+    renderScrollComponent?: (props: ScrollViewProps) => ReactElement<ScrollViewProps>;
+    ListHeaderComponentStyle?: StyleProp$1<ViewStyle$1> | undefined;
+    ListFooterComponentStyle?: StyleProp$1<ViewStyle$1> | undefined;
+};
+type LegendListProps<ItemT = any, TItemType extends string | undefined = string | undefined> = LegendListPropsOverrides<ItemT, TItemType>;
 type LegendListRef = Omit<LegendListRef$1, "getNativeScrollRef" | "getScrollResponder" | "reportContentInset"> & {
     getNativeScrollRef(): React.ElementRef<typeof ScrollViewComponent>;
     getScrollResponder(): ScrollResponderMixin;
     reportContentInset(inset?: Partial<Insets$1> | null): void;
 };
 
-type KeysToOmit = "animatedProps" | "getEstimatedItemSize" | "getFixedItemSize" | "getItemType" | "itemsAreEqual" | "ItemSeparatorComponent" | "keyExtractor" | "onItemSizeChanged" | "renderItem" | "renderScrollComponent";
-type PropsBase<ItemT> = LegendListPropsBase<ItemT, ComponentProps<typeof Reanimated.ScrollView>>;
-interface AnimatedLegendListPropsBase<ItemT> extends Omit<PropsBase<ItemT>, KeysToOmit> {
+type KeysToOmit = "getEstimatedItemSize" | "getFixedItemSize" | "getItemType" | "itemsAreEqual" | "ItemSeparatorComponent" | "keyExtractor" | "onItemSizeChanged" | "renderItem" | "renderScrollComponent";
+type PropsBase<ItemT> = LegendListProps<ItemT>;
+type ReanimatedLayoutAnimation = ComponentProps<typeof Reanimated.View>["layout"];
+interface AnimatedLegendListPropsBase<ItemT> extends Omit<PropsBase<ItemT>, KeysToOmit | "refScrollView"> {
+    animatedProps?: ComponentProps<typeof Reanimated.ScrollView>["animatedProps"];
     refScrollView?: React$1.Ref<Reanimated.ScrollView>;
     /**
      * Reanimated layout transition applied to each item container position view.
      * Example: `LinearTransition.duration(280)`.
      */
-    itemLayoutAnimation?: ComponentProps<typeof Reanimated.View>["layout"];
+    itemLayoutAnimation?: ReanimatedLayoutAnimation;
 }
 type OtherAnimatedLegendListProps<ItemT> = Pick<PropsBase<ItemT>, KeysToOmit>;
 type AnimatedLegendListProps<ItemT> = Omit<AnimatedLegendListPropsBase<ItemT>, "refLegendList" | "ref"> & OtherAnimatedLegendListProps<ItemT>;
