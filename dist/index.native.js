@@ -1668,13 +1668,19 @@ function getItemSize(ctx, key, index, data, useAverageSize, preferCachedSize) {
   const {
     sizesKnown,
     sizes,
-    averageSizes,
-    props: { estimatedItemSize, getEstimatedItemSize, getFixedItemSize, getItemType },
-    scrollingTo
+    dataRefWhenMeasured,
+    props: { estimatedItemSize, getEstimatedItemSize, getItemType }
   } = state;
+  const sizeKnown = sizesKnown.get(key);
+  if (sizeKnown !== void 0) {
+    const measuredDataRef = dataRefWhenMeasured.get(key);
+    if (measuredDataRef === data) {
+      return sizeKnown;
+    }
+  }
   let size;
-  const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
   if (size === void 0) {
+    const itemType = getItemType ? (_a3 = getItemType(data, index)) != null ? _a3 : "" : "";
     size = getEstimatedItemSize ? getEstimatedItemSize(data, index, itemType) : estimatedItemSize;
   }
   setSize(ctx, key, size);
@@ -1942,7 +1948,7 @@ var checkThreshold = (distance, atThreshold, threshold, wasReached, snapshot, co
   if (within) {
     const changed = !snapshot || snapshot.atThreshold !== atThreshold || snapshot.contentSize !== context.contentSize || snapshot.dataLength !== context.dataLength;
     if (changed) {
-      if (allowReentryOnChange) {
+      {
         onReached(distance);
       }
       updateSnapshot();
@@ -1990,9 +1996,7 @@ function checkAtBottom(ctx) {
       },
       (snapshot) => {
         state.endReachedSnapshot = snapshot;
-      },
-      true
-    );
+      });
   }
 }
 
@@ -2009,10 +2013,11 @@ function checkAtTop(state) {
   } = state;
   const distanceFromTop = scroll;
   state.isAtStart = distanceFromTop <= 0;
+  const threshold = onStartReachedThreshold * scrollLength;
   state.isStartReached = checkThreshold(
     distanceFromTop,
     false,
-    onStartReachedThreshold * scrollLength,
+    threshold,
     state.isStartReached,
     state.startReachedSnapshot,
     {
@@ -2029,9 +2034,7 @@ function checkAtTop(state) {
     },
     (snapshot) => {
       state.startReachedSnapshot = snapshot;
-    },
-    false
-  );
+    });
 }
 
 // src/core/updateScroll.ts
@@ -2292,6 +2295,7 @@ function prepareMVCP(ctx, dataChanged) {
       prevPosition = positions.get(targetId);
     }
     return () => {
+      var _a3, _b;
       let positionDiff = 0;
       if (dataChanged && targetId === void 0 && mvcpData) {
         const data = state.props.data;
@@ -2316,11 +2320,10 @@ function prepareMVCP(ctx, dataChanged) {
         if (newPosition !== void 0) {
           const totalSize = getContentSize(ctx);
           let diff = newPosition - prevPosition;
-          if (diff !== 0 && state.scroll + state.scrollLength > totalSize) {
+          const allMeasured = state.sizesKnown.size >= ((_b = (_a3 = state.props.data) == null ? void 0 : _a3.length) != null ? _b : 0);
+          if (allMeasured && diff !== 0 && state.scroll + state.scrollLength > totalSize) {
             if (diff > 0) {
               diff = Math.max(0, totalSize - state.scroll - state.scrollLength);
-            } else {
-              diff = 0;
             }
           }
           positionDiff = diff;
@@ -3223,6 +3226,14 @@ function calculateItemsInView(ctx, params = {}) {
       scrollBottomBuffered,
       startIndex
     });
+    if (dataChanged) {
+      const { dataRefWhenMeasured } = state;
+      for (const key of dataRefWhenMeasured.keys()) {
+        if (!indexByKey.has(key)) {
+          dataRefWhenMeasured.delete(key);
+        }
+      }
+    }
     if (minIndexSizeChanged !== void 0) {
       state.minIndexSizeChanged = void 0;
     }
@@ -3305,7 +3316,8 @@ function calculateItemsInView(ctx, params = {}) {
       }
     }
     const idsInView = [];
-    for (let i = firstFullyOnScreenIndex; i <= endNoBuffer; i++) {
+    const firstVisibleIndex = startNoBuffer != null ? startNoBuffer : firstFullyOnScreenIndex;
+    for (let i = firstVisibleIndex; i <= endNoBuffer; i++) {
       const id = (_h = idCache[i]) != null ? _h : getId(state, i);
       idsInView.push(id);
     }
@@ -3972,6 +3984,9 @@ function updateOneItemSize(ctx, itemKey, sizeObj) {
   const size = Platform2.OS === "web" ? Math.round(rawSize) : roundSize(rawSize);
   const prevSizeKnown = sizesKnown.get(itemKey);
   sizesKnown.set(itemKey, size);
+  if (data[index] !== void 0) {
+    state.dataRefWhenMeasured.set(itemKey, data[index]);
+  }
   if (!getEstimatedItemSize && !getFixedItemSize && size > 0) {
     const itemType = getItemType ? (_a3 = getItemType(data[index], index)) != null ? _a3 : "" : "";
     let averages = averageSizes[itemType];
@@ -4593,6 +4608,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         scrollTime: 0,
         sizes: /* @__PURE__ */ new Map(),
         sizesKnown: /* @__PURE__ */ new Map(),
+        dataRefWhenMeasured: /* @__PURE__ */ new Map(),
         stabilizationStableFrames: 0,
         startBuffered: -1,
         startNoBuffer: -1,
