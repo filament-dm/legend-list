@@ -1328,7 +1328,17 @@ var Container = typedMemo(function Container2({
       itemLayoutRef.current.didLayout = true;
     };
     const shouldDeferWebShrinkLayoutUpdate = !isInMVCPActiveMode(ctx.state) && prevSize !== void 0 && size + 1 < prevSize;
+    const debugSizing = ctx.state.props.debugSizing;
     if (shouldDeferWebShrinkLayoutUpdate) {
+      if (debugSizing) {
+        console.log("[DRIFT DEBUG] Deferring shrink update:", {
+          isInMVCPMode: isInMVCPActiveMode(ctx.state),
+          itemKey: currentItemKey,
+          newSize: size,
+          prevSize,
+          timestamp: Date.now()
+        });
+      }
       const token = pendingShrinkToken + 1;
       itemLayoutRef.current.pendingShrinkToken = token;
       requestAnimationFrame(() => {
@@ -1341,9 +1351,28 @@ var Container = typedMemo(function Container2({
         if (rect) {
           layout = { height: rect.height, width: rect.width };
         }
+        if (debugSizing) {
+          const confirmedSize = currentHorizontal ? layout.width : layout.height;
+          console.log("[DRIFT DEBUG] Shrink confirmed after RAF:", {
+            confirmedSize: roundSize(confirmedSize),
+            itemKey: currentItemKey,
+            originalSize: size,
+            timestamp: Date.now()
+          });
+        }
         doUpdate();
       });
       return;
+    }
+    if (debugSizing) {
+      console.log("[DRIFT DEBUG] Size update (immediate):", {
+        deferred: false,
+        itemKey: currentItemKey,
+        mvcpActive: isInMVCPActiveMode(ctx.state),
+        newSize: size,
+        prevSize,
+        timestamp: Date.now()
+      });
     }
     {
       doUpdate();
@@ -1891,10 +1920,11 @@ var ListComponentScrollView = React3.forwardRef(function ListComponentScrollView
     ...StyleSheet.flatten(contentContainerStyle)
   };
   const {
-    contentInset: _contentInset,
-    scrollEventThrottle: _scrollEventThrottle,
-    ScrollComponent: _ScrollComponent,
+    contentInset,
+    scrollEventThrottle,
+    ScrollComponent,
     useWindowScroll: _useWindowScroll,
+    debugSizing,
     ...webProps
   } = props;
   return /* @__PURE__ */ React3__namespace.createElement(
@@ -2738,15 +2768,38 @@ function updateAnchorLock(state, params) {
     const existingLock = state.mvcpAnchorLock;
     const quietPasses = !dataChanged && Math.abs(positionDiff) <= MVCP_POSITION_EPSILON && (existingLock == null ? void 0 : existingLock.id) === anchorId ? existingLock.quietPasses + 1 : 0;
     if (!dataChanged && quietPasses >= MVCP_ANCHOR_LOCK_QUIET_PASSES_TO_RELEASE) {
+      if (state.props.debugSizing) {
+        console.log("[DRIFT DEBUG] Anchor lock RELEASED (quiet passes met):", {
+          anchorId,
+          positionDiff,
+          quietPasses,
+          timestamp: now
+        });
+      }
       state.mvcpAnchorLock = void 0;
       return;
     }
+    const wasCreated = !existingLock;
+    const wasExtended = existingLock && Math.abs(positionDiff) > MVCP_POSITION_EPSILON;
     state.mvcpAnchorLock = {
       expiresAt: now + MVCP_ANCHOR_LOCK_TTL_MS,
       id: anchorId,
       position: anchorPosition,
       quietPasses
     };
+    if (state.props.debugSizing) {
+      console.log("[DRIFT DEBUG] Anchor lock updated:", {
+        action: wasCreated ? "CREATED" : wasExtended ? "EXTENDED" : "MAINTAINED",
+        anchorId,
+        anchorPosition,
+        dataChanged,
+        expiresAt: now + MVCP_ANCHOR_LOCK_TTL_MS,
+        now,
+        positionDiff,
+        quietPasses,
+        timestamp: now
+      });
+    }
   }
 }
 function prepareMVCP(ctx, dataChanged) {
@@ -2972,7 +3025,8 @@ function updateTotalSize(ctx) {
   const state = ctx.state;
   const {
     positions,
-    props: { data }
+    sizesKnown,
+    props: { data, debugSizing }
   } = state;
   const numColumns = (_a3 = peek$(ctx, "numColumns")) != null ? _a3 : 1;
   if (data.length === 0) {
@@ -2999,11 +3053,41 @@ function updateTotalSize(ctx) {
             maxSize = size;
           }
         }
-        addTotalSize(ctx, null, lastPosition + maxSize);
+        const totalSize = lastPosition + maxSize;
+        if (debugSizing) {
+          console.log("[DRIFT DEBUG] Total size updated (multi-column):", {
+            allMeasured: sizesKnown.size >= data.length,
+            dataLength: data.length,
+            lastId,
+            lastIndex: data.length - 1,
+            lastPosition,
+            maxSize,
+            measuredCount: sizesKnown.size,
+            timestamp: Date.now(),
+            totalSize
+          });
+        }
+        addTotalSize(ctx, null, totalSize);
       } else {
         const lastSize = getItemSize(ctx, lastId, lastIndex, data[lastIndex]);
         if (lastSize !== void 0) {
           const totalSize = lastPosition + lastSize;
+          const lastSizeKnown = sizesKnown.get(lastId);
+          if (debugSizing) {
+            console.log("[DRIFT DEBUG] Total size updated:", {
+              allMeasured: sizesKnown.size >= data.length,
+              dataLength: data.length,
+              lastId,
+              lastIndex: data.length - 1,
+              lastPosition,
+              lastSize,
+              lastSizeIsEstimate: lastSizeKnown === void 0,
+              lastSizeKnown,
+              measuredCount: sizesKnown.size,
+              timestamp: Date.now(),
+              totalSize
+            });
+          }
           addTotalSize(ctx, null, totalSize);
         }
       }
@@ -4078,7 +4162,20 @@ function calculateItemsInView(ctx, params = {}) {
       }
     }
     if (didChangePositions) {
-      set$(ctx, "lastPositionUpdate", Date.now());
+      const timestamp = Date.now();
+      set$(ctx, "lastPositionUpdate", timestamp);
+      if (state.props.debugSizing) {
+        const contentSize = getContentSize(ctx);
+        console.log("[DRIFT DEBUG] Container positions updated:", {
+          dataLength: state.props.data.length,
+          measuredCount: state.sizesKnown.size,
+          mvcpActive: isInMVCPActiveMode(state),
+          numContainers,
+          pendingTotalSize: state.pendingTotalSize,
+          timestamp,
+          totalSize: contentSize
+        });
+      }
     }
     if (!queuedInitialLayout && endBuffered !== null) {
       if (checkAllSizesKnown(state)) {
@@ -4263,12 +4360,23 @@ function updateAveragesOnDataChange(state, oldData, newData) {
 
 // src/core/checkResetContainers.ts
 function checkResetContainers(ctx, dataProp) {
+  var _a3;
   const state = ctx.state;
   const { previousData } = state;
   if (previousData) {
     updateAveragesOnDataChange(state, previousData, dataProp);
   }
-  const { maintainScrollAtEnd } = state.props;
+  const { maintainScrollAtEnd, debugSizing } = state.props;
+  if (debugSizing) {
+    console.log("[DRIFT DEBUG] Data changed, calling calculateItemsInView:", {
+      dataChangeNeedsScrollUpdate: state.dataChangeNeedsScrollUpdate,
+      mvcpAnchorLock: state.mvcpAnchorLock ? "ACTIVE" : "none",
+      mvcpAnchorLockExpires: (_a3 = state.mvcpAnchorLock) == null ? void 0 : _a3.expiresAt,
+      newLength: dataProp.length,
+      prevLength: previousData == null ? void 0 : previousData.length,
+      timestamp: Date.now()
+    });
+  }
   calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
   const shouldMaintainScrollAtEnd = maintainScrollAtEnd === true || maintainScrollAtEnd.onDataChange;
   const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx, false);
@@ -4487,22 +4595,49 @@ var ScrollAdjustHandler = class {
 };
 
 // src/core/updateItemSize.ts
-function runOrScheduleMVCPRecalculate(ctx) {
+function runOrScheduleMVCPRecalculate(ctx, itemKey) {
+  var _a3;
   const state = ctx.state;
+  const debugSizing = state.props.debugSizing;
   {
     if (!state.mvcpAnchorLock) {
       if (state.queuedMVCPRecalculate !== void 0) {
         cancelAnimationFrame(state.queuedMVCPRecalculate);
         state.queuedMVCPRecalculate = void 0;
       }
+      if (debugSizing) {
+        console.log("[DRIFT DEBUG] MVCP recalc (immediate, no anchor lock):", {
+          itemKey,
+          timestamp: Date.now()
+        });
+      }
       calculateItemsInView(ctx, { doMVCP: true });
       return;
     }
     if (state.queuedMVCPRecalculate !== void 0) {
+      if (debugSizing) {
+        console.log("[DRIFT DEBUG] MVCP recalc (already queued):", {
+          itemKey,
+          timestamp: Date.now()
+        });
+      }
       return;
+    }
+    if (debugSizing) {
+      console.log("[DRIFT DEBUG] MVCP recalc (queued in RAF):", {
+        anchorLockActive: !!state.mvcpAnchorLock,
+        anchorLockExpires: (_a3 = state.mvcpAnchorLock) == null ? void 0 : _a3.expiresAt,
+        itemKey,
+        timestamp: Date.now()
+      });
     }
     state.queuedMVCPRecalculate = requestAnimationFrame(() => {
       state.queuedMVCPRecalculate = void 0;
+      if (debugSizing) {
+        console.log("[DRIFT DEBUG] MVCP recalc (RAF executing):", {
+          timestamp: Date.now()
+        });
+      }
       calculateItemsInView(ctx, { doMVCP: true });
     });
   }
@@ -4590,7 +4725,7 @@ function updateItemSize(ctx, itemKey, sizeObj) {
   if (didContainersLayout || checkAllSizesKnown(state)) {
     if (needsRecalculate) {
       state.scrollForNextCalculateItemsInView = void 0;
-      runOrScheduleMVCPRecalculate(ctx);
+      runOrScheduleMVCPRecalculate(ctx, itemKey);
     }
     if (shouldMaintainScrollAtEnd) {
       if (maintainScrollAtEnd === true || maintainScrollAtEnd.onItemLayout) {
@@ -5072,6 +5207,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     data: dataProp = [],
     dataVersion,
     debugInitialization,
+    debugSizing,
     drawDistance = 250,
     estimatedItemSize = 100,
     estimatedListSize,
@@ -5155,6 +5291,16 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
   const maintainVisibleContentPositionConfig = normalizeMaintainVisibleContentPosition(
     maintainVisibleContentPositionProp
   );
+  React3.useEffect(() => {
+    if (debugSizing) {
+      console.log("[DRIFT DEBUG] debugSizing enabled for LegendList", {
+        dataLength: dataProp.length,
+        estimatedItemSize,
+        maintainVisibleContentPosition: !!maintainVisibleContentPositionConfig,
+        timestamp: Date.now()
+      });
+    }
+  }, [debugSizing]);
   const [renderNum, setRenderNum] = React3.useState(0);
   const initialScrollProp = initialScrollAtEnd ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? {
     index: initialScrollIndexProp.index || 0,
@@ -5306,6 +5452,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     data: dataProp,
     dataVersion,
     debugInitialization: !!debugInitialization,
+    debugSizing: !!debugSizing,
     drawDistance,
     estimatedItemSize,
     getEstimatedItemSize: useWrapIfItem(getEstimatedItemSize),

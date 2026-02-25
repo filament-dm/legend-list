@@ -392,6 +392,12 @@ interface LegendListSpecificProps<ItemT, TItemType extends string | undefined> {
      */
     debugInitialization?: boolean;
     /**
+     * Enable debug console logging for size measurements and MVCP calculations.
+     * Useful for debugging list position drift and collapse issues.
+     * @default false
+     */
+    debugSizing?: boolean;
+    /**
      * Number of columns to render items in.
      * @default 1
      */
