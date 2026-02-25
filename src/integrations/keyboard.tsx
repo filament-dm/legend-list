@@ -56,8 +56,6 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
     const didInteractive = useSharedValue(false);
     // Track keyboard open state to ignore spurious iOS keyboard events
     const isKeyboardOpen = useSharedValue(false);
-    // Track alignItemsPaddingTop at keyboard start to adjust scroll animation
-    const alignPaddingAtKeyboardStart = useSharedValue(0);
 
     const scrollHandler = useAnimatedScrollHandler(
         (event) => {
@@ -77,11 +75,24 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
         [refLegendList],
     );
 
-    // Capture alignItemsPaddingTop from the list state so the keyboard scroll
-    // animation can account for padding that will be absorbed by layout changes.
-    const captureAlignPadding = useCallback(() => {
-        const state = refLegendList.current?.getState();
-        alignPaddingAtKeyboardStart.set(state?.alignItemsPaddingTop ?? 0);
+    // After the keyboard animation completes, the scroll position may be past the valid
+    // range because alignItemsPaddingTop decreased (absorbing the space change).
+    // Unpin contentOffset and scroll to the correct position.
+    const correctScrollAfterKeyboard = useCallback(() => {
+        // Wait for layout changes (alignItemsPaddingTop update) to settle
+        requestAnimationFrame(() => {
+            const state = refLegendList.current?.getState();
+            if (!state) return;
+            const padding = state.alignItemsPaddingTop;
+            if (padding > 0) {
+                // Content doesn't fill the screen - scroll should be 0
+                animatedOffsetY.set(0);
+                scrollOffsetY.set(0);
+            } else {
+                // Content fills the screen - unpin and let native scroll handle it
+                animatedOffsetY.set(null);
+            }
+        });
     }, []);
 
     useKeyboardHandler(
@@ -107,10 +118,6 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
                     scrollOffsetAtKeyboardStart.set(scrollOffsetY.get());
                     animatedOffsetY.set(scrollOffsetY.get());
                     runOnJS(setScrollProcessingEnabled)(false);
-
-                    if (alignItemsAtEnd) {
-                        runOnJS(captureAlignPadding)();
-                    }
                 }
             },
             onInteractive: (event) => {
@@ -138,18 +145,10 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
                     const vKeyboardHeight = keyboardHeight.get();
                     const vProgress = vIsOpening ? event.progress : 1 - event.progress;
 
-                    // When alignItemsAtEnd is active and content doesn't fill the screen,
-                    // the align padding will shrink as the scroll view shrinks, already
-                    // keeping items at the bottom. Reduce the scroll amount by the padding
-                    // that will be absorbed by this layout change.
-                    const vEffectiveKeyboardHeight = alignItemsAtEnd
-                        ? Math.max(0, vKeyboardHeight - alignPaddingAtKeyboardStart.get())
-                        : vKeyboardHeight;
-
                     const targetOffset = Math.max(
                         0,
                         scrollOffsetAtKeyboardStart.get() +
-                            (vIsOpening ? vEffectiveKeyboardHeight : -vEffectiveKeyboardHeight) * vProgress,
+                            (vIsOpening ? vKeyboardHeight : -vKeyboardHeight) * vProgress,
                     );
                     scrollOffsetY.set(targetOffset);
                     animatedOffsetY.set(targetOffset);
@@ -172,14 +171,10 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
                         const vIsOpening = isOpening.get();
                         const vKeyboardHeight = keyboardHeight.get();
 
-                        const vEffectiveKeyboardHeight = alignItemsAtEnd
-                            ? Math.max(0, vKeyboardHeight - alignPaddingAtKeyboardStart.get())
-                            : vKeyboardHeight;
-
                         const targetOffset = Math.max(
                             0,
                             scrollOffsetAtKeyboardStart.get() +
-                                (vIsOpening ? vEffectiveKeyboardHeight : -vEffectiveKeyboardHeight) *
+                                (vIsOpening ? vKeyboardHeight : -vKeyboardHeight) *
                                     (vIsOpening ? event.progress : 1 - event.progress),
                         );
 
@@ -203,6 +198,13 @@ export const KeyboardAvoidingLegendList = (forwardRef as TypedForwardRef)(functi
                             keyboardInset.set(newInset);
                             animatedOffsetY.set(scrollOffsetY.get());
                         }
+                    }
+
+                    // After the keyboard animation, correct scroll position for
+                    // alignItemsAtEnd lists where the padding reduction already
+                    // accounts for the space change.
+                    if (alignItemsAtEnd) {
+                        runOnJS(correctScrollAfterKeyboard)();
                     }
                 }
             },
