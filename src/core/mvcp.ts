@@ -69,9 +69,20 @@ function updateAnchorLock(
                 : 0;
 
         if (!dataChanged && quietPasses >= MVCP_ANCHOR_LOCK_QUIET_PASSES_TO_RELEASE) {
+            if (state.props.debugSizing) {
+                console.log("[DRIFT DEBUG] Anchor lock RELEASED (quiet passes met):", {
+                    anchorId,
+                    positionDiff,
+                    quietPasses,
+                    timestamp: now,
+                });
+            }
             state.mvcpAnchorLock = undefined;
             return;
         }
+
+        const wasCreated = !existingLock;
+        const wasExtended = existingLock && Math.abs(positionDiff) > MVCP_POSITION_EPSILON;
 
         state.mvcpAnchorLock = {
             expiresAt: now + MVCP_ANCHOR_LOCK_TTL_MS,
@@ -79,6 +90,20 @@ function updateAnchorLock(
             position: anchorPosition,
             quietPasses,
         };
+
+        if (state.props.debugSizing) {
+            console.log("[DRIFT DEBUG] Anchor lock updated:", {
+                action: wasCreated ? "CREATED" : wasExtended ? "EXTENDED" : "MAINTAINED",
+                anchorId,
+                anchorPosition,
+                dataChanged,
+                expiresAt: now + MVCP_ANCHOR_LOCK_TTL_MS,
+                now,
+                positionDiff,
+                quietPasses,
+                timestamp: now,
+            });
+        }
     }
 }
 
@@ -86,6 +111,7 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
     const state = ctx.state;
     const { idsInView, positions, props } = state;
     const {
+        alignItemsAtEnd,
         maintainVisibleContentPosition: { data: mvcpData, size: mvcpScroll, shouldRestorePosition },
     } = props;
     const isWeb = Platform.OS === "web";
@@ -122,19 +148,44 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
             // If we're currently scrolling to a target index, do MVCP for its position
             targetId = getId(state, scrollTarget);
         } else if (idsInView.length > 0 && state.didContainersLayout && !dataChanged) {
-            // Do MVCP for the first item fully in view
-            targetId = idsInView.find((id) => indexByKey.get(id) !== undefined);
+            // Do MVCP for the first (or last if alignItemsAtEnd) item fully in view
+            if (alignItemsAtEnd) {
+                // For chat UIs with alignItemsAtEnd, anchor to the bottom-most visible item
+                for (let i = idsInView.length - 1; i >= 0; i--) {
+                    const id = idsInView[i];
+                    if (indexByKey.get(id) !== undefined) {
+                        targetId = id;
+                        break;
+                    }
+                }
+            } else {
+                targetId = idsInView.find((id) => indexByKey.get(id) !== undefined);
+            }
         }
 
         if (dataChanged && idsInView.length > 0 && state.didContainersLayout) {
             // Capture visible anchors for fallback in case the primary anchor disappears after data updates.
-            for (let i = 0; i < idsInView.length; i++) {
-                const id = idsInView[i];
-                const index = indexByKey.get(id);
-                if (index !== undefined) {
-                    const position = positions[index];
-                    if (position !== undefined) {
-                        idsInViewWithPositions.push({ id, position });
+            // For alignItemsAtEnd, iterate backwards to prioritize bottom-most items
+            if (alignItemsAtEnd) {
+                for (let i = idsInView.length - 1; i >= 0; i--) {
+                    const id = idsInView[i];
+                    const index = indexByKey.get(id);
+                    if (index !== undefined) {
+                        const position = positions[index];
+                        if (position !== undefined) {
+                            idsInViewWithPositions.push({ id, position });
+                        }
+                    }
+                }
+            } else {
+                for (let i = 0; i < idsInView.length; i++) {
+                    const id = idsInView[i];
+                    const index = indexByKey.get(id);
+                    if (index !== undefined) {
+                        const position = positions[index];
+                        if (position !== undefined) {
+                            idsInViewWithPositions.push({ id, position });
+                        }
                     }
                 }
             }
@@ -216,14 +267,27 @@ export function prepareMVCP(ctx: StateContext, dataChanged?: boolean): (() => vo
                 if (newPosition !== undefined) {
                     const totalSize = getContentSize(ctx);
                     let diff = newPosition - prevPosition;
-                    if (diff !== 0 && isEndAnchoredScrollTarget && state.scroll + state.scrollLength > totalSize) {
+
+                    // Only apply the end-of-list guard when all items have been measured,
+                    // so totalSize is accurate. When unmeasured items exist (e.g. after
+                    // pagination prepends estimated items), totalSize is unreliable and
+                    // the guard would incorrectly zero legitimate diffs, causing drift.
+                    const allMeasured = state.sizesKnown.size >= (state.props.data?.length ?? 0);
+                    if (
+                        allMeasured &&
+                        diff !== 0 &&
+                        isEndAnchoredScrollTarget &&
+                        state.scroll + state.scrollLength > totalSize
+                    ) {
                         // If we're scrolling to the end of the list, then there's two potential issues we workaround:
                         // 1. List items above the scroll target may be in view so we don't want to take too much adjusting
                         // 2. Adjusting too much could cause the list to scroll back up
                         if (diff > 0) {
                             diff = Math.max(0, totalSize - state.scroll - state.scrollLength);
                         } else {
-                            diff = 0;
+                            // Negative diffs (anchor moved up / content shrunk) pass through
+                            // even at the end of the list — we need to scroll up to follow
+                            // the anchor and prevent visual drift (Bug 3 fix).
                         }
                     }
 

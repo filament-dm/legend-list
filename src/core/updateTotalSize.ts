@@ -7,7 +7,8 @@ export function updateTotalSize(ctx: StateContext) {
     const state = ctx.state;
     const {
         positions,
-        props: { data },
+        sizesKnown,
+        props: { data, debugSizing },
     } = state;
     const numColumns = peek$(ctx, "numColumns") ?? 1;
 
@@ -37,11 +38,41 @@ export function updateTotalSize(ctx: StateContext) {
                     }
                 }
 
-                addTotalSize(ctx, null, lastPosition + maxSize);
+                const totalSize = lastPosition + maxSize;
+                if (debugSizing) {
+                    console.log("[DRIFT DEBUG] Total size updated (multi-column):", {
+                        allMeasured: sizesKnown.size >= data.length,
+                        dataLength: data.length,
+                        lastId,
+                        lastIndex: data.length - 1,
+                        lastPosition,
+                        maxSize,
+                        measuredCount: sizesKnown.size,
+                        timestamp: Date.now(),
+                        totalSize,
+                    });
+                }
+                addTotalSize(ctx, null, totalSize);
             } else {
                 const lastSize = getItemSize(ctx, lastId, lastIndex, data[lastIndex]);
                 if (lastSize !== undefined) {
                     const totalSize = lastPosition + lastSize;
+                    const lastSizeKnown = sizesKnown.get(lastId);
+                    if (debugSizing) {
+                        console.log("[DRIFT DEBUG] Total size updated:", {
+                            allMeasured: sizesKnown.size >= data.length,
+                            dataLength: data.length,
+                            lastId,
+                            lastIndex: data.length - 1,
+                            lastPosition,
+                            lastSize,
+                            lastSizeIsEstimate: lastSizeKnown === undefined,
+                            lastSizeKnown,
+                            measuredCount: sizesKnown.size,
+                            timestamp: Date.now(),
+                            totalSize,
+                        });
+                    }
                     addTotalSize(ctx, null, totalSize);
                 }
             }

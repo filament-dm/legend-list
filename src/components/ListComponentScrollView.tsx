@@ -166,6 +166,21 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         [getMaxScrollOffset, getScrollTarget, horizontal, isWindowScroll],
     );
 
+    // One-time injection of global webkit-scrollbar hiding style
+    useLayoutEffect(() => {
+        const styleId = "legendlist-hide-scrollbar";
+        if (!document.getElementById(styleId)) {
+            const styleElement = document.createElement("style");
+            styleElement.id = styleId;
+            styleElement.textContent = `
+            .legendlist-hide-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+        `;
+            document.head.appendChild(styleElement);
+        }
+    }, []); // Empty deps - only run once
+
     useImperativeHandle(ref, () => {
         const api: ScrollViewMethods = {
             getBoundingClientRect: () => scrollRef.current?.getBoundingClientRect(),
@@ -292,6 +307,9 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         };
     }, [isWindowScroll, onLayout]);
 
+    // Hide scrollbars if either indicator prop is false (matches react-native-web behavior)
+    const hideScrollbar = showsHorizontalScrollIndicator === false || showsVerticalScrollIndicator === false;
+
     const scrollViewStyle: CSSProperties = {
         ...(isWindowScroll
             ? {}
@@ -299,7 +317,14 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
                   overflow: "auto",
                   overflowX: horizontal ? "auto" : showsHorizontalScrollIndicator ? "auto" : "hidden",
                   overflowY: horizontal ? (showsVerticalScrollIndicator ? "auto" : "hidden") : "auto",
+                  position: "relative", // Ensure proper positioning context
                   WebkitOverflowScrolling: "touch", // iOS momentum scrolling
+                  width: horizontal ? "100%" : undefined,
+                  // Add Firefox/IE scrollbar hiding (inline styles)
+                  ...(hideScrollbar && {
+                      msOverflowStyle: "none",
+                      scrollbarWidth: "none",
+                  }),
               }),
         ...StyleSheet.flatten(style),
     };
@@ -312,16 +337,23 @@ export const ListComponentScrollView = forwardRef(function ListComponentScrollVi
         ...StyleSheet.flatten(contentContainerStyle),
     };
 
+    // biome-ignore lint/correctness/noUnusedVariables: Spreading out invalid DOM props
     const {
-        contentInset: _contentInset,
-        scrollEventThrottle: _scrollEventThrottle,
-        ScrollComponent: _ScrollComponent,
+        contentInset,
+        scrollEventThrottle,
+        ScrollComponent,
         useWindowScroll: _useWindowScroll,
+        debugSizing,
         ...webProps
-    } = props as ListComponentScrollViewProps & ExtraPropsFromRN;
+    } = props as ListComponentScrollViewProps & ExtraPropsFromRN & { debugSizing?: boolean };
 
     return (
-        <div ref={scrollRef} {...(webProps as HTMLAttributes<HTMLDivElement>)} style={scrollViewStyle}>
+        <div
+            className={hideScrollbar ? "legendlist-hide-scrollbar" : undefined}
+            ref={scrollRef}
+            {...(webProps as HTMLAttributes<HTMLDivElement>)}
+            style={scrollViewStyle}
+        >
             {refreshControl}
             <div ref={contentRef} style={contentStyle}>
                 {children}
