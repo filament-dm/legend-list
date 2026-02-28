@@ -4384,7 +4384,7 @@ var LegendList = typedMemo(
   })
 );
 var LegendListInner = typedForwardRef(function LegendListInner2(props, forwardedRef) {
-  var _a3, _b, _c, _d, _e;
+  var _a3, _b, _c, _d;
   const {
     alignItemsAtEnd = false,
     alwaysRender,
@@ -4469,7 +4469,8 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     maintainVisibleContentPositionProp
   );
   const [renderNum, setRenderNum] = useState(0);
-  const initialScrollProp = initialScrollAtEnd ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? {
+  const isSimpleChat = !initialScrollIndexProp && !initialScrollOffsetProp && !stabilizationAnchorId && (maintainScrollAtEnd || (timelineId == null ? void 0 : timelineId.includes("live-timeline")));
+  const initialScrollProp = initialScrollAtEnd || isSimpleChat ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 } : initialScrollIndexProp || initialScrollOffsetProp ? typeof initialScrollIndexProp === "object" ? {
     index: initialScrollIndexProp.index || 0,
     viewOffset: initialScrollIndexProp.viewOffset || (initialScrollIndexProp.viewPosition === 1 ? -stylePaddingBottomState : 0),
     viewPosition: initialScrollIndexProp.viewPosition || 0
@@ -4645,56 +4646,6 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     timelineId
   };
   state.refScroller = refScroller;
-  const timelineChanged = timelineId !== state.lastTimelineId;
-  const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
-  if (anchorChanged) {
-    state.lastStabilizationAnchorId = stabilizationAnchorId;
-  }
-  if (timelineChanged) {
-    if (ctx.initializationManager.isImperativeInit()) {
-      return;
-    }
-    const isSwitchingFromFocused = (_d = state.lastTimelineId) == null ? void 0 : _d.includes("focused-timeline");
-    const isSwitchingToLive = timelineId == null ? void 0 : timelineId.includes("live-timeline");
-    const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
-    state.lastTimelineId = timelineId;
-    ctx.initializationManager.enterInitialization({
-      anchorId: stabilizationAnchorId,
-      timelineId: timelineId || ""
-    });
-    if (shouldExitEarly) {
-      ctx.initializationManager.exitInitialization({
-        type: "early-exit" /* EARLY_EXIT */,
-        mode: ctx.initializationManager.getMode(),
-        timelineId: timelineId || ""
-      });
-    } else {
-      if (!initialScrollProp && dataProp && dataProp.length > 0) {
-        const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
-          dataProp,
-          keyExtractor
-        );
-        if (scrollPrepared) {
-          ctx.initializationManager.enterScrollingPhase();
-          setRenderNum((v) => v + 1);
-        } else {
-          ctx.initializationManager.exitInitialization({
-            type: "failed" /* FAILED */,
-            mode: ctx.initializationManager.getMode(),
-            reason: "Scroll preparation failed - anchor not found in data",
-            timelineId: timelineId || ""
-          });
-        }
-      } else {
-        ctx.initializationManager.exitInitialization({
-          type: "failed" /* FAILED */,
-          mode: ctx.initializationManager.getMode(),
-          reason: "No data or has initialScroll prop",
-          timelineId: timelineId || ""
-        });
-      }
-    }
-  }
   const memoizedLastItemKeys = useMemo(() => {
     if (!dataProp.length) return [];
     return Array.from(
@@ -4847,6 +4798,51 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
     () => initializeStateVars(true),
     [dataVersion, memoizedLastItemKeys.join(","), numColumnsProp, stylePaddingBottomState, stylePaddingTopState]
   );
+  useLayoutEffect(() => {
+    const timelineChanged = timelineId !== state.lastTimelineId;
+    const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+    if (anchorChanged) {
+      state.lastStabilizationAnchorId = stabilizationAnchorId;
+    }
+    if (timelineChanged) {
+      if (ctx.initializationManager.isImperativeInit()) {
+        return;
+      }
+      state.lastTimelineId = timelineId;
+      const isSimpleChatCase = (maintainScrollAtEnd || (timelineId == null ? void 0 : timelineId.includes("live-timeline"))) && !stabilizationAnchorId;
+      if (isSimpleChatCase) {
+        return;
+      }
+      ctx.initializationManager.enterInitialization({
+        anchorId: stabilizationAnchorId,
+        timelineId: timelineId || ""
+      });
+      if (!initialScrollProp && dataProp && dataProp.length > 0) {
+        const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+          dataProp,
+          keyExtractor
+        );
+        if (scrollPrepared) {
+          ctx.initializationManager.enterScrollingPhase();
+          setRenderNum((v) => v + 1);
+        } else {
+          ctx.initializationManager.exitInitialization({
+            type: "failed" /* FAILED */,
+            mode: ctx.initializationManager.getMode(),
+            reason: "Scroll preparation failed - anchor not found in data",
+            timelineId: timelineId || ""
+          });
+        }
+      } else {
+        ctx.initializationManager.exitInitialization({
+          type: "failed" /* FAILED */,
+          mode: ctx.initializationManager.getMode(),
+          reason: "No data or has initialScroll prop",
+          timelineId: timelineId || ""
+        });
+      }
+    }
+  }, [timelineId, stabilizationAnchorId, maintainScrollAtEnd, dataProp, initialScrollProp, keyExtractor]);
   useEffect(() => {
     if (!onMetricsChange) {
       return;
@@ -4932,7 +4928,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
         }
       ),
       refScrollView: combinedRef,
-      scrollAdjustHandler: (_e = refState.current) == null ? void 0 : _e.scrollAdjustHandler,
+      scrollAdjustHandler: (_d = refState.current) == null ? void 0 : _d.scrollAdjustHandler,
       scrollEventThrottle: 0,
       snapToIndices,
       stickyHeaderIndices,
