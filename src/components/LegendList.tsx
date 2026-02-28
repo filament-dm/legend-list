@@ -199,7 +199,21 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
     );
 
     const [renderNum, setRenderNum] = useState(0);
-    const initialScrollProp: ScrollIndexWithOffset | undefined = initialScrollAtEnd
+
+    // Detect if this is a simple CHAT case (live timeline with no target message)
+    // Simple CHAT cases should use the fast, synchronous scroll-to-end path
+    // instead of the full InitializationManager flow
+    //
+    // TODO(austin): This is only an optimization while we have urlPreviews disabled on web.
+    // If we re-enable urlPreviews, we need to always rely on InitializationManager to maintain
+    // the correct scroll position during async updates and resizes.
+    const isSimpleChat =
+        !initialScrollIndexProp &&
+        !initialScrollOffsetProp &&
+        !stabilizationAnchorId &&
+        (maintainScrollAtEnd || timelineId?.includes('live-timeline'));
+
+    const initialScrollProp: ScrollIndexWithOffset | undefined = initialScrollAtEnd || isSimpleChat
         ? { index: Math.max(0, dataProp.length - 1), viewOffset: -stylePaddingBottomState, viewPosition: 1 }
         : initialScrollIndexProp || initialScrollOffsetProp
           ? typeof initialScrollIndexProp === "object"
@@ -408,84 +422,6 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
 
     state.refScroller = refScroller;
 
-    // Detect timeline or anchor changes
-    const timelineChanged = timelineId !== state.lastTimelineId;
-    const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
-
-    // Track anchor changes separately (for logging/debugging, but doesn't trigger initialization)
-    if (anchorChanged) {
-        state.lastStabilizationAnchorId = stabilizationAnchorId;
-    }
-
-    // ONLY timeline changes trigger initialization
-    // Anchor-only changes are UI hints (scroll targets) that shouldn't block pagination or reset state
-    if (timelineChanged) {
-        // Skip timeline change detection during imperative initialization
-        // (e.g., when jumpToLatest() is running)
-        if (ctx.initializationManager.isImperativeInit()) {
-            return;
-        }
-
-        // Detect if this is a focused → live timeline switch without anchor
-        // In this case, skip scrolling/stabilizing altogether and exit early
-        const isSwitchingFromFocused = state.lastTimelineId?.includes('focused-timeline');
-        const isSwitchingToLive = timelineId?.includes('live-timeline');
-        const shouldExitEarly = isSwitchingFromFocused && isSwitchingToLive && !stabilizationAnchorId;
-        // Update timeline tracking
-        state.lastTimelineId = timelineId;
-
-        // Enter initialization via the InitializationManager
-        // This sets the correct mode (CHAT vs MID_TIMELINE vs CHAT_WITH_TARGET) and resets MVCP state
-        ctx.initializationManager.enterInitialization({
-            anchorId: stabilizationAnchorId,
-            timelineId: timelineId || "",
-        });
-
-        if (shouldExitEarly) {
-            // Exit early if conditions are met to skip scrolling/stabilizing
-            ctx.initializationManager.exitInitialization({
-                type: InitializationCompletionType.EARLY_EXIT,
-                mode: ctx.initializationManager.getMode(),
-                timelineId: timelineId || "",
-            });
-        } else {
-            // Normal initialization flow: prepare scroll if we have data
-            // prepareInitialScroll handles both chat mode (no anchor) and targeted mode (with anchor)
-            if (!initialScrollProp && dataProp && dataProp.length > 0) {
-                const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
-                    dataProp as readonly unknown[],
-                    keyExtractor as (item: unknown, index: number) => string,
-                );
-
-                // If initial scroll was prepared, enter SCROLLING phase to perform the scroll
-                if (scrollPrepared) {
-                    ctx.initializationManager.enterScrollingPhase();
-                    // Force re-render to trigger initialContentOffset memo recalculation
-                    // This ensures the memo uses the newly set state.initialScroll
-                    setRenderNum((v) => v + 1);
-                } else {
-                    // Scroll couldn't be prepared (e.g., anchor not in data) - exit initialization
-                    ctx.initializationManager.exitInitialization({
-                        type: InitializationCompletionType.FAILED,
-                        mode: ctx.initializationManager.getMode(),
-                        reason: "Scroll preparation failed - anchor not found in data",
-                        timelineId: timelineId || "",
-                    });
-                }
-            } else {
-                // No data yet, or has explicit initialScroll prop - exit initialization immediately
-                // This handles cases like switching to live timeline without needing scroll positioning
-                // The onInitializationComplete callback will fire, signaling the transition is complete
-                ctx.initializationManager.exitInitialization({
-                    type: InitializationCompletionType.FAILED,
-                    mode: ctx.initializationManager.getMode(),
-                    reason: "No data or has initialScroll prop",
-                    timelineId: timelineId || "",
-                });
-            }
-        }
-    }
-
     const memoizedLastItemKeys = useMemo(() => {
         if (!dataProp.length) return [];
         return Array.from({ length: Math.min(numColumnsProp, dataProp.length) }, (_, i) =>
@@ -680,6 +616,90 @@ const LegendListInner = typedForwardRef(function LegendListInner<T>(
         () => initializeStateVars(true),
         [dataVersion, memoizedLastItemKeys.join(","), numColumnsProp, stylePaddingBottomState, stylePaddingTopState],
     );
+
+    // Handle timeline changes for initialization
+    useLayoutEffect(() => {
+        // Detect timeline or anchor changes
+        const timelineChanged = timelineId !== state.lastTimelineId;
+        const anchorChanged = stabilizationAnchorId !== state.lastStabilizationAnchorId;
+
+        // Track anchor changes separately (for logging/debugging, but doesn't trigger initialization)
+        if (anchorChanged) {
+            state.lastStabilizationAnchorId = stabilizationAnchorId;
+        }
+
+        // ONLY timeline changes trigger initialization
+        // Anchor-only changes are UI hints (scroll targets) that shouldn't block pagination or reset state
+        if (timelineChanged) {
+            // Skip timeline change detection during imperative initialization
+            // (e.g., when jumpToLatest() is running)
+            if (ctx.initializationManager.isImperativeInit()) {
+                return;
+            }
+
+            // Update timeline tracking
+            state.lastTimelineId = timelineId;
+
+            // Check if this is a simple CHAT case (live timeline with no target)
+            // For simple CHAT, we bypass the InitializationManager entirely and use the
+            // fast, synchronous scroll-to-end path (same as initialScrollAtEnd={true})
+            const isSimpleChatCase =
+                (maintainScrollAtEnd || timelineId?.includes('live-timeline')) && !stabilizationAnchorId;
+
+            // TODO(austin): This bypass is only beneficial while we have urlPreviews disabled on web.
+            // If we re-enable urlPreviews, we need to always rely on InitializationManager to maintain
+            // the correct scroll position during async updates and resizes, even for simple CHAT timelines.
+            if (isSimpleChatCase) {
+                // Simple CHAT case: bypass InitializationManager, let initialScrollProp handle it
+                // This provides the same smooth, simple scroll behavior as initialScrollAtEnd={true}
+                // The initialScrollProp calculation above already handles this case
+                return;
+            }
+
+            // Complex case: use InitializationManager for targeted scrolling (e.g., specific message)
+            // Enter initialization via the InitializationManager
+            // This sets the correct mode (CHAT_WITH_TARGET or MID_TIMELINE) and resets MVCP state
+            ctx.initializationManager.enterInitialization({
+                anchorId: stabilizationAnchorId,
+                timelineId: timelineId || "",
+            });
+
+            // Normal initialization flow: prepare scroll if we have data
+            // prepareInitialScroll handles targeted mode (with anchor)
+            if (!initialScrollProp && dataProp && dataProp.length > 0) {
+                const scrollPrepared = ctx.initializationManager.prepareInitialScroll(
+                    dataProp as readonly unknown[],
+                    keyExtractor as (item: unknown, index: number) => string,
+                );
+
+                // If initial scroll was prepared, enter SCROLLING phase to perform the scroll
+                if (scrollPrepared) {
+                    ctx.initializationManager.enterScrollingPhase();
+                    // Force re-render to trigger initialContentOffset memo recalculation
+                    // This ensures the memo uses the newly set state.initialScroll
+                    setRenderNum((v) => v + 1);
+                } else {
+                    // Scroll couldn't be prepared (e.g., anchor not in data) - exit initialization
+                    ctx.initializationManager.exitInitialization({
+                        type: InitializationCompletionType.FAILED,
+                        mode: ctx.initializationManager.getMode(),
+                        reason: "Scroll preparation failed - anchor not found in data",
+                        timelineId: timelineId || "",
+                    });
+                }
+            } else {
+                // No data yet, or has explicit initialScroll prop - exit initialization immediately
+                // This handles cases like switching to live timeline without needing scroll positioning
+                // The onInitializationComplete callback will fire, signaling the transition is complete
+                ctx.initializationManager.exitInitialization({
+                    type: InitializationCompletionType.FAILED,
+                    mode: ctx.initializationManager.getMode(),
+                    reason: "No data or has initialScroll prop",
+                    timelineId: timelineId || "",
+                });
+            }
+        }
+    }, [timelineId, stabilizationAnchorId, maintainScrollAtEnd, dataProp, initialScrollProp, keyExtractor]);
 
     useEffect(() => {
         if (!onMetricsChange) {
