@@ -1,10 +1,22 @@
 import { calculateItemsInView } from "@/core/calculateItemsInView";
 import { doMaintainScrollAtEnd } from "@/core/doMaintainScrollAtEnd";
 import { addTotalSize } from "@/core/updateTotalSize";
-import { peek$, type StateContext, set$ } from "@/state/state";
+import { getContentSize, peek$, type StateContext, set$ } from "@/state/state";
 import type { InternalState, MaintainScrollAtEndOptions } from "@/types";
 import { checkAllSizesKnown } from "@/utils/checkAllSizesKnown";
 import { getItemSize } from "@/utils/getItemSize";
+
+function isPinnedToEndForItemLayout(ctx: StateContext, state: InternalState) {
+    const contentInsetEnd = state.props.stylePaddingBottom || 0;
+    const contentSize = getContentSize(ctx) + contentInsetEnd;
+    const distanceFromEnd = contentSize - state.scroll - state.scrollLength;
+
+    if (contentSize <= state.scrollLength) {
+        return true;
+    }
+
+    return distanceFromEnd <= 2;
+}
 
 export function updateItemSize(
     ctx: StateContext,
@@ -129,6 +141,9 @@ export function updateItemSize(
         }
         if (shouldMaintainScrollAtEnd) {
             if (maintainScrollAtEnd === true || (maintainScrollAtEnd as MaintainScrollAtEndOptions).onItemLayout) {
+                if (!isPinnedToEndForItemLayout(ctx, state)) {
+                    return;
+                }
                 doMaintainScrollAtEnd(ctx, state, false);
             }
         }

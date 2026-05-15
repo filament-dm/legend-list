@@ -1,7 +1,14 @@
 // biome-ignore lint/style/useImportType: Leaving this out makes it crash in some environments
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DimensionValue, LayoutRectangle, StyleProp, View, ViewStyle } from "react-native";
+import {
+    type DimensionValue,
+    type LayoutRectangle,
+    Platform,
+    type StyleProp,
+    type View,
+    type ViewStyle,
+} from "react-native";
 
 import { PositionView, PositionViewSticky } from "@/components/PositionView";
 import { Separator } from "@/components/Separator";
@@ -43,6 +50,7 @@ export const Container = typedMemo(function Container<ItemT>({
     ]);
 
     const refLastSize = useRef<{ width: number; height: number }>();
+    const pendingSizeFrameTokenRef = useRef(0);
     const ref = useRef<View>(null);
     const [layoutRenderCount, forceLayoutRender] = useState(0);
 
@@ -119,12 +127,36 @@ export const Container = typedMemo(function Container<ItemT>({
 
             // Apply a small rounding so we don't run callbacks for tiny changes
             const size = Math.floor(rectangle[horizontal ? "width" : "height"] * 8) / 8;
+            const prevSize = refLastSize.current?.[horizontal ? "width" : "height"];
 
             const doUpdate = () => {
                 refLastSize.current = { height: layout.height, width: layout.width };
                 updateItemSize(itemKey, layout);
                 didLayoutRef.current = true;
             };
+
+            if (prevSize !== undefined && prevSize > 10 && size > prevSize * 4 && size - prevSize > 100) {
+                const token = pendingSizeFrameTokenRef.current + 1;
+                pendingSizeFrameTokenRef.current = token;
+
+                requestAnimationFrame(() => {
+                    if (pendingSizeFrameTokenRef.current !== token) {
+                        return;
+                    }
+
+                    if (Platform.OS === "web") {
+                        ref.current?.measure?.((_x, _y, width, height) => {
+                            layout = { height, width };
+                            doUpdate();
+                        });
+                        return;
+                    }
+
+                    doUpdate();
+                });
+
+                return;
+            }
 
             if (IsNewArchitecture || size > 0) {
                 doUpdate();
