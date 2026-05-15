@@ -37,12 +37,12 @@ export function useOnLayoutSync<T extends View = View>(
                 if (Platform.OS === "web") {
                     initialMeasureFrameRef.current = requestAnimationFrame(() => {
                         initialMeasureFrameRef.current = undefined;
-                        ref.current?.measure((x, y, width, height) => {
+                        ref.current?.measure((x: number, y: number, width: number, height: number) => {
                             onLayoutChange({ height, width, x, y }, true);
                         });
                     });
                 } else {
-                    ref.current.measure((x, y, width, height) => {
+                    ref.current.measure((x: number, y: number, width: number, height: number) => {
                         onLayoutChange({ height, width, x, y }, true);
                     });
                 }

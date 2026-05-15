@@ -112,7 +112,7 @@ export const Container = typedMemo(function Container<ItemT>({
             index: index!,
             itemKey,
             triggerLayout: () => {
-                forceLayoutRender((v) => v + 1);
+                forceLayoutRender((v: number) => v + 1);
             },
             value: data,
         };
@@ -145,7 +145,7 @@ export const Container = typedMemo(function Container<ItemT>({
                     }
 
                     if (Platform.OS === "web") {
-                        ref.current?.measure?.((_x, _y, width, height) => {
+                        ref.current?.measure?.((_x: number, _y: number, width: number, height: number) => {
                             layout = { height, width };
                             doUpdate();
                         });
@@ -163,7 +163,7 @@ export const Container = typedMemo(function Container<ItemT>({
             } else {
                 // On old architecture, the size can be 0 sometimes, maybe when not fully rendered?
                 // So we need to make sure it's actually rendered and measure it to make sure it's actually 0.
-                ref.current?.measure?.((_x, _y, width, height) => {
+                ref.current?.measure?.((_x: number, _y: number, width: number, height: number) => {
                     layout = { height, width };
                     doUpdate();
                 });
