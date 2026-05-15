@@ -51,8 +51,11 @@ export const Container = typedMemo(function Container<ItemT>({
 
     const refLastSize = useRef<{ width: number; height: number }>();
     const pendingSizeFrameTokenRef = useRef(0);
+    const currentItemKeyRef = useRef(itemKey);
     const ref = useRef<View>(null);
     const [layoutRenderCount, forceLayoutRender] = useState(0);
+
+    currentItemKeyRef.current = itemKey;
 
     const otherAxisPos: DimensionValue | undefined = numColumns > 1 ? `${((column - 1) / numColumns) * 100}%` : 0;
     const otherAxisSize: DimensionValue | undefined = numColumns > 1 ? `${(1 / numColumns) * 100}%` : undefined;
@@ -143,9 +146,15 @@ export const Container = typedMemo(function Container<ItemT>({
                     if (pendingSizeFrameTokenRef.current !== token) {
                         return;
                     }
+                    if (currentItemKeyRef.current !== itemKey) {
+                        return;
+                    }
 
                     if (Platform.OS === "web") {
                         ref.current?.measure?.((_x: number, _y: number, width: number, height: number) => {
+                            if (currentItemKeyRef.current !== itemKey) {
+                                return;
+                            }
                             layout = { height, width };
                             doUpdate();
                         });
@@ -178,6 +187,14 @@ export const Container = typedMemo(function Container<ItemT>({
         },
         [itemKey, layoutRenderCount],
     );
+
+    useEffect(() => {
+        // Invalidate deferred callbacks scheduled for a previous item key.
+        pendingSizeFrameTokenRef.current += 1;
+        return () => {
+            pendingSizeFrameTokenRef.current += 1;
+        };
+    }, [itemKey]);
 
     if (!IsNewArchitecture) {
         // Since old architecture cannot use unstable_getBoundingClientRect it needs to ensure that

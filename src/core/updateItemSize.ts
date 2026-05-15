@@ -10,12 +10,13 @@ function isPinnedToEndForItemLayout(ctx: StateContext, state: InternalState) {
     const contentInsetEnd = state.props.stylePaddingBottom || 0;
     const contentSize = getContentSize(ctx) + contentInsetEnd;
     const distanceFromEnd = contentSize - state.scroll - state.scrollLength;
+    const maintainScrollAtEndThreshold = state.props.maintainScrollAtEndThreshold ?? 0.1;
 
     if (contentSize <= state.scrollLength) {
         return true;
     }
 
-    return distanceFromEnd <= 2;
+    return distanceFromEnd <= state.scrollLength * maintainScrollAtEndThreshold;
 }
 
 export function updateItemSize(
