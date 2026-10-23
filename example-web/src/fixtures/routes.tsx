@@ -15,6 +15,7 @@ import ColumnsExample from "./ColumnsExample";
 import CountriesExample from "./CountriesExample";
 import CountriesWithHeadersStickyExample from "./CountriesWithHeadersStickyExample";
 import DatasetSwitchExample from "./DatasetSwitchExample";
+import EndCorrectionExample from "./EndCorrectionExample";
 import EndResizeExample from "./EndResizeExample";
 import ExternalScrollExample from "./ExternalScrollExample";
 import ExtraDataExample from "./ExtraDataExample";
@@ -41,6 +42,13 @@ export type FixtureRoute = {
 };
 
 export const FIXTURE_ROUTES: FixtureRoute[] = [
+    {
+        description: "Reproduces a late end correction when older row heights settle above a fixed footer.",
+        element: () => <EndCorrectionExample />,
+        group: "Chat & Messaging",
+        path: "end-correction",
+        title: "End Correction",
+    },
     {
         description:
             "Switches datasets in one mounted list with end, unread, and jump targets, tall rows, and late sizes.",
