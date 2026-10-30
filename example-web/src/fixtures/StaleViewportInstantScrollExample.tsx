@@ -56,7 +56,9 @@ function Run({ animated, onVerdict }: { animated: boolean; onVerdict: (verdict: 
         frame = requestAnimationFrame(() => {
             frame = requestAnimationFrame(() => {
                 if (hostRef.current) hostRef.current.style.height = `${FULL_HEIGHT}px`;
-                ref.current?.scrollToOffset({ animated, offset: END_OFFSET }).catch(() => {});
+                ref.current
+                    ?.scrollToOffset({ animated, offset: END_OFFSET })
+                    .catch((error: unknown) => console.error("scrollToOffset failed", error));
             });
         });
         const timeout = setTimeout(() => {

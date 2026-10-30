@@ -9,6 +9,9 @@ try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+    });
     await page.goto(`${process.env.FIXTURE_URL || "http://127.0.0.1:5188"}/stale-viewport-instant-scroll`);
 
     const rerun = async (testId) => {
@@ -25,6 +28,7 @@ try {
     for (let run = 0; run < 3; run++) {
         if (run > 0) await rerun("run-instant");
         const { ok, text } = await readVerdict();
+        assert.deepEqual(errors, []);
         assert.equal(ok, "true", text);
     }
     // Animated scrolls already follow DOM scroll events; keep them as a control.
